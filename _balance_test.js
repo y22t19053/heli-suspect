@@ -51,6 +51,7 @@ function runGame(seatCount, seed) {
     winner: st.winner,
     winType: st.winType,
     rounds: st.round,
+    logs: st.logs.slice(),
     incomes,
     minPay: incomes.length ? Math.min(...incomes.map(s => +((s.match(/\+(\d+)⊙/) || [0, 99])[1]) || 99)) : 99,
     err: null
@@ -97,4 +98,13 @@ test('#48 全 AI 1000 局平衡性（2 人 400 / 3 人 350 / 4 人 250，种子�
       '%  均轮 ' + a.avgRounds + '  异常 ' + a.abnormal);
   }
   console.log('总计 ' + total + ' 局，异常 ' + abnormal + '，最小单笔收入 ' + minPayAll + '⊙，最长 ' + maxRounds + ' 轮');
+});
+
+test('#13 同种子对局全等复现（highestEnemy 平票抽签也走 state.rng）', () => {
+  // 同一种子跑两遍：状态轨迹（含日志）必须逐位一致，否则存在残留 Math.random
+  const a = runGame(4, 20260809 + 17);
+  const b = runGame(4, 20260809 + 17);
+  const sa = JSON.stringify({ logs: a.logs, winner: a.winner, winType: a.winType, rounds: a.rounds });
+  const sb = JSON.stringify({ logs: b.logs, winner: b.winner, winType: b.winType, rounds: b.rounds });
+  assert.equal(sa, sb, '同种子两局应逐位一致（含平票抽签路径），发现残留非确定性随机');
 });
