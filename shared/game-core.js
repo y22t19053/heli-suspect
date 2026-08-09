@@ -408,6 +408,8 @@
     const seed = (typeof rawSeed === 'number' && Number.isFinite(rawSeed))
       ? (rawSeed >>> 0)
       : (typeof rawSeed === 'string' && rawSeed.trim() !== '' ? hashStr(rawSeed) : (Date.now() % 2147483647));
+    // #13 修复：保留用户输入的原始种子码字符串（无则 null），供结算屏/战报显示原串而非 hash 数字
+    const seedRaw = (typeof rawSeed === 'string' && rawSeed.trim() !== '') ? rawSeed.trim() : null;
     const rng = mulberry32(seed);
     const names = Array.isArray(opts.names) ? opts.names : [];
     const aiMask = Array.isArray(opts.aiMask) ? opts.aiMask : [];
@@ -436,6 +438,7 @@
     const state = {
       version: 1, seatCount,
       seed,                             // 种子码（可复现；分享战绩用，超级更新#13）
+      seedRaw,                          // 用户输入的原始种子码字符串（无则 null；显示/分享用 #13 修复）
       rng,                              // 随机源（抽签质证等随机技能用；测试可注入种子）
       phase: 'pickChar',
       round: 0,                // 当前轮次（1 起）

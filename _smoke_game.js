@@ -53,3 +53,11 @@ test('新位置技能在牌堆中正常存在（不出错即通过）', () => {
   assert.ok(Object.keys(deckSkills).length > 0, '牌堆中应出现技能');
 });
 
+test('种子码原串保留：字符串种子存 seedRaw，数字/缺省为 null', () => {
+  const s1 = Core.createGame({ seatCount: 2, names: ['A', 'B'], aiMask: [true, true], seed: 'abc123' });
+  assert.equal(s1.seedRaw, 'abc123', '字符串种子应原样保留到 seedRaw');
+  assert.equal(typeof s1.seed, 'number', 'seed 仍是可复现的 hash 数字');
+  assert.equal(Core.createGame({ seatCount: 2, names: ['A', 'B'], aiMask: [true, true], seed: 42 }).seedRaw, null, '数字种子 seedRaw 应为 null');
+  assert.equal(Core.createGame({ seatCount: 2, names: ['A', 'B'], aiMask: [true, true] }).seedRaw, null, '缺省种子 seedRaw 应为 null');
+});
+

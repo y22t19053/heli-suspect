@@ -2760,8 +2760,9 @@ function renderOver(){
   else if (game.winType === 'juryNull') winSub = '🕊️ 陪审团否决：人民拒绝适用恶法';
   drawPixelText(winSub, W/2, H*0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? '#FFFFFF' : '#FFD60A', { align: 'center' });
   drawPixelText('—— 最终陪审团倾向 ——', W/2, H*0.585, 18, '#FFFFFF', { align: 'center' });
-  // #13 种子码（可复现，分享战绩用）
-  if (game.seed != null) drawPixelText('🌱 种子 ' + game.seed, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
+  // #13 种子码（可复现，分享战绩用；显示用户输入原串 seedRaw，留空显示随机数字）
+  const seedShow = game.seedRaw != null ? game.seedRaw : game.seed;
+  if (seedShow != null) drawPixelText('🌱 种子 ' + seedShow, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
   const order = game.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
   let y = H * 0.635;
   order.forEach((s, i) => {
@@ -2796,7 +2797,7 @@ function buildReportSP(g){
     '胜诉方：' + win.name + (winSide2 ? '（' + winSide2 + '）' : ''),
     '胜诉方式：' + wt,
     '进行轮次：' + (g.round != null ? g.round : '-') + ' / 5',
-    '种子码：' + (g.seed != null ? g.seed : '随机'),
+    '种子码：' + (g.seedRaw != null ? g.seedRaw : (g.seed != null ? g.seed : '随机')),
     '—— 最终陪审团倾向 ——'
   ];
   order.forEach((s, i) => lines.push((i + 1) + '. ' + s.name + ' — ' + s.support));
@@ -3334,9 +3335,9 @@ function startGame(){
   aiQueue = []; aiTimer = 0; logExpanded = true;
   const names = ['你', 'AI·公诉', 'AI·被告', 'AI·第三方'];
   const aiMask = names.map((_, i) => i !== 0);
-  // #13 种子码：留空=随机（同种子=同一对局可复现），并记住本次输入
+  // #13 种子码：留空=随机（同种子=同一对局可复现）；仅在有输入时记住，避免空串覆盖上次记忆（P1 修复）
   const seedVal = seedInput.trim();
-  try { localStorage.setItem('elec_seed', seedInput); } catch (err) { /* 忽略 */ }
+  if (seedVal) { try { localStorage.setItem('elec_seed', seedVal); } catch (err) { /* 忽略 */ } }
   game = ElectionCore.createGame({ seatCount, names: names.slice(0, seatCount), aiMask: aiMask.slice(0, seatCount), seed: seedVal || Math.floor(Math.random() * 1e9) });
   lastV = game.version; lastPhase = game.phase;
   lastRowSig = sigOf(game.row); lastVotesSig = ''; lastRankSig = '';

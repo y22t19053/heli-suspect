@@ -2149,8 +2149,9 @@ function renderOver() {
   else if (view.winType === 'juryNull') winSub = '🕊️ 陪审团否决：人民拒绝适用恶法';
   drawPixelText(winSub, W / 2, H * 0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? '#FFFFFF' : '#FFD400', { align: 'center' });
   drawPixelText('—— 最终陪审团倾向 ——', W / 2, H * 0.585, 18, '#FFFFFF', { align: 'center' });
-  // #13 种子码（可复现，分享战绩用）
-  if (view.seed != null) drawPixelText('🌱 种子 ' + view.seed, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
+  // #13 种子码（可复现，分享战绩用；显示用户输入原串 seedRaw，留空显示随机数字）
+  const seedShow = view.seedRaw != null ? view.seedRaw : view.seed;
+  if (seedShow != null) drawPixelText('🌱 种子 ' + seedShow, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
   const order = view.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
   let y = Math.min(H * 0.635, H - 130 - order.length * 46);   // S4：4 人局整体上移，避免与“返回大厅”按钮重叠
   order.forEach((s, i) => {
@@ -2802,8 +2803,8 @@ function handleButton(id) {
       if (confirm('确定要离开当前对局吗？进度将丢失。')) location.reload();
       break;
     case 'copyReport': {
-      // #13 分享战绩：生成纯文本快照并复制到剪贴板
-      if (view) copyText(buildReport(view.seats, view.seed, view.winType), '✅ 战绩已复制，可粘贴分享');
+      // #13 分享战绩：生成纯文本快照并复制到剪贴板（显示用户原串 seedRaw，留空显示随机数字）
+      if (view) copyText(buildReport(view.seats, (view.seedRaw != null ? view.seedRaw : view.seed), view.winType), '✅ 战绩已复制，可粘贴分享');
       break;
     }
     case 'wait': break;

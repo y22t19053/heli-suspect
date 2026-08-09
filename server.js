@@ -241,6 +241,7 @@ function makeView(st, mySeat) {
     winner: st.winner,
     gameOver: st.gameOver,
     seed: st.seed,              // 种子码（可复现，分享战绩用）
+    seedRaw: st.seedRaw != null ? st.seedRaw : null,   // 用户输入的原始种子码（战报/结算屏显示原串，而非 hash 数字）
     logs: st.logs,          // 环形缓冲（logHead 偏移 + 尾部 MAX_LOG 条）：length 单调递增，客户端按全局序号增量扫描
     logHead: st.logHead || 0  // 已被截断丢弃的头部条数（客户端全局序号 = logHead + index）
   };
