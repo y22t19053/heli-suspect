@@ -73,7 +73,8 @@ async function canvasStats(page) {
 const shot = name => path.join(SHOT_DIR, name);
 
 /* ---------- 单机 ---------- */
-test('单机：菜单渲染无错误 + 截屏', async () => {
+test('单机：菜单渲染无错误 + 截屏', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
   const { page, errors } = await newPage();
   await page.goto(BASE + '/singleplayer.html');
   await page.waitForTimeout(1500);   // 等 rAF 渲染稳定
@@ -86,7 +87,8 @@ test('单机：菜单渲染无错误 + 截屏', async () => {
   console.log('[单机] 菜单 canvas=' + st.w + 'x' + st.h + ' 内容占比 ' + st.ratio);
 });
 
-test('单机：进入对局自动推进 + 渲染截屏', async () => {
+test('单机：进入对局自动推进 + 渲染截屏', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
   const { page, errors } = await newPage();
   await page.goto(BASE + '/singleplayer.html');
   await page.waitForTimeout(800);
@@ -172,7 +174,8 @@ test('单机：进入对局自动推进 + 渲染截屏', async () => {
 });
 
 /* ---------- 联机 ---------- */
-test('联机：大厅 + 单人房 + 开局自动推进 + 渲染截屏', async () => {
+test('联机：大厅 + 单人房 + 开局自动推进 + 渲染截屏', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
   const { page, errors } = await newPage();
   await page.goto(BASE + '/');
   await page.waitForTimeout(1200);
@@ -253,7 +256,8 @@ test('联机：大厅 + 单人房 + 开局自动推进 + 渲染截屏', async ()
 });
 
 /* ---------- 对比 ---------- */
-test('对比：单机 vs 联机截图健康度', () => {
+test('对比：单机 vs 联机截图健康度', (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
   const sp = shot('sp_game.png');
   const mp = shot('mp_game.png');
   assert.ok(fs.existsSync(sp), '缺少单机对局截图');
