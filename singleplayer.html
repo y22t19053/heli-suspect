@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>当庭揭示 · 世纪审判（单机）</title>
+<title>合理怀疑 · 世纪审判（单机）</title>
 <meta name="description" content="虚构「米合众国」联邦巡回法庭卡牌对抗——举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
 <meta name="theme-color" content="#0F1B2D">
-<meta property="og:title" content="当庭揭示 · 世纪审判（单机）">
+<meta property="og:title" content="合理怀疑 · 世纪审判（单机）">
 <meta property="og:description" content="法庭卡牌对抗：举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
 <meta property="og:type" content="website">
 <meta property="og:image" content="favicon.svg">
@@ -31,7 +31,7 @@
 <script>
 "use strict";
 /* =====================================================================
- * 《当庭揭示 · 世纪审判》单机渲染器 v2 —— 大更新版
+ * 《合理怀疑 · 世纪审判》单机渲染器 v2 —— 大更新版
  * 虚构"米合众国"联邦巡回法庭体系，四方法律团队对抗
  * 视觉：美漫硬边政治讽刺漫画 —— 报纸米黄底 + 粗黑描边 + 无渐变 + 大字海报
  * 动画：FX 队列引擎（翻牌/爆炸/新闻/计票柱/领奖台/阶段横幅/方向光束/数值飘字…）
@@ -57,7 +57,7 @@ const ctx = canvas.getContext('2d');
  * 经 _build_ui.js 内联为下方 THEME 块；渲染层直接读全局。 */
 /*__THEME_START__*/
 /* ============================================================
- * shared/theme.js — 当庭揭示 · 全局主题唯一源（超级更新#3/#4）
+ * shared/theme.js — 合理怀疑 · 全局主题唯一源（超级更新#3/#4）
  * 单主题：演播室深蓝 #0F1B2D + 法庭金 #FFD60A
  * （已删 PvZ 草地绿 / 旧报纸米黄风，双端共用一套）
  * ------------------------------------------------------------
@@ -1903,8 +1903,8 @@ function renderMenu(){
   // 大标题：演播室立体金字（黑投影 + 金色主体 + 描边）
   const tx = W / 2;
   const big = Math.min(84, H * 0.125);
-  drawPixelText('当 庭 揭 示', tx + 4, H * 0.19 + 6, big, '#000000', { align: 'center', outline: '#000000', lineW: Math.max(4, big / 14) });
-  drawPixelText('当 庭 揭 示', tx, H * 0.19, big, '#FFD60A', { align: 'center', outline: '#111111', lineW: Math.max(4, big / 14) });
+  drawPixelText('合 理 怀 疑', tx + 4, H * 0.19 + 6, big, '#000000', { align: 'center', outline: '#000000', lineW: Math.max(4, big / 14) });
+  drawPixelText('合 理 怀 疑', tx, H * 0.19, big, '#FFD60A', { align: 'center', outline: '#111111', lineW: Math.max(4, big / 14) });
   drawPixelText('⊙ 律师费 × 暗置举证 × ① ② ③ 技能审议', tx, H * 0.19 + Math.min(70, H * 0.10), 18, '#FFFFFF', { align: 'center', outline: '#111111', lineW: 3 });
   // 阵营墙（四大律师团）
   drawPixelText('四大律师团', tx, H * 0.35, 17, '#FFFFFF', { align: 'center', outline: '#111111', lineW: 2.5 });
@@ -1960,7 +1960,7 @@ function renderMenu(){
   ab.wood = true;
   buttons.push(ab); drawBtn(ab);
   // #109 版本号（右下角）
-  drawPixelText('v1.0.0', W - 8, H - 6, 11, '#A9B8CC', { align: 'right', shadow: false });
+  drawPixelText('v1.1.0', W - 8, H - 6, 11, '#A9B8CC', { align: 'right', shadow: false });
   if (showRules) renderRules();
   if (showAbout) renderAbout();
 }
@@ -1969,8 +1969,8 @@ function renderAbout(){
   pxRect(W*0.16, H*0.13, W*0.68, H*0.72, PAL.ui.b);
   pxBorder(W*0.16, H*0.13, W*0.68, H*0.72, '#111111', 4);
   const cx = W / 2;
-  drawPixelText('当庭揭示 · 世纪审判（单机）', cx, H*0.20, 24, '#FFD60A', { align: 'center' });
-  drawPixelText('版本 v1.0.0', cx, H*0.20 + 34, 15, '#5AC8FA', { align: 'center', shadow: false });
+  drawPixelText('合理怀疑 · 世纪审判（单机）', cx, H*0.20, 24, '#FFD60A', { align: 'center' });
+  drawPixelText('版本 v1.1.0', cx, H*0.20 + 34, 15, '#5AC8FA', { align: 'center', shadow: false });
   const lines = [
     '虚构「米合众国」联邦巡回法庭体系，四方法律团队对抗。',
     '每轮 16 步：选律师 → 定次序 → 抽议题 → 抽证据 → 调查取证',
@@ -2792,7 +2792,7 @@ function buildReportSP(g){
   const winSide2 = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
   const wt = g.winType === 'precedent' ? '⚖️ 先例胜利' : (g.winType === 'juryNull' ? '🕊️ 陪审团否决' : '最终陪审团倾向');
   const lines = [
-    '【当庭揭示 · 世纪审判】战报',
+    '【合理怀疑 · 世纪审判】战报',
     '胜诉方：' + win.name + (winSide2 ? '（' + winSide2 + '）' : ''),
     '胜诉方式：' + wt,
     '进行轮次：' + (g.round != null ? g.round : '-') + ' / 5',

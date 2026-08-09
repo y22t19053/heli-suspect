@@ -1,4 +1,4 @@
-﻿/* 当庭揭示 · 联机版样式：演播室庭审（深蓝 #0F1B2D + 金 #FFD60A，漫画硬阴影，零圆角） */
+/* 合理怀疑 · 联机版样式：演播室庭审（深蓝 #0F1B2D + 金 #FFD60A，漫画硬阴影，零圆角） */
 * { box-sizing: border-box; }
 /* 安全区变量：iPhone 刘海/底部横条让位（配合 viewport-fit=cover，client.js safeArea() 读取） */
 :root {

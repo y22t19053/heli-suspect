@@ -1,5 +1,5 @@
 /* ============================================================
- * 当庭揭示 · 联机服务器（Express 静态 + Socket.IO 权威房间）
+ * 合理怀疑 · 联机服务器（Express 静态 + Socket.IO 权威房间）
  * 运行：npm install && node server.js  →  http://localhost:3000
  * ============================================================ */
 const path = require('path');
@@ -628,7 +628,7 @@ io.on('connection', (socket) => {
 /* 启动 */
 server.listen(PORT, () => {
   console.log('=============================================');
-  console.log('  当庭揭示 · 联机服务器已启动');
+  console.log('  合理怀疑 · 联机服务器已启动');
   console.log('  浏览器打开: http://localhost:' + PORT);
   console.log('  SEAT_TIMEOUT_MS=' + SEAT_TIMEOUT_MS + ' MAX_ROOMS=' + MAX_ROOMS);
   console.log('=============================================');

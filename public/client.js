@@ -1,5 +1,5 @@
 /* ============================================================
- * 当庭揭示 · 联机版客户端（2026-08 重构适配 16 步状态机）
+ * 合理怀疑 · 联机版客户端（2026-08 重构适配 16 步状态机）
  * 流程：pickChar→chooseStarter→drawEvent→drawVoter→buy→play→reveal
  *       →preEvent→count→postEvent→rank→settle→discard→income→gameover
  * 职责：菜单/大厅（DOM）+ 对局渲染（Canvas 美漫像素风）+ Socket 交互
@@ -2172,7 +2172,7 @@ function buildReport(seats, seedVal, winType) {
   const winSide = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
   const wt = winType === 'precedent' ? '⚖️ 先例胜利' : (winType === 'juryNull' ? '🕊️ 陪审团否决' : '最终陪审团倾向');
   const lines = [
-    '【当庭揭示 · 世纪审判】战报',
+    '【合理怀疑 · 世纪审判】战报',
     '胜诉方：' + win.name + (winSide ? '（' + winSide + '）' : ''),
     '胜诉方式：' + wt,
     '种子码：' + (seedVal != null ? seedVal : '随机'),
