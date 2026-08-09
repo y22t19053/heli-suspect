@@ -19,11 +19,13 @@ const pubPath = path.join(root, 'public', 'singleplayer.html');
 const themePath = path.join(root, 'shared', 'theme.js');
 const kitPath = path.join(root, 'shared', 'ui-kit.js');
 const presPath = path.join(root, 'public', 'UIPresenter.js');
+const corePath = path.join(root, 'shared', 'render-core.js');
 
 let html = fs.readFileSync(htmlPath, 'utf8');
 const theme = fs.readFileSync(themePath, 'utf8');
 const kit = fs.readFileSync(kitPath, 'utf8');
 const pres = fs.readFileSync(presPath, 'utf8');
+const core = fs.readFileSync(corePath, 'utf8');
 
 function inlineBlock(src, start, end, body) {
   const si = src.indexOf(start);
@@ -35,10 +37,11 @@ function inlineBlock(src, start, end, body) {
   return src.slice(0, si + start.length) + '\n' + body + '\n' + src.slice(ei);
 }
 
-// 依次内联 THEME、UIKIT 与 UIPRESENTER
+// 依次内联 THEME、UIKIT、UIPRESENTER 与 RENDERCORE
 html = inlineBlock(html, '/*__THEME_START__*/', '/*__THEME_END__*/', theme);
 html = inlineBlock(html, '/*__UIKIT_START__*/', '/*__UIKIT_END__*/', kit);
 html = inlineBlock(html, '/*__UIPRESENTER_START__*/', '/*__UIPRESENTER_END__*/', pres);
+html = inlineBlock(html, '/*__RENDERCORE_START__*/', '/*__RENDERCORE_END__*/', core);
 
 fs.writeFileSync(htmlPath, html, 'utf8');
 fs.writeFileSync(pubPath, html, 'utf8');

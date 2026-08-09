@@ -1455,38 +1455,38 @@ function renderDraft() {
 
 /* ---------------- 屏幕渲染：对局 ---------------- */
 function renderGame() {
-  buttons = [];
-  hoverCards = [];
-  ctx.clearRect(0, 0, W, H);
-  pxRect(0, 0, W, H, PAL.bg.a);
-  // 演播室背景：斜向速度线 + 顶部聚光灯锥
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  const step = 34;
-  for (let x = -H; x < W + H; x += step) { ctx.moveTo(x, HUD_H); ctx.lineTo(x + H, H); }
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.beginPath();
-  for (let x = -H; x < W + H; x += step) { ctx.moveTo(x + step / 2, HUD_H); ctx.lineTo(x + step / 2 + H, H); }
-  ctx.stroke();
-  // 顶部两束聚光灯锥
-  ctx.fillStyle = 'rgba(255,244,200,0.05)';
-  ctx.beginPath();
-  ctx.moveTo(W * 0.18, HUD_H); ctx.lineTo(W * 0.42, HUD_H); ctx.lineTo(W * 0.34, H); ctx.lineTo(W * 0.02, H); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = 'rgba(255,244,200,0.04)';
-  ctx.beginPath();
-  ctx.moveTo(W * 0.78, HUD_H); ctx.lineTo(W * 0.62, HUD_H); ctx.lineTo(W * 0.72, H); ctx.lineTo(W * 0.98, H); ctx.closePath(); ctx.fill();
-  ctx.restore();
-  if (!view) return;
-  renderHud();
-  renderRowArea();
-  renderPanels();
-  renderBottom();
-  renderLogs();
-  drawGoalGuide();
-  renderFx();
+  // 渲染骨架收敛至 shared/render-core.js（renderScene）：清屏+背景+六段+尾部
+  const env = renderEnv();
+  env.drawBackdrop = () => {
+    pxRect(0, 0, W, H, PAL.bg.a);
+    // 演播室背景：斜向速度线 + 顶部聚光灯锥
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const step = 34;
+    for (let x = -H; x < W + H; x += step) { ctx.moveTo(x, HUD_H); ctx.lineTo(x + H, H); }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.beginPath();
+    for (let x = -H; x < W + H; x += step) { ctx.moveTo(x + step / 2, HUD_H); ctx.lineTo(x + step / 2 + H, H); }
+    ctx.stroke();
+    // 顶部两束聚光灯锥
+    ctx.fillStyle = 'rgba(255,244,200,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.18, HUD_H); ctx.lineTo(W * 0.42, HUD_H); ctx.lineTo(W * 0.34, H); ctx.lineTo(W * 0.02, H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,244,200,0.04)';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.78, HUD_H); ctx.lineTo(W * 0.62, HUD_H); ctx.lineTo(W * 0.72, H); ctx.lineTo(W * 0.98, H); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+  env.renderHud = renderHud;
+  env.renderRowArea = renderRowArea;
+  env.renderPanels = renderPanels;
+  env.renderBottom = renderBottom;
+  env.renderLogs = renderLogs;
+  env.renderTail = () => renderFx();
+  RenderCore.renderScene(env);
 }
 function renderHud() {
   pxRect(0, 0, W, HUD_H, '#101418');
@@ -1546,73 +1546,26 @@ function renderHud() {
     }
   }
 }
-/* 阶段目标指引框：呼吸灯边框 + 当前要做的事（按阶段与行动权） */
-function drawGoalGuide() {
-  if (!view) return;
-  const me = view.seats[mySeat];
-  if (!me) return;
-  const ph = view.phase;
-  const n = view.seatCount;
-  const handY0 = H - HAND_AREA_H - 40;
-  let tip = '', sub = '', bx2 = 0, by2 = 0;
-  if (ph === 'buy' && myTurn()) { tip = '调查取证：传唤证物架上的证据'; sub = '点击证物传唤 · 完成后点「结束取证」'; bx2 = 12; by2 = handY0 - 40; }
-  else if (ph === 'play' && myTurn()) { tip = '暗置举证：从手牌打 1 张'; sub = '选中后点「举证」· 也可直接点「结束举证」放弃'; bx2 = 12; by2 = handY0 - 40; }
-  else if (ph === 'discard' && view.discardSeat === mySeat) { tip = '整理：保留最多 ' + keepMax() + ' 份'; sub = '点击手牌留证要保留的证词，其余归档'; bx2 = 12; by2 = handY0 - 40; }
-  else if (ph === 'reveal' && myTurn()) { tip = '技能发动：点击目标卡牌'; sub = '证据排除 / 程序动议等技能需选择目标'; bx2 = W * 0.5; by2 = 38; }
-  else if (ph === 'count' && myTurn()) { tip = '换位技能：点击金色高亮牌'; sub = '选择与目标互换位置'; bx2 = W * 0.5; by2 = 38; }
-  else if ((ph === 'preEvent' || ph === 'postEvent') && view.eventTurnSeat === mySeat) { tip = ph === 'preEvent' ? '庭审前事件：打出或跳过' : '庭审后事件：打出或跳过'; sub = '点击事件区可用的事件牌'; bx2 = 12; by2 = handY0 - 40; }
-  else if (ph === 'chooseStarter' && view.starterPicker === mySeat) { tip = '选择本轮起始玩家'; sub = '点击一位玩家的头像'; bx2 = W * 0.5; by2 = 38; }
-  if (!tip) return;
-  const bw2 = Math.min(430, W - 30);
-  if (bx2 + bw2 > W - 8) bx2 = W - 8 - bw2;
-  if (bx2 < 8) bx2 = 8;
-  const on = 0.5 + 0.5 * Math.sin(performance.now() / 220);
-  ctx.save();
-  ctx.globalAlpha = 0.9;
-  pxRect(bx2, by2, bw2, 42, 'rgba(16,20,28,0.92)');
-  ctx.globalAlpha = 0.45 + on * 0.55;
-  pxBorder(bx2 - 2, by2 - 2, bw2 + 4, 46, '#FFD60A', 3);
-  ctx.globalAlpha = 0.9;
-  drawPixelText('🎯 ' + tip, bx2 + 13, by2 + 14, 14.5, '#FFD60A', { shadow: false });
-  drawPixelText(sub, bx2 + 13, by2 + 32, 11.5, '#CDD8E8', { shadow: false });
-  ctx.restore();
-  // 新手指引（策划意见1 轻量版）：前两轮附加指向目标区域的闪烁箭头
-  if ((view.round || 0) <= 2) {
-    const pu = Math.sin(performance.now() / 160);
-    const drawArrow = (ax, ay, dir) => {
-      ctx.save();
-      ctx.globalAlpha = 0.55 + 0.45 * Math.abs(pu);
-      ctx.translate(ax, ay);
-      ctx.scale(1 + 0.12 * pu, 1 + 0.12 * pu);
-      ctx.fillStyle = '#FFD60A';
-      ctx.strokeStyle = '#111111'; ctx.lineWidth = 2;
-      ctx.beginPath();
-      if (dir === 'down') { ctx.moveTo(0, 0); ctx.lineTo(-9, -13); ctx.lineTo(9, -13); }
-      else { ctx.moveTo(0, 0); ctx.lineTo(-13, -9); ctx.lineTo(-13, 9); }
-      ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.restore();
-    };
-    const btnY = H - HAND_AREA_H + 30;
-    if (ph === 'buy' && myTurn()) drawArrow(W - 200, btnY - 16, 'down');
-    else if (ph === 'play' && myTurn()) drawArrow(W - 200, btnY - 16, 'down');
-    else if ((ph === 'preEvent' || ph === 'postEvent') && view.eventTurnSeat === mySeat) drawArrow(120, H - HAND_AREA_H + 20, 'down');
-    else if (ph === 'discard' && view.discardSeat === mySeat) drawArrow(150, H - HAND_AREA_H + 20, 'down');
-  }
+/* ===== 共享渲染模块接入（shared/render-core.js）：env 组装 + 薄封装 =====
+ * 渲染函数本体已收敛至 RenderCore（单一事实源），此处仅注入差异参数。
+ * 双端差异：数据源（view/game）、文案（copy）、辅助函数注入。 */
+function renderEnv() {
+  return {
+    ctx, W, H, PAL, screen,
+    G: () => view,
+    mySeat, HAND_AREA_H,
+    mouse, hoverAnim, hoverCards, buttons,
+    keepMax: () => keepMax(),
+    campColor,
+    tooltipInfo: (h) => tooltipInfo(h),
+    copy: { buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张' }
+  };
 }
-function myTurn() {
-  const g = view;
-  if (!g) return false;
-  switch (g.phase) {
-    case 'buy': return !g.seats[mySeat].buyDone;
-    case 'play': return g.turn === mySeat && !g.seats[mySeat].playDone;
-    case 'reveal': return !!(g.revealPending && g.revealPending.owner === mySeat);
-    case 'count': return !!(g.swapPending && g.swapPending.owner === mySeat);
-    case 'preEvent': case 'postEvent': return g.eventTurnSeat === mySeat;
-    case 'discard': return g.discardSeat === mySeat && !g.seats[mySeat].keepDone;
-    case 'chooseStarter': return g.starterPicker === mySeat && !g.starterChosen;
-    default: return false;
-  }
-}
+function myTurn() { return RenderCore.myTurnOf(renderEnv()); }
+function drawGoalGuide() { RenderCore.drawGoalGuide(renderEnv()); }
+function updateHoverAnim() { RenderCore.updateHoverAnim(renderEnv()); }
+function hoverAlpha() { return RenderCore.hoverAlpha(renderEnv()); }
+function drawHoverTooltip() { RenderCore.drawHoverTooltip(renderEnv()); }
 function renderRowArea() {
   const row = view.row || [];
   const lay = rowLayout();
@@ -2470,37 +2423,8 @@ function drawDebugPanel() {
 /* ---------------- 悬浮信息卡 Tooltip ---------------- */
 // 悬停状态机：dir=1 淡入（hover 命中），dir=0 淡出（鼠标移开）
 let hoverAnim = { card: null, t0: 0, dir: 1 };
-let hoverRect = null;   // 上一帧放大卡的屏幕矩形（兜底：鼠标停在放大卡上时保持悬停）
-function updateHoverAnim() {
-  if (screen !== 'game' && screen !== 'draft') { hoverAnim.card = null; return; }
-  const now = performance.now();
-  let hit = null;
-  for (let i = 0; i < hoverCards.length; i++) {
-    const h = hoverCards[i];
-    if (mouse.x >= h.x && mouse.x <= h.x + h.w && mouse.y >= h.y && mouse.y <= h.y + h.h) { hit = h; break; }
-  }
-  if (hit) {
-    const same = hoverAnim.card && hoverAnim.card.kind === hit.kind
-      && (hoverAnim.card.data === hit.data) && (hoverAnim.card.card === hit.card);
-    hoverAnim.card = hit;
-    if (!same) { hoverAnim.t0 = now; hoverAnim.dir = 1; }
-    else hoverAnim.t0 = now;   // 持续悬停：淡入保持满值
-  } else if (hoverAnim.card) {
-    // 兜底：鼠标停在放大卡上（放大卡不参与命中检测）→ 保持悬停，防止闪烁
-    const hr = hoverRect;
-    const onEnlarged = hr && mouse.x >= hr.bx && mouse.x <= hr.bx + hr.bw
-      && mouse.y >= hr.by && mouse.y <= hr.by + hr.bh;
-    if (onEnlarged) { hoverAnim.t0 = now; }
-    else if (hoverAnim.dir === 1) { hoverAnim.t0 = now; hoverAnim.dir = 0; }
-    else if (now - hoverAnim.t0 > 200) hoverAnim.card = null;   // 淡出完成清理
-  }
-}
-function hoverAlpha() {
-  if (!hoverAnim.card) return 0;
-  const dt = performance.now() - hoverAnim.t0;
-  if (hoverAnim.dir === 1) return clamp(dt / 130, 0, 1);
-  return clamp(1 - dt / 200, 0, 1);
-}
+var hoverRect = null;   // 上一帧放大卡的屏幕矩形（var 挂 window，供 render-core.js 读写）
+// updateHoverAnim / hoverAlpha 已收敛至 shared/render-core.js（薄封装见前）
 /* 组装悬浮卡说明内容（按 kind 分发） */
 function tooltipInfo(h) {
   const k = h.kind;
@@ -2548,59 +2472,7 @@ function tooltipInfo(h) {
   return null;
 }
 /* 绘制悬浮信息卡：放大 1.5 倍的卡牌 + 说明文字框（淡入淡出） */
-function drawHoverTooltip() {
-  const h = hoverAnim.card;
-  if (!h) return;
-  const a = hoverAlpha();
-  if (a <= 0.02) return;
-  ctx.save();
-  ctx.globalAlpha = a;
-  const scale = 1.5;
-  const bw = Math.round(h.w * scale), bh = Math.round(h.h * scale);
-  // 放大卡水平：优先鼠标右侧，放不下则转左侧（始终不盖鼠标）
-  let bx = mouse.x + 26;
-  if (bx + bw > W - 8) bx = Math.max(8, mouse.x - bw - 26);
-  // 放大卡垂直：优先鼠标上方（放大卡不遮鼠标 → 悬停不闪烁），上方放不下才放鼠标下方
-  let by = mouse.y - bh - 20;
-  if (by < 6) by = Math.min(Math.max(6, H - bh - 6), mouse.y + 26);
-  hoverRect = { bx, by, bw, bh };
-  let drawCardKind = false;
-  if (h.kind === 'char' && h.data) { UIKit.drawCharCard(ctx, bx, by, bw, bh, h.data, campColor(mySeat), true); drawCardKind = true; }
-  else if (h.kind === 'event' && h.data && h.data.ev) { UIKit.drawEventCard(ctx, bx, by, bw, bh, h.data.ev); drawCardKind = true; }
-  else if (h.kind === 'charSkill') { /* 只出文字框 */ }
-  else if (h.card || (h.data && (h.data.card || h.data.ev))) { UIKit.drawCard(ctx, bx, by, bw, bh, h.card || h.data.card || h.data.ev); drawCardKind = true; }
-  const info = tooltipInfo(h);
-  if (info) {
-    const padX = 14, padY = 12, lh = 21, tSize = 20;
-    const boxW = Math.min(360, W - 16);
-    const content = info.lines.concat(info.extra || []);
-    const extraH = info.extra && info.extra.length ? info.extra.length * 17 + 8 : 0;
-    const boxH = padY * 2 + tSize + 10 + content.length * lh + extraH;
-    // 文字框：有放大卡时与放大卡垂直居中对齐放其右侧，放不下转左侧；无卡时跟随鼠标
-    let bx2 = (drawCardKind ? bx + bw + 18 : mouse.x + 26);
-    let by2 = (drawCardKind ? by + bh / 2 - boxH / 2 : mouse.y + 34);
-    if (bx2 + boxW > W - 8) bx2 = Math.max(8, (drawCardKind ? bx - boxW - 18 : W - 8 - boxW));
-    if (by2 + boxH > H - 8) by2 = Math.max(8, H - 8 - boxH);
-    if (by2 < 8) by2 = 8;
-    comicShadow(bx2, by2, boxW, boxH, 4, 4);
-    pxRect(bx2, by2, boxW, boxH, '#FFFDF2');
-    pxBorder(bx2, by2, boxW, boxH, '#111111', 2.5);
-    drawPixelText(info.title, bx2 + padX, by2 + padY + tSize / 2, tSize, info.catCol || '#d64545', { shadow: false });
-    ctx.save();
-    ctx.strokeStyle = 'rgba(17,17,17,0.35)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(bx2 + 8, by2 + padY + tSize + 4); ctx.lineTo(bx2 + boxW - 8, by2 + padY + tSize + 4); ctx.stroke();
-    ctx.restore();
-    let ty = by2 + padY + tSize + 12;
-    info.lines.forEach(ln => {
-      ty += drawWrapText(ln, bx2 + padX, ty + lh / 2, 13.5, '#333333', boxW - padX * 2, lh, { shadow: false });
-    });
-    (info.extra || []).forEach(ln => {
-      drawPixelText('◆ ' + ln, bx2 + padX, ty + 8, 11.5, '#c98a1b', { shadow: false });
-      ty += 17;
-    });
-  }
-  ctx.restore();
-}
+// drawHoverTooltip 已收敛至 shared/render-core.js（薄封装见前）
 
 /* ---------------- 渲染调度 ---------------- */
 function render() {

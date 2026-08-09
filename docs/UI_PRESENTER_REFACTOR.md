@@ -127,3 +127,61 @@ const next = vm.hud.nextStep;           // {0:阶段id, 1:中文名} 或 null
 | 单一事实源 | `myTurn/phaseIndex/nextStep` 两端逻辑收敛，杜绝漂移 |
 | 渐进可控 | 每个渲染函数独立迁移、独立回滚，风险隔离 |
 | 为后续 | 若引入 DOM/新渲染后端（如 WebGL），只需换 Renderer，投影层不变 |
+
+---
+
+## 7. 共享渲染模块（shared/render-core.js）— 第 22 条交付
+
+> 评审任务 22："创建共享渲染模块"。在 UIPresenter 之上再抽一层**绘制共享层**：
+> 把 `singleplayer.html` 与 `public/client.js` 中**逐字复制的渲染函数**收敛为单一事实源，
+> 双端差异经 **env 参数注入**表达，薄封装留在两端。
+
+### 7.1 本批收敛范围（完全/高度同构，零风险）
+
+| 函数 | 原两端实现 | 收敛后 |
+|---|---|---|
+| `RenderCore.renderScene(env)` | renderGame 主流程（清屏+背景+六段+尾部） | 统一调度骨架 |
+| `RenderCore.drawGoalGuide(env)` | drawGoalGuide（逐字同构） | 单一事实源 |
+| `RenderCore.updateHoverAnim(env)` | updateHoverAnim（逐字同构） | 单一事实源 |
+| `RenderCore.hoverAlpha(env)` | hoverAlpha（逐字同构） | 单一事实源 |
+| `RenderCore.drawHoverTooltip(env)` | drawHoverTooltip（逐字同构） | 单一事实源 |
+| `RenderCore.myTurnOf(env)` | myTurn / myTurnSP（逐字同构） | 单一事实源 |
+
+**待后续收敛**（差异大，保留两端本地实现，经 env 注入调用）：
+`renderHud`（倒计时 vs 轮次进度条/排名横幅）、`renderRowArea`（辩论台底座/入场动画）、
+`renderPanels`（panelFlow vs 静态坐标）、`renderBottom`（按钮机制/手牌抽屉）、
+`renderLogs`（右上角浮动面板 vs 贴底栏）、`checkFxDiffs`（数据源与触发差异大）。
+
+### 7.2 env 注入契约（两端各写一个 `renderEnv()` 组装）
+
+```js
+// 联机（client.js）与单机（singleplayer.html）各一份，差异仅数据源与文案：
+function renderEnv() {
+  return {
+    ctx, W, H, PAL, screen,
+    G: () => view,               // 单机: () => game
+    mySeat, HAND_AREA_H,
+    mouse, hoverAnim, hoverCards, buttons,   // 状态对象引用（RC 只改属性）
+    keepMax: () => keepMax(),
+    campColor,
+    tooltipInfo: (h) => tooltipInfo(h),      // 两端组装差异大，注入
+    copy: { buyTip: '…', playTip: '…' }      // 文案差异（单机版措辞）
+  };
+}
+```
+
+`renderScene` 额外注入：`drawBackdrop`（联机速度线+聚光灯 / 单机 `drawBg(PAL.bg)`）、
+`renderHud/renderRowArea/renderPanels/renderBottom/renderLogs`（两端本地实现）、
+`renderTail`（联机 `renderFx` / 单机 `renderToast`+D1/D2/D3 遮罩）。
+
+### 7.3 关键工程约束
+
+- **`hoverRect` 必须 `var` 声明**（挂 window）：`drawHoverTooltip` 对其整体重新赋值，
+  共享模块无法经引用同步 `let` 变量；`hoverAnim` 仅属性读写，可经 env 传引用。
+- **依赖的绘制原语**（`drawPixelText/pxRect/pxBorder/drawWrapText/clamp/comicShadow/UIKit`）
+  必须为 function 声明（进 window），共享模块直接调用；`const` 箭头函数会漏挂。
+- 单机接入经 `_build_ui.js` 的 `/*__RENDERCORE_START__*/` 标记内联
+  （顺序 THEME→UIKIT→UIPRESENTER→RENDERCORE）；联机在 `index.html` 以
+  `<script src="/shared/render-core.js">` 挂载（ui-kit.js 后、UIPresenter.js 前）。
+- 两端原函数名保留为一行薄封装（如 `function myTurn(){ return RenderCore.myTurnOf(renderEnv()); }`），
+  全部调用点零改动。
