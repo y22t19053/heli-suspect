@@ -1874,7 +1874,6 @@
     needsAIAction, humanActing, phaseLabel, myClickable,
     PHASE_STEPS, PHASE_STEPS_VISIBLE,
     buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
-    sideName: function (side) { return side === 'prosecutor' ? '检方' : '辩护方'; },
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES },
     mulberry32,
     feature, setFeature, getFeatures,   // 功能开关（Feature Toggle）

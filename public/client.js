@@ -112,38 +112,6 @@ window.addEventListener('resize', resize);
 resize();
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-/* 网格布局：在矩形区域 (x,y,w,h) 内均分摆放 count 个卡片槽位（不越界） */
-function gridSlots(x, y, w, h, count, gap, aspect, maxW) {
-  if (count <= 0) return [];
-  gap = Math.max(2, gap || 6);
-  aspect = aspect || 0.68;
-  maxW = maxW || 96;
-  let cols = Math.min(count, Math.max(1, Math.floor((w + gap) / (64 + gap))));
-  let cw = Math.min(maxW, (w - (cols - 1) * gap) / cols);
-  let ch = cw / aspect;
-  const maxRows = Math.ceil(count / cols);
-  if (ch * maxRows + (maxRows - 1) * gap > h) {
-    ch = (h - (maxRows - 1) * gap) / maxRows;
-    cw = Math.max(20, ch * aspect);
-    const cols2 = Math.min(count, Math.max(1, Math.floor((w + gap) / (cw + gap))));
-    if (cols2 !== cols) {
-      cols = cols2;
-      cw = Math.min(maxW, (w - (cols - 1) * gap) / cols);
-      ch = Math.min(ch, cw / aspect);
-    }
-  }
-  const rows = Math.ceil(count / cols);
-  const tw = cols * cw + (cols - 1) * gap;
-  const th = rows * ch + (rows - 1) * gap;
-  const startX = x + (w - tw) / 2;
-  const startY = y + (h - th) / 2;
-  const out = [];
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(i / cols), c = i % cols;
-    out.push({ x: startX + c * (cw + gap), y: startY + r * (ch + gap), w: cw, h: ch });
-  }
-  return out;
-}
 /* 通用卡牌槽位（P0 根因修复）：均分可用宽 = W - 20 - 右预留，左对齐，永不溢出。
  * 取代所有 (W - 300)/(W - 330) 硬编码减法——那些预留是“按钮还在底栏内”时代的历史遗留。 */
 function flexRects(n, y, h, gap, maxW, reserveR) {

@@ -10,7 +10,6 @@ const Core = require('./shared/game-core.js');
 
 const PORT = process.env.PORT || 3000;
 const SEAT_TIMEOUT_MS = clampInt(Number(process.env.SEAT_TIMEOUT_MS) || 30000, 5000, 120000);   // 单次操作倒计时（可配置，超级更新#69）
-const AI_STEP_DELAY = 600;       // AI 行动节奏（毫秒）
 const AI_INTERVAL = 900;         // AI 连续行动的最小间隔
 
 /* ---------------- 安全层配置（超级更新：连接/房间/消息限流） ---------------- */
