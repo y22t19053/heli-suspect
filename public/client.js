@@ -1169,6 +1169,9 @@ function initMenu() {
   $('btn-create').onclick = () => doCreate('multi');
   $('btn-solo').onclick = () => doCreate('solo');
   $('btn-join').onclick = () => doJoin();
+  $('btn-quickjoin').onclick = () => doQuickJoin();
+  const bs = $('btn-spectate');
+  if (bs) bs.onclick = () => doSpectate();
   $('btn-start').onclick = () => socket.emit('startGame', {}, ack => { if (ack && !ack.ok) toast(ack.msg, true); });
   $('btn-leave').onclick = () => location.reload();
   $('btn-tutorial').onclick = () => { screen = 'help'; helpPage = 0; hide('menu'); show('game'); };
@@ -1184,6 +1187,9 @@ function setBusy(busy) {
   $('btn-create').disabled = busy;
   $('btn-solo').disabled = busy;
   $('btn-join').disabled = busy;
+  $('btn-quickjoin').disabled = busy;
+  const bs = $('btn-spectate');
+  if (bs) bs.disabled = busy;
   if (busy) $('menu-msg').textContent = '连接中…';
 }
 function doCreate(mode) {
@@ -1196,8 +1202,9 @@ function doCreate(mode) {
   // 仅在有输入时记住，避免空串覆盖上次记忆（与单机端一致）
   const seed = $('inp-seed').value.trim();
   if (seed) { try { localStorage.setItem('elec_seed', seed); } catch (err) { /* 忽略 */ } }
+  const password = $('inp-pass').value.trim();
   setBusy(true);
-  socket.emit('createRoom', { name, mode, maxSeats, seed }, ack => {
+  socket.emit('createRoom', { name, mode, maxSeats, seed, password }, ack => {
     setBusy(false);
     if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
     lastRoomCode = ack.code;
@@ -1212,8 +1219,41 @@ function doJoin() {
   localStorage.setItem('elec_mode', 'multi');   // #108 加入房间即联机模式
   const code = $('inp-code').value.trim().toUpperCase();
   if (!code) { $('menu-msg').textContent = '请输入房间代码'; return; }
+  const password = $('inp-pass').value.trim();
   setBusy(true);
-  socket.emit('joinRoom', { name, code }, ack => {
+  socket.emit('joinRoom', { name, code, password }, ack => {
+    setBusy(false);
+    if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
+    lastRoomCode = code;
+    lastPlayerName = name;
+    hide('menu');
+    show('lobby');
+  });
+}
+function doQuickJoin() {
+  const name = $('inp-name').value.trim() || '玩家';
+  localStorage.setItem('elec_name', name);
+  localStorage.setItem('elec_mode', 'multi');
+  setBusy(true);
+  socket.emit('quickJoin', { name }, ack => {
+    setBusy(false);
+    if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
+    lastRoomCode = ack.code;
+    lastPlayerName = name;
+    hide('menu');
+    show('lobby');
+  });
+}
+function doSpectate() {
+  // 观战模式（E 类）：观看对局，不占座位。需房间号；密码房需正确密码。
+  const name = $('inp-name').value.trim() || '观众' + Math.floor(100 + Math.random() * 900);
+  localStorage.setItem('elec_name', name);
+  localStorage.setItem('elec_mode', 'multi');
+  const code = $('inp-code').value.trim().toUpperCase();
+  if (!code) { $('menu-msg').textContent = '请输入要旁观的房间代码'; return; }
+  const password = $('inp-pass').value.trim();
+  setBusy(true);
+  socket.emit('joinRoom', { name, code, password, spectate: true }, ack => {
     setBusy(false);
     if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
     lastRoomCode = code;
@@ -1247,6 +1287,12 @@ function renderLobby() {
     list.appendChild(div);
   });
   const humans = roomInfo.seats.filter(s => s.connected).length;
+  if (mySeat < 0) {
+    // 观战者：不占座位，等待对局开始（未开局旁观）或等 state 切入对局画面
+    $('lobby-msg').textContent = '👁 旁观中：等待对局画面…';
+    hide('btn-start');
+    return;
+  }
   $('lobby-msg').textContent = '已就绪 ' + humans + ' / ' + roomInfo.maxSeats + ' 人';
   const isHost = roomInfo.seats[mySeat] && roomInfo.seats[mySeat].host;
   if (isHost) { show('btn-start'); $('btn-start').disabled = humans < 1; }
@@ -1414,6 +1460,24 @@ function renderHud() {
   drawPixelText(view.round > 0 ? '第 ' + view.round + ' 轮' : '准备中', 14, HUD_H / 2, 20, '#FFD60A', { shadow: false });
   const ph = view.phaseLabel || view.phase;
   drawPixelText(ph, W / 2, HUD_H / 2, 22, '#FFFFFF', { align: 'center' });
+  // 底部：支持度竞逐轨道（按支持度占比着色，实时反映排名）——观战者也可见
+  if (view.round > 0) {
+    const tot = Math.max(1, view.seats.reduce((a, b) => a + b.support, 0));
+    let sx = 0;
+    view.seats.forEach((s, i) => {
+      const w2 = Math.max(2, Math.round(W * (s.support / tot)));
+      pxRect(sx, HUD_H - 5, w2, 5, campColor(i));
+      sx += w2;
+    });
+  } else {
+    pxRect(0, HUD_H - 5, W * 0.5, 5, '#FF3B30');
+    pxRect(W * 0.5, HUD_H - 5, W * 0.5, 5, '#0A84FF');
+  }
+  if (mySeat < 0) {
+    // 观战模式：右上角固定旁观标识（无行动权、无倒计时、无私有区）
+    drawPixelText('👁 旁观中', W - 14, HUD_H / 2, 16, '#5AC8FA', { align: 'right', shadow: false });
+    return;
+  }
   const startTxt = view.startingSeat != null && view.seats[view.startingSeat] ? '起始：' + view.seats[view.startingSeat].name : '';
   drawPixelText(startTxt, W - 14, HUD_H / 2, 16, '#FFD60A', { align: 'right', shadow: false });
   // 行动倒计时（我行动时）：最后 5 秒红色呼吸脉冲 + 每秒滴答音效，≤3 秒心跳加速
@@ -1429,19 +1493,6 @@ function renderHud() {
       lastTickSec = remain;
       sfx(remain <= 3 ? 'tickFast' : 'tick');
     }
-  }
-  // 底部：支持度竞逐轨道（按支持度占比着色，实时反映排名）
-  if (view.round > 0) {
-    const tot = Math.max(1, view.seats.reduce((a, b) => a + b.support, 0));
-    let sx = 0;
-    view.seats.forEach((s, i) => {
-      const w2 = Math.max(2, Math.round(W * (s.support / tot)));
-      pxRect(sx, HUD_H - 5, w2, 5, campColor(i));
-      sx += w2;
-    });
-  } else {
-    pxRect(0, HUD_H - 5, W * 0.5, 5, '#FF3B30');
-    pxRect(W * 0.5, HUD_H - 5, W * 0.5, 5, '#0A84FF');
   }
   // 阶段进度条：当前高亮 + 下一步提示（回合进程状态条）
   const steps = PHASE_STEPS;
@@ -1475,9 +1526,20 @@ function renderEnv() {
     G: () => view,
     mySeat, HAND_AREA_H,
     mouse, hoverAnim, hoverCards, buttons,
-    keepMax: () => keepMax(),
+    keepMax: () => RenderCore.keepMaxOf(renderEnv()),
     campColor,
     tooltipInfo: (h) => tooltipInfo(h),
+    rowLayout: () => rowLayout(),
+    drawRowCard,
+    drawRowBackdrop: (cy, rh) => {
+      // 辩论台底座：深色台面 + 金色边线 + 中央微标（renderRowArea 已收敛至 RenderCore）
+      pxRect(8, cy - 24, W - 16, rh + 34, PAL.bg.b);
+      pxBorder(8, cy - 24, W - 16, rh + 34, '#FFD60A', 2);
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      drawPixelText('⚖️ 庭审区 ★', W / 2, cy - 14, 11, '#FFD60A', { align: 'center', shadow: false });
+      ctx.restore();
+    },
     copy: { buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张' }
   };
 }
@@ -1486,42 +1548,7 @@ function drawGoalGuide() { RenderCore.drawGoalGuide(renderEnv()); }
 function updateHoverAnim() { RenderCore.updateHoverAnim(renderEnv()); }
 function hoverAlpha() { return RenderCore.hoverAlpha(renderEnv()); }
 function drawHoverTooltip() { RenderCore.drawHoverTooltip(renderEnv()); }
-function renderRowArea() {
-  const row = view.row || [];
-  const lay = rowLayout();
-  const cy = lay.cy, rh = lay.rh;
-  void row;
-  // 辩论台底座：深色台面 + 金色边线 + 中央星条旗微标
-  pxRect(8, cy - 24, W - 16, rh + 34, PAL.bg.b);
-  pxBorder(8, cy - 24, W - 16, rh + 34, '#FFD60A', 2);
-  ctx.save();
-  ctx.globalAlpha = 0.5;
-  drawPixelText('⚖️ 庭审区 ★', W / 2, cy - 14, 11, '#FFD60A', { align: 'center', shadow: false });
-  ctx.restore();
-  drawPixelText('证据 · 已亮出', 20, cy - 4, 13, '#9FB3CE', { shadow: false });
-  // 审议阶段：行左/右半区分隔线 + 行首/行尾标记（位置博弈技能可读性）
-  if (view.phase === 'count') {
-    const act = lay.items.filter(it => it.revealed === true && it.removed !== true);
-    if (act.length >= 2) {
-      const x0 = act[0].x, x1 = act[act.length - 1].x + act[act.length - 1].w;
-      const midX = (x0 + x1) / 2;
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,214,10,0.4)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath(); ctx.moveTo(midX, cy - 24); ctx.lineTo(midX, cy + rh + 10); ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.globalAlpha = 0.9;
-      drawPixelText('◀ 左半区', x0 + 4, cy - 14, 10, '#FFD60A', { shadow: false });
-      drawPixelText('右半区 ▶', x1 - 48, cy - 14, 10, '#FFD60A', { shadow: false });
-      ctx.restore();
-      drawPixelText('👈 行首', act[0].x + act[0].w / 2, act[0].y - 15, 10, '#FFD60A', { align: 'center', shadow: false });
-      drawPixelText('行尾 👉', act[act.length - 1].x + act[act.length - 1].w / 2, act[act.length - 1].y - 15, 10, '#FFD60A', { align: 'center', shadow: false });
-    }
-  }
-  lay.items.forEach(it => drawRowCard(it));
-  if (!row.length) drawPixelText('（等待暗置举证…）', W / 2, cy + rh / 2, 15, '#7E93B0', { align: 'center', shadow: false });
-}
+function renderRowArea() { RenderCore.renderRowArea(renderEnv()); }
 function drawRowCard(it) {
   const { card, x, y, w, h, seat } = it;
   const revealed = it.revealed === true;
@@ -1720,18 +1747,7 @@ function renderPanels() {
     if (focusDim) ctx.restore();
   }
 }
-function currentActSeat() {
-  const g = view;
-  switch (g.phase) {
-    case 'play': return g.turn;
-    case 'preEvent': case 'postEvent': return g.eventTurnSeat;
-    case 'discard': return g.discardSeat;
-    case 'reveal': return g.revealPending ? g.revealPending.owner : -1;
-    case 'count': return g.swapPending ? g.swapPending.owner : -1;
-    case 'chooseStarter': return g.starterPicker;
-    default: return -1;
-  }
-}
+function currentActSeat() { return RenderCore.currentActSeatOf(renderEnv()); }
 function marketSlotRects(s) {
   // 底部大卡牌区市场槽（P1-6：布局唯一源在 UIPresenter.layouts()）
   const L = _layouts();
@@ -1765,6 +1781,12 @@ function renderBottom() {
   // 底部全宽大卡牌区底台（杀戮尖塔式）
   pxRect(6, y0 + 2, W - 12, HAND_AREA_H - 8, 'rgba(16,20,28,0.88)');
   pxBorder(6, y0 + 2, W - 12, HAND_AREA_H - 8, '#3A4258', 2);
+  if (!me) {
+    // 观战模式：不渲染私有区域（手牌/市场/事件），只显示观战横幅
+    drawPixelText('👁 观战中 · 不参与对局', W / 2, y0 + HAND_AREA_H / 2 - 12, 24, '#FFD60A', { align: 'center' });
+    drawPixelText('当前阶段：' + (view.phaseLabel || view.phase), W / 2, y0 + HAND_AREA_H / 2 + 18, 15, '#CDD8E8', { align: 'center' });
+    return;
+  }
   const showEvents = view.phase === 'preEvent' || view.phase === 'postEvent';
   const showHand = view.phase === 'play' || view.phase === 'discard';
   if (view.phase === 'buy') {
@@ -1852,21 +1874,19 @@ function handGridRects(n, y, h) {
 function canClickHand(card) {
   if (!view) return false;
   const g = view;
+  if (mySeat < 0) return false;   // 观战者不可点手牌
   if (g.phase === 'play' && g.turn === mySeat && !g.seats[mySeat].playDone) return true;
   if (g.phase === 'discard' && g.discardSeat === mySeat && !g.seats[mySeat].keepDone) {
     return selected.indexOf(card.uid) >= 0 || selected.length < keepMax();
   }
   return false;
 }
-function keepMax() {
-  const s = view.seats[mySeat];
-  // 官方规则=基础 2 张 + keepPlus 加成（曾误写 1+，单机正确、联机少 1 个保留位 → 对齐）
-  return 2 + (s.char && s.char.skill && s.char.skill.type === 'keepPlus' ? s.char.skill.v : 0);
-}
+function keepMax() { return RenderCore.keepMaxOf(renderEnv()); }
 function isEventUsable(ev) {
   if (!view || ev.used || ev.hidden) return false;
   if (view.eventTurnSeat !== mySeat) return false;   // M3：非我方事件回合事件牌不可用
   const s = view.seats[mySeat];
+  if (!s) return false;   // 观战者无私有事件牌
   if (s.eventPassed || s.eventCount >= 2) return false;
   if ((view.phase === 'preEvent' && ev.timing !== 'pre') || (view.phase === 'postEvent' && ev.timing !== 'post')) return false;
   return ev.lv <= ElectionCore.eventLvMax(view.round);
@@ -1926,6 +1946,7 @@ function addButton(id, x, y, w, h, text, opts) {
 function renderActionButtons(me) {
   // 操作按钮：手牌区上方一行横排（贴近手牌，不遮挡卡牌），宽度自适应 + 自动缩字
   const g = view;
+  if (!me) return;   // 观战者不渲染行动按钮
   const btnH = compact ? 38 : (isMobile ? 50 : 46);
   const btnW0 = 126, gap = 8;
   const y = H - HAND_AREA_H - btnH - 8;
@@ -2719,7 +2740,8 @@ function handleButton(id) {
     }
     case 'evPrev': eventPage = Math.max(0, (eventPage || 0) - 1); sfx('click'); break;
     case 'evNext': {
-      const maxPg = Math.max(0, Math.ceil((mySeatObj().events || []).length / 4) - 1);
+      const me0 = mySeatObj();
+      const maxPg = Math.max(0, Math.ceil(((me0 && me0.events) || []).length / 4) - 1);
       eventPage = Math.min(maxPg, (eventPage || 0) + 1); sfx('click');
       break;
     }
@@ -2959,7 +2981,7 @@ function checkFxDiffs() {
     lastSupport[i] = s.support;
   });
   // 市场新卡（仅自己的市场可见）
-  if (mySeat != null) {
+  if (mySeat >= 0) {
     const s = view.seats[mySeat];
     const sig = (s.market || []).map(c => c.uid).join(',');
     if (lastMarketSig[mySeat] !== undefined && sig !== lastMarketSig[mySeat]) {

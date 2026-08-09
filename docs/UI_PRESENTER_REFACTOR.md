@@ -136,21 +136,24 @@ const next = vm.hud.nextStep;           // {0:阶段id, 1:中文名} 或 null
 > 把 `singleplayer.html` 与 `public/client.js` 中**逐字复制的渲染函数**收敛为单一事实源，
 > 双端差异经 **env 参数注入**表达，薄封装留在两端。
 
-### 7.1 本批收敛范围（完全/高度同构，零风险）
+### 7.1 收敛范围与状态（本批收敛：完全/高度同构，零风险）
 
-| 函数 | 原两端实现 | 收敛后 |
-|---|---|---|
-| `RenderCore.renderScene(env)` | renderGame 主流程（清屏+背景+六段+尾部） | 统一调度骨架 |
-| `RenderCore.drawGoalGuide(env)` | drawGoalGuide（逐字同构） | 单一事实源 |
-| `RenderCore.updateHoverAnim(env)` | updateHoverAnim（逐字同构） | 单一事实源 |
-| `RenderCore.hoverAlpha(env)` | hoverAlpha（逐字同构） | 单一事实源 |
-| `RenderCore.drawHoverTooltip(env)` | drawHoverTooltip（逐字同构） | 单一事实源 |
-| `RenderCore.myTurnOf(env)` | myTurn / myTurnSP（逐字同构） | 单一事实源 |
+| 函数 | 原两端实现 | 收敛后 | 状态 |
+|---|---|---|---|
+| `RenderCore.renderScene(env)` | renderGame 主流程（清屏+背景+六段+尾部） | 统一调度骨架 | ✅ |
+| `RenderCore.drawGoalGuide(env)` | drawGoalGuide（逐字同构） | 单一事实源 | ✅ |
+| `RenderCore.updateHoverAnim(env)` | updateHoverAnim（逐字同构） | 单一事实源 | ✅ |
+| `RenderCore.hoverAlpha(env)` | hoverAlpha（逐字同构） | 单一事实源 | ✅ |
+| `RenderCore.drawHoverTooltip(env)` | drawHoverTooltip（逐字同构） | 单一事实源 | ✅ |
+| `RenderCore.myTurnOf(env)` | myTurn / myTurnSP（逐字同构） | 单一事实源 | ✅ |
+| `RenderCore.currentActSeatOf(env)` | currentActSeat（逐字同构） | 单一事实源（统一含 chooseStarter） | ✅ |
+| `RenderCore.keepMaxOf(env)` | keepMax（逐字同构） | 单一事实源（观战者恒 0） | ✅ |
+| `RenderCore.renderRowArea(env)` | renderRowArea（同构骨架+少量差异） | 单一事实源（差异经 copy/注入表达） | ✅ |
 
-**待后续收敛**（差异大，保留两端本地实现，经 env 注入调用）：
-`renderHud`（倒计时 vs 轮次进度条/排名横幅）、`renderRowArea`（辩论台底座/入场动画）、
-`renderPanels`（panelFlow vs 静态坐标）、`renderBottom`（按钮机制/手牌抽屉）、
-`renderLogs`（右上角浮动面板 vs 贴底栏）、`checkFxDiffs`（数据源与触发差异大）。
+**按设计保留双端本地实现**（差异大，经 renderScene 的 env 注入调用，属设计收口非未完成项）：
+`renderHud`（倒计时/观战 vs 轮次进度条/排名横幅）、`renderPanels`（panelFlow vs 静态坐标）、
+`renderBottom`（按钮机制/手牌抽屉）、`renderLogs`（右上角浮动面板 vs 贴底栏）、
+`checkFxDiffs`（数据源与触发差异大）。
 
 ### 7.2 env 注入契约（两端各写一个 `renderEnv()` 组装）
 

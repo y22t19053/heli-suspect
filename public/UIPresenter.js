@@ -62,9 +62,10 @@
       return null;
     },
 
-    /* 是否轮到我（抽取两端 myTurnSP 逻辑为单一事实源） */
+    /* 是否轮到我（抽取两端 myTurnSP 逻辑为单一事实源）
+     * 观战者（mySeat = -1）恒 false：不参与行动判定 */
     myTurn(view) {
-      if (!view || view.mySeat == null) return false;
+      if (!view || view.mySeat == null || view.mySeat < 0) return false;
       const me = view.mySeat;
       switch (view.phase) {
         case 'buy': return !view.seats[me].buyDone;

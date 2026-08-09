@@ -48,6 +48,11 @@
       <input id="inp-seed" maxlength="20" placeholder="同一种子 = 同一对局">
     </div>
 
+    <div class="field">
+      <label>房间密码（可选，留空公开）</label>
+      <input id="inp-pass" maxlength="12" placeholder="创建或加入时填写">
+    </div>
+
     <button id="btn-create" class="btn primary">创 建 房 间</button>
     <button id="btn-solo" class="btn">单 人 模 式（AI 补位）</button>
 
@@ -64,6 +69,8 @@
       <input id="inp-code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase">
     </div>
     <button id="btn-join" class="btn">加 入 房 间</button>
+    <button id="btn-quickjoin" class="btn">快 速 加 入（公开房）</button>
+    <button id="btn-spectate" class="btn">旁 观 房 间（不占座）</button>
 
     <div id="menu-msg" class="msg"></div>
     <div class="version-tag">合理怀疑 · 世纪审判联机版 v1.1.0</div>

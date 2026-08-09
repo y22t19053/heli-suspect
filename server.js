@@ -41,12 +41,18 @@ function genCode() {
   return code;
 }
 
-function createRoom({ mode, maxSeats, hostName, seed }) {
+function sanitizePass(raw) {
+  const s = String(raw == null ? '' : raw).replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 12);
+  return s;
+}
+
+function createRoom({ mode, maxSeats, hostName, seed, password }) {
   const code = genCode();
   const room = {
     code, mode,
     maxSeats: clampInt(maxSeats, 2, 4),
     seed: (typeof seed === 'string' && seed.trim() !== '') ? seed.trim().slice(0, 40) : null,   // 房主种子码（留空=随机，分享战绩用）
+    password: sanitizePass(password),   // 房间密码（留空=公开房，加入/快速加入需匹配）
     seats: [],
     state: null,
     started: false,
@@ -55,6 +61,7 @@ function createRoom({ mode, maxSeats, hostName, seed }) {
     aiRetries: new Map(),       // seat -> 连续 AI 行动重试次数（防死循环）
     aiBusy: new Set(),          // seat 正在执行 AI 行动
     aiQueue: Promise.resolve(), // 本房间独立的 AI 行动队列（避免跨房间串行阻塞）
+    snapshots: new Map(),       // seat -> 断线快照 { state(深拷贝), savedAt }：AI 托管期间保留，重连时恢复私有资源
     hostSeat: 0,
     lastActivity: Date.now(),   // 最后活动时间（空闲清理用）
     notices: [],
@@ -254,7 +261,7 @@ function makeView(st, mySeat) {
     phase: st.phase,
     phaseLabel: Core.phaseLabel(st),
     seats,
-    draftCandidates: mySeat != null ? st.draftCandidates[mySeat] : [],
+    draftCandidates: mySeat >= 0 ? st.draftCandidates[mySeat] : [],
     draftPicked: st.seats.map(s => !!s.char),
     round: st.round,
     startingSeat: st.startingSeat,
@@ -298,6 +305,117 @@ function broadcastThink(room, seat, on) {
   }
 }
 
+/* ---------------- 断线快照（3.4 审查项） ----------------
+ * 断线时保存整局状态深拷贝；AI 托管期间该座位走「保守托管」（ghostAct）：
+ * 只做流程推进（选角/定起始/结束取证/放弃举证/跳过排除/跳过换位/不打事件），
+ * 不消耗玩家的私有资源（不买牌/不锁牌/不刷新/不出牌/不打事件）。
+ * 玩家重连时从快照恢复私有资源（hand/market/events/keepUids/lockedUids），
+ * 使其手牌/市场与断线时刻一致；与全局的冲突（牌已被流程移走）以当前状态为准。 */
+function saveSnapshot(room, seat) {
+  if (!room.state) return;
+  room.snapshots.set(seat, {
+    state: JSON.parse(JSON.stringify(room.state)),
+    savedAt: Date.now()
+  });
+}
+/* 冲突检测：快照中的私有卡牌若已出现在全局（行区/他人手牌市场/牌堆/档案），
+ * 说明 AI 或流程已将其移走——以当前状态为准，不恢复，避免卡牌复制。 */
+function cardInGlobal(st, seat, uid) {
+  if (Array.isArray(st.row) && st.row.some(r => r.card && r.card.uid === uid)) return true;
+  if (Array.isArray(st.used) && st.used.some(c => c.uid === uid)) return true;
+  if (Array.isArray(st.grave) && st.grave.some(c => c.uid === uid)) return true;
+  for (let i = 0; i < st.seats.length; i++) {
+    if (i === seat) continue;
+    const s2 = st.seats[i];
+    if (s2 && Array.isArray(s2.hand) && s2.hand.some(c => c.uid === uid)) return true;
+    if (s2 && Array.isArray(s2.market) && s2.market.some(c => c.uid === uid)) return true;
+  }
+  return false;
+}
+/* 重连恢复：把快照中的私有资源覆盖回当前 state（带冲突检测），删除快照 */
+function restoreSnapshot(room, seat) {
+  const snap = room.snapshots.get(seat);
+  if (!snap) return false;
+  room.snapshots.delete(seat);
+  const st = room.state;
+  const cur = st && st.seats[seat];
+  const old = snap.state && snap.state.seats && snap.state.seats[seat];
+  if (!st || !cur || !old) return false;
+  // 私有卡牌集合：仅恢复仍"属于该玩家"的牌（冲突检测），避免复制
+  const pick = (arr) => (Array.isArray(arr) ? arr.filter(c => c && !cardInGlobal(st, seat, c.uid)) : []);
+  if (Array.isArray(old.hand)) cur.hand = pick(old.hand);
+  if (Array.isArray(old.market)) cur.market = pick(old.market);
+  if (Array.isArray(old.events)) {
+    cur.events = old.events.filter(e => e && !cardInGlobal(st, seat, e.uid));
+  }
+  cur.keepUids = Array.isArray(old.keepUids) ? old.keepUids.slice() : [];
+  cur.lockedUids = Array.isArray(old.lockedUids) ? old.lockedUids.slice() : [];
+  cur.lastLockedUids = Array.isArray(old.lastLockedUids) ? old.lastLockedUids.slice() : [];
+  // 仅当快照与当前阶段一致（AI 未跨阶段消耗）时恢复流转标志；跨阶段则以当前为准
+  if (st.phase === snap.state.phase && st.round === snap.state.round) {
+    if (old.buyDone !== undefined) cur.buyDone = old.buyDone;
+    if (old.playDone !== undefined) cur.playDone = old.playDone;
+    if (old.keepDone !== undefined) cur.keepDone = old.keepDone;
+    if (old.eventPassed !== undefined) cur.eventPassed = old.eventPassed;
+    if (old.eventCount !== undefined) cur.eventCount = old.eventCount;
+  }
+  return true;
+}
+/* 保守托管（断线/超时玩家）：只推进流程，不消耗私有资源 */
+function ghostAct(room, seat) {
+  const st = room.state;
+  const s = st.seats[seat];
+  if (!s || st.gameOver) return;
+  try {
+    switch (st.phase) {
+      case 'pickChar':
+        if (!s.char) {
+          const cands = st.draftCandidates[seat] || [];
+          if (cands.length) Core.apply(st, seat, { type: 'pickChar', charId: cands[0].id });
+        }
+        break;
+      case 'chooseStarter':
+        if (st.starterPicker === seat && !st.starterChosen) {
+          Core.apply(st, seat, { type: 'pickStarter', starterSeat: seat });
+        }
+        break;
+      case 'buy':
+        if (!s.buyDone) Core.apply(st, seat, { type: 'endBuy' });   // 不买/不锁/不刷新
+        break;
+      case 'play':
+        if (st.turn === seat && !s.playDone) Core.apply(st, seat, { type: 'finishPlay' });   // 放弃举证，手牌不动
+        break;
+      case 'reveal':
+        if (st.revealPending && st.revealPending.owner === seat) {
+          st.revealPending = null;   // 跳过证据排除（不炸对方牌）
+          Core.advance(st);
+          return;
+        }
+        break;
+      case 'count':
+        if (st.swapPending && st.swapPending.owner === seat) {
+          st.swapPending = null;     // 跳过政治操盘（不换位）
+          Core.advance(st);
+          return;
+        }
+        break;
+      case 'preEvent':
+      case 'postEvent':
+        if (st.eventTurnSeat === seat && !s.eventPassed) Core.apply(st, seat, { type: 'passEvent' });
+        break;
+      case 'discard':
+        if (st.discardSeat === seat && !s.keepDone) {
+          // 保留规则必需的最少张数（保持手牌原有顺序取前 N 张），其余归档
+          const keepMax = 2 + ((s.char && s.char.skill.type === 'keepPlus') ? s.char.skill.v : 0);
+          const n = Math.min(keepMax, (s.hand || []).length);
+          s.keepUids = (s.hand || []).slice(0, n).map(c => c.uid);
+          Core.apply(st, seat, { type: 'finishKeep' });
+        }
+        break;
+    }
+  } catch (e) { console.error('[ghostAct]', room.code, seat, e); }
+}
+
 /* ---------------- AI 驱动（每房间独立队列，互不阻塞） ---------------- */
 function scheduleAI(room, seat) {
   if (room.aiBusy.has(seat)) return;
@@ -324,7 +442,10 @@ function scheduleAI(room, seat) {
         forceSkip(st, seat);
         return;
       }
-      const res = Core.aiAct(st, seat);
+      // 断线托管（3.4）：该座位有快照 → 走保守托管，只推进流程、不消耗私有资源
+      const res = room.snapshots.has(seat)
+        ? (ghostAct(room, seat), { ok: true })
+        : Core.aiAct(st, seat);
       // AI 决策日志（测试意见2）：行动后快照，供事后分析 AI 行为
       const after = { money: st.seats[seat].money, hand: (st.seats[seat].hand || []).length, lock: (st.seats[seat].lockedUids || []).length, row: st.row.length, phase: st.phase };
       room.diag.push({ t: Date.now(), ev: 'aiAct', seat, name: st.seats[seat].name, before, after, msgs: (res && res.msgs) || [] });
@@ -419,6 +540,8 @@ function onTimeout(room, seat) {
   // 守卫：该座位已不再需要行动（阶段已推进/轮次已过）→ 不接管，避免把人类玩家永久变成 AI
   if (!Core.needsAIAction(room.state).includes(seat)) return;
   room.aiRetries.delete(seat);   // 重新计 AI 重试次数
+  // 超时接管前保存快照（3.4）：玩家回来后按断线流程恢复私有资源
+  saveSnapshot(room, seat);
   pushLogs(room, ['⏰ ' + room.state.seats[seat].name + ' 超时，AI 代为操作']);
   room.state.seats[seat].isAI = true; // 本回合由 AI 接管
   scheduleAI(room, seat);
@@ -521,7 +644,7 @@ io.on('connection', (socket) => {
     const mode = data.mode === 'solo' ? 'solo' : 'multi';
     const maxSeats = clampInt(data.maxSeats, 2, 4);
     if (SOCK_TO_ROOM.has(socket.id)) return ack && ack({ ok: false, msg: '你已在房间中' });
-    const room = createRoom({ mode, maxSeats, hostName: name, seed: data.seed });
+    const room = createRoom({ mode, maxSeats, hostName: name, seed: data.seed, password: data.password });
     // 房主入座 0
     room.seats[0] = { name, isAI: false, connected: true };
     room.hostSeat = 0;
@@ -542,10 +665,26 @@ io.on('connection', (socket) => {
     if (SOCK_TO_ROOM.has(socket.id)) return ack && ack({ ok: false, msg: '你已在房间中' });
     const room = ROOMS.get(code);
     if (!room) return ack && ack({ ok: false, msg: '房间不存在' });
-    // 对局已开始：仅允许同名玩家重连（断线重连自动恢复）
+    // 房间密码校验（E 类）：加入/重连/观战均需提供正确密码
+    if (room.password && sanitizePass(data.password) !== room.password) {
+      return ack && ack({ ok: false, msg: '房间密码错误' });
+    }
+    // 对局已开始：仅允许同名玩家重连（断线重连自动恢复），或观战（spectate 不占座位）
     if (room.started) {
       const re = room.seats.findIndex(s => s.name === name && !s.connected);
-      if (re === -1) return ack && ack({ ok: false, msg: '对局已开始，无法加入' });
+      if (re === -1) {
+        // 观战模式（E 类）：观看已开始的对局，不占座位、不参与行动判定
+        if (data.spectate === true) {
+          SOCK_TO_ROOM.set(socket.id, { code, seat: -1 });
+          socket.join(code);
+          pushLogs(room, ['👁 ' + name + ' 开始旁观']);
+          broadcastRoom(room);
+          if (room.state) afterStateChange(room);   // 观战者立即收到完整 state（含 makeView mySeat=-1 私有信息隐藏）
+          if (ack) ack({ ok: true, code, seat: -1, spectate: true });
+          return;
+        }
+        return ack && ack({ ok: false, msg: '对局已开始，无法加入' });
+      }
       room.seats[re] = { name, isAI: false, connected: true };
       SOCK_TO_ROOM.set(socket.id, { code, seat: re });
       socket.join(code);
@@ -556,6 +695,8 @@ io.on('connection', (socket) => {
         room.aiRetries.delete(re);                 // 清除历史 AI 重试计数，避免误判强制跳过
         const t = room.timers.get(re);
         if (t) { clearTimeout(t); room.timers.delete(re); }   // 清除旧的超时定时器
+        // 3.4 快照恢复：AI 托管期间的私有资源（手牌/市场/事件）还原到断线时刻
+        if (restoreSnapshot(room, re)) pushLogs(room, ['↩ 已为你恢复掉线前的手牌与市场（座位 ' + re + '）']);
       }
       pushLogs(room, ['✅ ' + name + ' 重新连接（座位 ' + re + '）']);
       broadcastRoom(room);
@@ -572,6 +713,27 @@ io.on('connection', (socket) => {
     socket.join(code);
     broadcastRoom(room);
     if (ack) ack({ ok: true, code, seat });
+  });
+
+  /* 快速加入（E 类）：自动进入第一个未开局、无密码、且有真人空位的公开房 */
+  socket.on('quickJoin', (data, ack) => {
+    if (!rateLimit(socket, false)) return ack && ack({ ok: false, msg: '操作过于频繁，请稍候' });
+    data = data || {};
+    const name = sanitizeName(data.name);
+    if (SOCK_TO_ROOM.has(socket.id)) return ack && ack({ ok: false, msg: '你已在房间中' });
+    let target = null;
+    for (const room of ROOMS.values()) {
+      if (room.started || room.password) continue;
+      if (room.seats.some(s => !s.connected && !s.isAI)) { target = room; break; }
+    }
+    if (!target) return ack && ack({ ok: false, msg: '暂无开放的公开房间，可创建新房间' });
+    const seat = target.seats.findIndex(s => !s.connected && !s.isAI);
+    if (seat === -1) return ack && ack({ ok: false, msg: '房间已满' });
+    target.seats[seat] = { name, isAI: false, connected: true };
+    SOCK_TO_ROOM.set(socket.id, { code: target.code, seat });
+    socket.join(target.code);
+    broadcastRoom(target);
+    if (ack) ack({ ok: true, code: target.code, seat });
   });
 
   socket.on('startGame', (data, ack) => {
@@ -612,6 +774,7 @@ io.on('connection', (socket) => {
     if (!room || !room.state || room.state.gameOver) return ack && ack({ ok: false, msg: '对局未进行中' });
     const seat = info.seat;
     const st = room.state;
+    if (seat < 0) return ack && ack({ ok: false, msg: '观战中不可操作' });   // 观战者无行动权
     if (st.seats[seat].isAI) return ack && ack({ ok: false, msg: '你已被 AI 接管（等待重连或下局）' });
     const clean = sanitizeAction(action);
     if (!clean) return ack && ack({ ok: false, msg: '非法操作' });
@@ -640,9 +803,11 @@ io.on('connection', (socket) => {
     SOCK_TO_ROOM.delete(socket.id);
     if (!room) return;
     const seat = info.seat;
-    room.seats[seat].connected = false;
-    // 对局中：AI 接管
-    if (room.state && !room.state.gameOver) {
+    if (seat < 0) return;   // 观战者离开：不占座位、无房间状态需清理
+    if (seat >= 0 && seat < room.seats.length) room.seats[seat].connected = false;
+    // 对局中：AI 接管（3.4：先保存快照，玩家重连时恢复私有资源）
+    if (room.state && !room.state.gameOver && seat >= 0) {
+      saveSnapshot(room, seat);
       room.state.seats[seat].isAI = true;
       pushLogs(room, ['⚠ ' + (room.seats[seat].name || '玩家') + ' 掉线，AI 已接管（可用同房间号与昵称重连）']);
       // 转移房主
