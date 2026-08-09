@@ -149,10 +149,14 @@ const next = vm.hud.nextStep;           // {0:阶段id, 1:中文名} 或 null
 | `RenderCore.currentActSeatOf(env)` | currentActSeat（逐字同构） | 单一事实源（统一含 chooseStarter） | ✅ |
 | `RenderCore.keepMaxOf(env)` | keepMax（逐字同构） | 单一事实源（观战者恒 0） | ✅ |
 | `RenderCore.renderRowArea(env)` | renderRowArea（同构骨架+少量差异） | 单一事实源（差异经 copy/注入表达） | ✅ |
+| `RenderCore.renderHudOf(env)` | renderHud（倒计时/观战 vs 轮次进度条/排名横幅） | 单一事实源（差异经 copy 注入） | ✅ |
+| `RenderCore.renderPanelsOf(env)` | renderPanels（panelFlow vs 静态坐标） | 单一事实源（以联机流式 panelFlow 为基底，差异经 copy/注入） | ✅ |
+| `RenderCore._panelFlowOf(env,…)` | panelFlow（流式排布私有子块） | 单一事实源 | ✅ |
+| `RenderCore.renderBottomOf(env)` | renderBottom（按钮机制/手牌抽屉） | 单一事实源（骨架合一，子块/按钮体系经 env 注入） | ✅ |
+| `RenderCore._renderMarketOf/_renderEventsOf/_renderHandOf(env,…)` | renderMarket/renderEvents/renderHand 子块 | 单一事实源 | ✅ |
 
 **按设计保留双端本地实现**（差异大，经 renderScene 的 env 注入调用，属设计收口非未完成项）：
-`renderHud`（倒计时/观战 vs 轮次进度条/排名横幅）、`renderPanels`（panelFlow vs 静态坐标）、
-`renderBottom`（按钮机制/手牌抽屉）、`renderLogs`（右上角浮动面板 vs 贴底栏）、
+`renderLogs`（右上角浮动面板 vs 贴底栏）、`renderActionButtons`（按钮体系差异大）、
 `checkFxDiffs`（数据源与触发差异大）。
 
 ### 7.2 env 注入契约（两端各写一个 `renderEnv()` 组装）
@@ -174,8 +178,10 @@ function renderEnv() {
 ```
 
 `renderScene` 额外注入：`drawBackdrop`（联机速度线+聚光灯 / 单机 `drawBg(PAL.bg)`）、
-`renderHud/renderRowArea/renderPanels/renderBottom/renderLogs`（两端本地实现）、
+`renderLogs/renderActionButtons`（两端本地实现，经 env 注入调用）、
 `renderTail`（联机 `renderFx` / 单机 `renderToast`+D1/D2/D3 遮罩）。
+renderHud/renderPanels/renderBottom 已收敛为 `RC.renderHudOf/renderPanelsOf/renderBottomOf`，
+不再经 env 注入，差异全部走 copy 配置与窄注入（如 `pickBtn/navBtn/marketSlots/eventSlots`）。
 
 ### 7.3 关键工程约束
 

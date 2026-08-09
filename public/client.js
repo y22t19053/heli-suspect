@@ -1446,85 +1446,36 @@ function renderGame() {
     ctx.moveTo(W * 0.78, HUD_H); ctx.lineTo(W * 0.62, HUD_H); ctx.lineTo(W * 0.72, H); ctx.lineTo(W * 0.98, H); ctx.closePath(); ctx.fill();
     ctx.restore();
   };
-  env.renderHud = renderHud;
   env.renderRowArea = renderRowArea;
-  env.renderPanels = renderPanels;
-  env.renderBottom = renderBottom;
   env.renderLogs = renderLogs;
   env.renderTail = () => renderFx();
   RenderCore.renderScene(env);
 }
-function renderHud() {
-  pxRect(0, 0, W, HUD_H, '#101418');
-  pxBorder(0, 0, W, HUD_H, '#FFD60A', 2.5);
-  drawPixelText(view.round > 0 ? '第 ' + view.round + ' 轮' : '准备中', 14, HUD_H / 2, 20, '#FFD60A', { shadow: false });
-  const ph = view.phaseLabel || view.phase;
-  drawPixelText(ph, W / 2, HUD_H / 2, 22, '#FFFFFF', { align: 'center' });
-  // 底部：支持度竞逐轨道（按支持度占比着色，实时反映排名）——观战者也可见
-  if (view.round > 0) {
-    const tot = Math.max(1, view.seats.reduce((a, b) => a + b.support, 0));
-    let sx = 0;
-    view.seats.forEach((s, i) => {
-      const w2 = Math.max(2, Math.round(W * (s.support / tot)));
-      pxRect(sx, HUD_H - 5, w2, 5, campColor(i));
-      sx += w2;
-    });
-  } else {
-    pxRect(0, HUD_H - 5, W * 0.5, 5, '#FF3B30');
-    pxRect(W * 0.5, HUD_H - 5, W * 0.5, 5, '#0A84FF');
-  }
-  if (mySeat < 0) {
-    // 观战模式：右上角固定旁观标识（无行动权、无倒计时、无私有区）
-    drawPixelText('👁 旁观中', W - 14, HUD_H / 2, 16, '#5AC8FA', { align: 'right', shadow: false });
-    return;
-  }
-  const startTxt = view.startingSeat != null && view.seats[view.startingSeat] ? '起始：' + view.seats[view.startingSeat].name : '';
-  drawPixelText(startTxt, W - 14, HUD_H / 2, 16, '#FFD60A', { align: 'right', shadow: false });
-  // 行动倒计时（我行动时）：最后 5 秒红色呼吸脉冲 + 每秒滴答音效，≤3 秒心跳加速
-  if (deadline && deadline > Date.now() && myTurn()) {
-    const remain = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-    const urgent = remain <= 5;
-    const pulse = urgent ? (Math.sin(performance.now() / (remain <= 3 ? 140 : 240)) > 0 ? 1 : 0.55) : 1;
-    ctx.save();
-    ctx.globalAlpha = pulse;
-    drawPixelText('⏱ ' + remain + 's', W - 200, HUD_H / 2, urgent ? 22 : 16, '#FF5A4E', { align: 'right', shadow: false });
-    ctx.restore();
-    if (urgent && remain !== lastTickSec) {
-      lastTickSec = remain;
-      sfx(remain <= 3 ? 'tickFast' : 'tick');
-    }
-  }
-  // 阶段进度条：当前高亮 + 下一步提示（回合进程状态条）
-  const steps = PHASE_STEPS;
-  const idx = steps.findIndex(s => s[0] === view.phase);
-  if (idx >= 0) {
-    // P0：stepW 加 2px 下限（W<350 时 (W-320) 为负），起笔自适应左侧，右侧为倒计时/起始者留 88px
-    let stepW = isMobile ? 16 : Math.min(30, (W - 320) / steps.length - 3);
-    stepW = clamp(stepW, 2, 30);
-    let sx = Math.max(76, isMobile ? 108 : 148);
-    const availR = W - 88;
-    if (sx + steps.length * (stepW + 3) > availR) {
-      stepW = Math.max(2, (availR - sx - (steps.length - 1) * 3) / steps.length);
-    }
-    steps.forEach((s, i) => {
-      const active = i === idx;
-      pxRect(sx, HUD_H - 16, stepW, 9, active ? '#FFD60A' : i < idx ? '#4A9A5A' : '#39425A');
-      pxBorder(sx, HUD_H - 16, stepW, 9, '#111111', 1);
-      sx += stepW + 3;
-    });
-    if (idx < steps.length - 1 && sx + 12 < W) {
-      drawPixelText('下一步：' + steps[idx + 1][1], sx + 6, HUD_H - 11, isMobile ? 10.5 : 12, '#DCE6F5', { shadow: false });
-    }
-  }
-}
 /* ===== 共享渲染模块接入（shared/render-core.js）：env 组装 + 薄封装 =====
  * 渲染函数本体已收敛至 RenderCore（单一事实源），此处仅注入差异参数。
- * 双端差异：数据源（view/game）、文案（copy）、辅助函数注入。 */
+ * 双端差异：数据源（view/game）、文案（copy）、辅助函数注入。
+ * P1-7：renderHud/renderPanels/renderBottom 已并入 RenderCore（renderHudOf/
+ *        renderPanelsOf/renderBottomOf），差异经下方 copy 与注入表达。 */
 function renderEnv() {
   return {
     ctx, W, H, PAL, screen,
     G: () => view,
-    mySeat, HAND_AREA_H,
+    mySeat, HAND_AREA_H, HUD_H,
+    UI, PHASE_STEPS,
+    fontBase: _FONT_BASE,
+    selected, eventPick, buyMode,
+    portraitMode, compact, isMobile,
+    eventPage: () => eventPage, setEventPage: (v) => { eventPage = v; },
+    handScroll: () => handScroll, setHandScroll: (v) => { handScroll = v; },
+    vm: () => vm,
+    panelRect: (i) => panelRect(i),
+    panelHeight: () => panelHeight(),
+    marketSlots: (s) => marketSlotRects(s),
+    eventSlots: () => eventSlotRects(),
+    canClickHand: (c) => canClickHand(c),
+    isEventUsable: (ev) => isEventUsable(ev),
+    renderActionButtons: (me) => renderActionButtons(me),
+    portraitPerPage: PORTRAIT_PER_PAGE,
     mouse, hoverAnim, hoverCards, buttons,
     keepMax: () => RenderCore.keepMaxOf(renderEnv()),
     campColor,
@@ -1540,7 +1491,47 @@ function renderEnv() {
       drawPixelText('⚖️ 庭审区 ★', W / 2, cy - 14, 11, '#FFD60A', { align: 'center', shadow: false });
       ctx.restore();
     },
-    copy: { buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张' }
+    navBtn: (id, x, y, w, h, text, enabled) => addButton(id, x, y, w, h, text, { disabled: !enabled }),
+    copy: {
+      buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张',
+      // —— renderHudOf：联机差异（默认值为联机侧，显式写出与单机成对）——
+      roundTxt: (g) => g.round > 0 ? '第 ' + g.round + ' 轮' : '准备中',
+      roundPos: { x: 14, y: HUD_H / 2, size: 20 },
+      phaseTxt: (g) => g.phaseLabel || g.phase,
+      phasePos: { x: W / 2, y: HUD_H / 2, size: 22 },
+      trackElse: (tY, tH) => { pxRect(0, tY, W * 0.5, tH, '#FF3B30'); pxRect(W * 0.5, tY, W * 0.5, tH, '#0A84FF'); },
+      isSpectator: () => mySeat < 0,
+      startTxt: (g) => g.startingSeat != null && g.seats[g.startingSeat] ? '起始：' + g.seats[g.startingSeat].name : '',
+      startPos: { x: W - 14, y: HUD_H / 2, size: 16 },
+      countdown: () => {
+        // 行动倒计时（我行动时）：最后 5 秒红色呼吸脉冲 + 每秒滴答音效，≤3 秒心跳加速
+        if (deadline && deadline > Date.now() && myTurn()) {
+          const remain = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+          const urgent = remain <= 5;
+          const pulse = urgent ? (Math.sin(performance.now() / (remain <= 3 ? 140 : 240)) > 0 ? 1 : 0.55) : 1;
+          ctx.save();
+          ctx.globalAlpha = pulse;
+          drawPixelText('⏱ ' + remain + 's', W - 200, HUD_H / 2, urgent ? 22 : 16, '#FF5A4E', { align: 'right', shadow: false });
+          ctx.restore();
+          if (urgent && remain !== lastTickSec) {
+            lastTickSec = remain;
+            sfx(remain <= 3 ? 'tickFast' : 'tick');
+          }
+        }
+      },
+      stepBar: {
+        maxW: 30, baseW: 320, mobile: isMobile ? 16 : null,
+        sx0: () => Math.max(76, isMobile ? 108 : 148), availR: () => W - 88,
+        nextSize: () => isMobile ? 10.5 : 12, nextCol: '#DCE6F5', nextDX: 6,
+        nextGuard: (sx) => sx + 12 < W
+      },
+      // —— renderPanelsOf：联机差异（默认值为联机侧）——
+      charBrief: (s) => (s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name,
+      lockShow: (s, isMe, g) => UI.show.locked && s.lockedCount,
+      scandalBar: (s, sc) => UI.show.scandalBar,
+      // —— renderBottomOf：联机差异（默认值为联机侧）——
+      handTitle: (me, from, to, total) => '手牌 ' + me.hand.length + ' 张 · ' + (from + 1) + '-' + to + ' / ' + total
+    }
   };
 }
 function myTurn() { return RenderCore.myTurnOf(renderEnv()); }
@@ -1615,138 +1606,8 @@ function drawRowCard(it) {
     hoverCards.push({ x, y, w, h, kind: 'swapTarget', data: { targetUid: card.uid } });
   }
 }
-/* 面板数值流：从 nx 开始向右排，先测量再绘制，放不下则级联隐藏后续低优先级项（hover 仍可查看） */
-function panelFlow(nx, y, size, items) {
-  const bold = '700 ';
-  const gap = 12;
-  for (const it of items) {
-    const w2 = textWidth(it.txt, bold + size + 'px ' + _FONT_BASE) + gap;
-    if (nx + w2 > W - 14) break;   // 放不下 → 级联隐藏剩余项
-    drawPixelText(it.txt, nx, y, size, it.col, { shadow: false });
-    nx += w2;
-  }
-  return nx;
-}
-function renderPanels() {
-  // 顶部紧凑信息条（取代旧中部大横板）：阵营头像 + 名字 + ⊙ + 支持度 + 丑闻 + 行动标志
-  // P1-8：数据源 = UIPresenter.project(view) 的 ViewModel；vm 缺失时防御性降级不画
-  if (!vm) return;
-  const g = vm.meta;
-  const seats = vm.seats;
-  const n = seats.length;
-  const ph = panelHeight();
-  const act = currentActSeat();
-  for (let i = 0; i < n; i++) {
-    const s = seats[i];
-    const pr = panelRect(i);
-    const { x, y, w } = pr;
-    const isMe = i === mySeat;
-    const crown = vm.hud.leader === i ? ' 👑' : '';
-    // 焦点模式（美术意见2 轻量版）：非我方行动回合时，无关座位面板压暗减少视觉噪音
-    const focusPhase = g.phase === 'buy' || g.phase === 'play' || g.phase === 'discard' || g.phase === 'preEvent' || g.phase === 'postEvent';
-    const focusDim = screen === 'game' && focusPhase && !myTurn() && !isMe && act !== i;
-    if (focusDim) { ctx.save(); ctx.globalAlpha = 0.4; }
-    pxRect(x, y, w, ph - 4, isMe ? campSoft(i) : '#F2E9D2');
-    pxBorder(x, y, w, ph - 4, '#111111', 2);
-    if (compact) {
-      // 横屏紧凑：两行布局（行1 头像+名字+side；行2 角色名+数值流），字号有下限防模糊
-      const av = 14, avY = y + 3;
-      const pt = partyOf(i);
-      pxRect(x + 6, avY, av, av, campColor(i));
-      pxBorder(x + 6, avY, av, av, '#111111', 2);
-      drawPixelText(pt.sym, x + 6 + av / 2, avY + av / 2, 10, contrast(campColor(i)), { align: 'center', shadow: false });
-      const nmR1 = drawPixelText(s.name + (isMe ? '（你）' : '') + crown, x + 24, y + 6, 11, '#111111', { shadow: false });
-      if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', x + 24 + nmR1.w + 4, y + 6, 9, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
-      // 行2：角色名（fitText 限宽）+ 数值流（放不下级联隐藏）
-      let nx2 = x + 24;
-      if (s.char) {
-        const fCh = fitText('·' + s.char.name, Math.max(26, w * 0.20), 10);
-        drawPixelText(fCh.text, x + 24, y + 15, fCh.size, '#C0392B', { shadow: false });
-        nx2 = x + 24 + fCh.w + 8;
-        hoverCards.push({ x: x + 24, y: y + 6, w: Math.min(160, w * 0.32), h: 16, kind: 'charSkill', data: { ch: s.char } });
-      }
-      const sc = s.scandal || 0;
-      const fs2 = UI.fs.num;
-      const flow = [];
-      flow.push({ txt: '⊙' + s.money, col: '#B8860B' });
-      flow.push({ txt: '⚖' + s.support, col: '#111111' });
-      flow.push({ txt: '😈' + sc, col: sc > 0 ? '#E04343' : '#8A8A8A' });
-      if (UI.show.jury && s.juryTokens > 0) flow.push({ txt: '🕊' + s.juryTokens + '/3', col: '#7B4FC9' });
-      if (UI.show.prev && g.precedentSeat === i) flow.push({ txt: '⚖️先例', col: '#7B4FC9' });
-      if (UI.show.handN) {
-        if (isMe) flow.push({ txt: '手牌' + s.handCount, col: '#333333' });
-        else if (act === i && g.phase === 'play') flow.push({ txt: '⚡举证中', col: '#FF5A4E' });
-      }
-      if (UI.show.locked && s.lockedCount) flow.push({ txt: '🔒' + s.lockedCount, col: '#0A84FF' });
-      if (act === i && g.phase !== 'play') flow.push({ txt: '▶行动中', col: '#FF5A4E' });
-      panelFlow(nx2, y + ph / 2, fs2, flow);
-      if (g.phase === 'play' && g.playLastSeat === i) {
-        const on = Math.sin(performance.now() / 110) > 0 ? 1 : 0.35;
-        ctx.save(); ctx.globalAlpha = on;
-        pxBorder(x - 2, y - 2, w + 4, ph, '#FFD60A', 3);
-        ctx.restore();
-      }
-    } else {
-      const av = 22;
-      const pt = partyOf(i);
-      pxRect(x + 6, y + 4, av, av, campColor(i));
-      pxBorder(x + 6, y + 4, av, av, '#111111', 2);
-      drawPixelText(pt.sym, x + 6 + av / 2, y + 4 + av / 2, 13, contrast(campColor(i)), { align: 'center', shadow: false });
-      const nmR2 = drawPixelText(s.name + (isMe ? '（你）' : '') + crown, x + 34, y + 9, 14, '#111111', { shadow: false });
-      if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', x + 34 + nmR2.w + 4, y + 9, 11, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
-      // 角色名（fitText 限宽）+ 数值流
-      let nx2 = x + 34;
-      if (s.char) {
-        const fCh2 = fitText((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name, Math.max(26, w * 0.22), 10.5);
-        drawPixelText(fCh2.text, x + 34, y + 21, fCh2.size, '#C0392B', { shadow: false });
-        nx2 = x + 34 + fCh2.w + 10;
-        hoverCards.push({ x: x + 34, y: y + 14, w: Math.min(160, w * 0.32), h: 14, kind: 'charSkill', data: { ch: s.char } });
-      }
-      const sc = s.scandal || 0;
-      const fs2 = UI.fs.num;
-      const flow = [];
-      flow.push({ txt: '⊙ ' + s.money, col: '#B8860B' });
-      flow.push({ txt: '⚖ ' + s.support, col: '#111111' });
-      flow.push({ txt: '😈' + sc, col: sc > 0 ? '#E04343' : '#8A8A8A' });
-      if (UI.show.jury && s.juryTokens > 0) flow.push({ txt: '🕊' + s.juryTokens + '/3', col: '#7B4FC9' });
-      if (UI.show.prev && g.precedentSeat === i) flow.push({ txt: '⚖️先例', col: '#7B4FC9' });
-      if (UI.show.handN) {
-        if (isMe) flow.push({ txt: '手牌 ' + s.handCount, col: '#333333' });
-        else if (act === i && g.phase === 'play') flow.push({ txt: '⚡ 举证中', col: '#FF5A4E' });
-      }
-      if (UI.show.locked && s.lockedCount) flow.push({ txt: '🔒' + s.lockedCount, col: '#0A84FF' });
-      if (act === i && g.phase !== 'play') flow.push({ txt: '▶ 行动中', col: '#FF5A4E' });
-      panelFlow(nx2, y + ph / 2, fs2, flow);
-      // 丑闻条（tiny 档隐藏）
-      if (UI.show.scandalBar) {
-        pxRect(x + w * 0.52 + 24, y + 6, 40, 6, '#3A2A2A');
-        pxBorder(x + w * 0.52 + 24, y + 6, 40, 6, '#111111', 1);
-        if (sc > 0) {
-          const scCol = sc <= 1 ? '#7DCEA0' : (sc <= 3 ? '#F1C40F' : '#E04343');
-          pxRect(x + w * 0.52 + 26, y + 8, Math.max(2, 36 * Math.min(1, sc / 5)), 2.5, scCol);
-        }
-      }
-      if (g.phase === 'play' && g.playLastSeat === i) {
-        const on = Math.sin(performance.now() / 110) > 0 ? 1 : 0.35;
-        ctx.save(); ctx.globalAlpha = on;
-        pxBorder(x - 2, y - 2, w + 4, ph, '#FFD60A', 3);
-        ctx.restore();
-        drawPixelText('🎙 结案陈词', x + w - 56, y + ph / 2, 12, '#B8860B', { align: 'center', shadow: false });
-      }
-    }
-    // 事件目标选择（enemy 事件）/ 选择起始玩家：点击头像（紧凑与非紧凑共用，用头像矩形）
-    const avX = compact ? 6 : 6, avY2 = compact ? y + 3 : y + 4, avSz = compact ? 14 : 22;
-    if ((g.phase === 'preEvent' || g.phase === 'postEvent') && eventPick && eventPick.seat === mySeat && i !== mySeat) {
-      pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, '#FF5A4E', 4);
-      hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'eventTarget', data: { targetSeat: i } });
-    }
-    if (g.phase === 'chooseStarter' && g.starterPicker === mySeat && !g.starterChosen) {
-      pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, '#FFD60A', 4);
-      hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'starter', data: { starterSeat: i } });
-    }
-    if (focusDim) ctx.restore();
-  }
-}
+/* 面板数值流与 renderPanels 已收敛至 RenderCore.renderPanelsOf（P1-7 双端合一），
+ * 本地差异经 renderEnv().copy 注入（panelFlow 逻辑在 RC._panelFlowOf）。 */
 function currentActSeat() { return RenderCore.currentActSeatOf(renderEnv()); }
 function marketSlotRects(s) {
   // 底部大卡牌区市场槽（P1-6：布局唯一源在 UIPresenter.layouts()）
@@ -1757,101 +1618,6 @@ function eventSlotRects() {
   // 底部大卡牌区事件槽：每页 4 张，翻页显示（P1-6：布局唯一源在 UIPresenter.layouts()）
   const L = _layouts();
   return L ? L.eventItems : [];
-}
-function renderMarket(s, x, y, w, h) {
-  const k = s.market.length || 1;
-  drawPixelText(buyMode === 'lock' ? '🔒 留证模式（点牌留证）' : '证物架 · 点牌传唤（⊙' + s.money + '）', 10, H - HAND_AREA_H + 12, 14, '#FFD60A', { shadow: false });
-  marketSlotRects(s).forEach(r => {
-    const card = r.card;
-    const locked = s.lockedUids.indexOf(card.uid) >= 0;
-    const cost = ElectionCore.buyCostOf(s, card);
-    const afford = s.money >= cost;
-    ctx.save();
-    ctx.globalAlpha = locked ? 1 : (afford ? 1 : 0.55);
-    UIKit.drawCard(ctx, r.x, r.y, r.w, r.h, card, { col: locked ? '#cfc3f2' : '#f6e9c8' });
-    ctx.restore();
-    if (locked) drawPixelText('🔒', r.x + r.w / 2, r.y + r.h * 0.4, 18, '#1E4FB5', { align: 'center', shadow: false });
-    hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'market', data: { card, uid: card.uid } });
-  });
-  void k;
-}
-function renderBottom() {
-  const me = view.seats[mySeat];
-  const y0 = H - HAND_AREA_H;
-  // 底部全宽大卡牌区底台（杀戮尖塔式）
-  pxRect(6, y0 + 2, W - 12, HAND_AREA_H - 8, 'rgba(16,20,28,0.88)');
-  pxBorder(6, y0 + 2, W - 12, HAND_AREA_H - 8, '#3A4258', 2);
-  if (!me) {
-    // 观战模式：不渲染私有区域（手牌/市场/事件），只显示观战横幅
-    drawPixelText('👁 观战中 · 不参与对局', W / 2, y0 + HAND_AREA_H / 2 - 12, 24, '#FFD60A', { align: 'center' });
-    drawPixelText('当前阶段：' + (view.phaseLabel || view.phase), W / 2, y0 + HAND_AREA_H / 2 + 18, 15, '#CDD8E8', { align: 'center' });
-    return;
-  }
-  const showEvents = view.phase === 'preEvent' || view.phase === 'postEvent';
-  const showHand = view.phase === 'play' || view.phase === 'discard';
-  if (view.phase === 'buy') {
-    renderMarket(me, 10, y0 + 28, portraitMode ? W - 20 : W - 260, HAND_AREA_H - 40);
-  } else if (showEvents) {
-    // 事件牌：分批 4 张 + 翻页箭头
-    const evs = me.events || [];
-    const maxPage = Math.max(0, Math.ceil(evs.length / 4) - 1);
-    if (eventPage > maxPage) eventPage = maxPage;
-    drawPixelText('事件牌（' + evs.length + '）', 10, y0 + 14, 14, '#FFD60A', { shadow: false });
-    if (maxPage > 0) {
-      addButton('evPrev', 118, y0 + 3, 40, 26, '◀', { disabled: eventPage <= 0 });
-      addButton('evNext', 162, y0 + 3, 40, 26, '▶', { disabled: eventPage >= maxPage });
-      drawPixelText((eventPage + 1) + '/' + (maxPage + 1), 210, y0 + 16, 11, '#C9D6EA', { shadow: false });
-    }
-    eventSlotRects().forEach(r => {
-      const usable = isEventUsable(r.ev);
-      UIKit.drawEventCard(ctx, r.x, r.y, r.w, r.h, r.ev, { col: usable ? PAL.events.a : '#8a8a9a' });
-      if (usable) hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'event', data: { ev: r.ev, uid: r.ev.uid } });
-      if (r.ev.used) drawPixelText('✓ 已使用', r.x + r.w / 2, r.y + r.h - 12, 11, '#5AC8FA', { align: 'center', shadow: false });
-    });
-    if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60, 13, '#7E93B0', { shadow: false });
-  } else if (showHand) {
-    const handY = y0 + 28;
-    const hh = HAND_AREA_H - 40;
-    if (hh >= 64 && me.hand.length) {
-      if (portraitMode) {
-        // 竖屏纵向手牌抽屉（超级更新#37）：2 列网格 + 左右/上下滚动分页
-        const rects = handGridRects(me.hand.length, handY, hh);
-        const pages = Math.max(1, Math.ceil(rects.length / PORTRAIT_PER_PAGE));
-        if (handScroll > pages - 1) handScroll = pages - 1;
-        if (handScroll < 0) handScroll = 0;
-        const from = handScroll * PORTRAIT_PER_PAGE;
-        const to = Math.min(rects.length, from + PORTRAIT_PER_PAGE);
-        drawPixelText('手牌 ' + me.hand.length + ' 张 · ' + (from + 1) + '-' + to + ' / ' + rects.length, 12, y0 + 13, 12.5, '#FFD60A', { shadow: false });
-        if (pages > 1) {
-          drawPixelText((handScroll + 1) + '/' + pages, W / 2, y0 + 13, 12.5, '#C9D6EA', { align: 'center', shadow: false });
-          addButton('handPrev', W - 92, y0 + 2, 40, 24, '◀', { disabled: handScroll <= 0 });
-          addButton('handNext', W - 48, y0 + 2, 40, 24, '▶', { disabled: handScroll >= pages - 1 });
-        }
-        for (let i = from; i < to; i++) {
-          const r = rects[i];
-          const card = me.hand[i];
-          const sel = selected.indexOf(card.uid) >= 0;
-          const clickable = canClickHand(card);
-          UIKit.drawCard(ctx, r.x, r.y, r.w, r.h, card, { col: sel ? PAL.accent.b : '#f6e9c8' });
-          if (clickable) hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'hand', data: { card, uid: card.uid } });
-          if (sel) pxBorder(r.x - 3, r.y - 3, r.w + 6, r.h + 6, '#FFD400', 4);
-        }
-      } else {
-        const rects = flexRects(me.hand.length, handY, hh, 12, 200, 0);
-        me.hand.forEach((card, i) => {
-          const r = rects[i];
-          const sel = selected.indexOf(card.uid) >= 0;
-          const clickable = canClickHand(card);
-          UIKit.drawCard(ctx, r.x, r.y, r.w, r.h, card, { col: sel ? PAL.accent.b : '#f6e9c8' });
-          if (clickable) hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'hand', data: { card, uid: card.uid } });
-          if (sel) pxBorder(r.x - 3, r.y - 3, r.w + 6, r.h + 6, '#FFD400', 4);
-        });
-      }
-    } else if (me.hand.length) {
-      drawPixelText('手牌 ' + me.hand.length + ' 张', 10, y0 + 40, 14.5, '#9FB3CE', { shadow: false });
-    }
-  }
-  renderActionButtons(me);
 }
 /* 竖屏手牌抽屉：2 列网格（纵向排布），每页 PORTRAIT_PER_PAGE 张（超级更新#37） */
 const PORTRAIT_PER_PAGE = 6;
