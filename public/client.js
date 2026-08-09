@@ -1280,8 +1280,9 @@ function doCreate(mode) {
   localStorage.setItem('elec_seats', String(maxSeats));   // #108 保存座位数
   localStorage.setItem('elec_mode', mode);                // #108 保存模式（solo/multi）
   // #13 种子码（可选，留空=服务器随机；同种子=同一对局，可复现）
+  // 仅在有输入时记住，避免空串覆盖上次记忆（与单机端一致）
   const seed = $('inp-seed').value.trim();
-  localStorage.setItem('elec_seed', seed);
+  if (seed) { try { localStorage.setItem('elec_seed', seed); } catch (err) { /* 忽略 */ } }
   setBusy(true);
   socket.emit('createRoom', { name, mode, maxSeats, seed }, ack => {
     setBusy(false);
