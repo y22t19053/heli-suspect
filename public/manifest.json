@@ -1,0 +1,18 @@
+{
+  "name": "当庭揭示 · 世纪审判联机版",
+  "short_name": "当庭揭示",
+  "description": "虚构「米合众国」联邦巡回法庭卡牌对抗——举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0F1B2D",
+  "theme_color": "#0F1B2D",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

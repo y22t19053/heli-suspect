@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>当庭揭示 · 世纪审判联机版</title>
+<meta name="description" content="虚构「米合众国」联邦巡回法庭卡牌对抗——举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
+<meta name="theme-color" content="#0F1B2D">
+<meta property="og:title" content="当庭揭示 · 世纪审判联机版">
+<meta property="og:description" content="法庭卡牌对抗：举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="/favicon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= 主菜单（HTML 层） ================= -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <div class="logo-row">
+      <span class="logo-ico">⚖</span>
+      <div class="logo">当 庭 揭 示</div>
+      <span class="logo-ico">🔨</span>
+    </div>
+    <div class="logo-sub">COURTROOM DRAMA · ONLINE</div>
+    <div class="grass-divider"></div>
+
+    <div class="field">
+      <label>你的昵称</label>
+      <input id="inp-name" maxlength="12" placeholder="输入昵称">
+    </div>
+
+    <div class="row">
+      <label>座位数</label>
+      <select id="sel-seats">
+        <option value="2">2 人</option>
+        <option value="3">3 人</option>
+        <option value="4">4 人</option>
+      </select>
+    </div>
+
+    <button id="btn-create" class="btn primary">创 建 房 间</button>
+    <button id="btn-solo" class="btn">单 人 模 式（AI 补位）</button>
+
+    <div class="menu-extra">
+      <button id="btn-tutorial" class="btn half">新 手 教 程</button>
+      <button id="btn-glossary" class="btn half">术 语 百 科</button>
+      <button id="btn-about" class="btn half">关 于</button>
+    </div>
+
+    <div class="divider">─ 或 ─</div>
+
+    <div class="field">
+      <label>房间代码</label>
+      <input id="inp-code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase">
+    </div>
+    <button id="btn-join" class="btn">加 入 房 间</button>
+
+    <div id="menu-msg" class="msg"></div>
+    <div class="version-tag">当庭揭示 · 世纪审判联机版 v1.0.0</div>
+    <div class="hint">规则：共 5 轮庭审，每轮 16 步——选律师→定次序→抽议题→抽证据→调查取证（传唤/留证/换证）→暗置举证→亮出（证据排除）→审议（①②③）→排名→结算倾向→整理→发放酬金。<br>
+    每轮按排名结算陪审团倾向（末位也有保底），5 轮后倾向最高者胜诉。</div>
+  </div>
+</div>
+
+<!-- ================= 关于弹窗 ================= -->
+<div id="about" class="overlay hidden">
+  <div class="panel about-panel">
+    <div class="logo-row">
+      <span class="logo-ico">⚖</span>
+      <div class="logo small">关 于</div>
+      <span class="logo-ico">🔨</span>
+    </div>
+    <div class="logo-sub">ABOUT · 版本信息</div>
+    <div class="grass-divider"></div>
+    <div class="about-body">
+      <div class="about-title">当庭揭示 · 世纪审判联机版</div>
+      <div class="about-ver">版本 v1.0.0</div>
+      <p>虚构「米合众国」联邦巡回法庭体系，四方法律团队对抗。
+      每轮 16 步：选律师→定次序→抽议题→抽证据→调查取证（传唤/留证/换证）→暗置举证→亮出（证据排除）→审议（①②③ 技能）→排名→结算陪审团倾向→整理→发放酬金。</p>
+      <p>5 轮庭审后陪审团倾向最高者胜诉；先例确立或陪审团集满 3 人可提前胜诉。</p>
+      <p class="about-note">本游戏为虚构作品，与任何现实人物、组织、事件无关。</p>
+    </div>
+    <button id="about-close" class="btn primary">关 闭</button>
+  </div>
+</div>
+
+<!-- ================= 大厅（HTML 层） ================= -->
+<div id="lobby" class="overlay hidden">
+  <div class="panel">
+    <div class="logo-row">
+      <span class="logo-ico">📋</span>
+      <div class="logo small">联 机 大 厅</div>
+      <span class="logo-ico">🗳</span>
+    </div>
+    <div class="logo-sub">WAITING ROOM</div>
+    <div class="grass-divider"></div>
+    <div class="room-code">房间代码 <span id="room-code">----</span></div>
+    <div id="seat-list" class="seat-list"></div>
+    <div class="msg" id="lobby-msg"></div>
+    <button id="btn-start" class="btn primary hidden">开 始 对 局</button>
+    <button id="btn-leave" class="btn">离 开 房 间</button>
+  </div>
+</div>
+
+<!-- ================= 游戏画布 ================= -->
+<canvas id="game" class="hidden"></canvas>
+
+<div id="toast-wrap"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/shared/game-core.js"></script>
+<script src="/shared/theme.js"></script>
+<script src="/shared/ui-kit.js"></script>
+<script src="UIPresenter.js"></script>
+<script src="client.js"></script>
+</body>
+</html>

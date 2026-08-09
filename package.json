@@ -1,0 +1,21 @@
+{
+  "name": "election-roguelike-online",
+  "version": "1.0.0",
+  "description": "当庭揭示 · 讽刺卡通风 Roguelike 选举卡牌游戏（Socket.IO 联机版）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test _test_skill_combos.js && node --test _balance_test.js && node --test _smoke_game.js && node --test _render_test.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1",
+    "socket.io-client": "^4.8.3"
+  }
+}

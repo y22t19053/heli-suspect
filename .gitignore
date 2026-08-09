@@ -1,0 +1,13 @@
+# 依赖
+node_modules/
+
+# 临时测试产物
+_shots/
+*.png
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 日志
+*.log
