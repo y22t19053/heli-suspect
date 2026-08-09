@@ -239,7 +239,8 @@ function makeView(st, mySeat) {
     winType: st.winType || 'support',
     winner: st.winner,
     gameOver: st.gameOver,
-    logs: st.logs   // 完整日志（pushLogs 已限制 40 条）：客户端按 length 增量扫描新闻 FX，截断会导致永久失效
+    logs: st.logs,          // 环形缓冲（logHead 偏移 + 尾部 MAX_LOG 条）：length 单调递增，客户端按全局序号增量扫描
+    logHead: st.logHead || 0  // 已被截断丢弃的头部条数（客户端全局序号 = logHead + index）
   };
   return view;
 }
@@ -381,7 +382,13 @@ function onTimeout(room, seat) {
 function pushLogs(room, msgs) {
   if (!room.state) return;
   room.state.logs.push(...msgs);
-  if (room.state.logs.length > 40) room.state.logs = room.state.logs.slice(-40);
+  // 环形缓冲：丢弃头部而非重建数组（slice(-40) 会令 length 回缩，客户端按全局序号增量扫描新闻 FX 会永久错过）
+  const MAX_LOG = 40;
+  if (room.state.logs.length > MAX_LOG) {
+    const drop = room.state.logs.length - MAX_LOG;
+    room.state.logs.splice(0, drop);
+    room.state.logHead = (room.state.logHead || 0) + drop;
+  }
 }
 
 /* 按 uid 找卡（行区/市场/手牌/事件牌），用于埋点记录卡名 */

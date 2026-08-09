@@ -2845,7 +2845,7 @@ function checkFxDiffs() {
     lastHandN = view.seats.map(s => (s.hand || []).length); lastEventsN = view.seats.map(s => (s.events || []).length);
     lastMarketSig = view.seats.map(s => (s.market || []).map(c => c.uid).join(','));
     lastHandUids = view.seats.map(s => (s.hand || []).map(c => c.uid));
-    lastLogN = view.logs.length;
+    lastLogN = (view.logHead || 0) + view.logs.length;
     overFxDone = view.gameOver;
     sideRevealDone = false;   // 新对局/重连：允许重新播放抛硬币
   }
@@ -3021,10 +3021,11 @@ function checkFxDiffs() {
     }
     lastEventsN[i] = s.events.length;
   });
-  // 事件打出 → 新闻（服务端发送完整日志，length 单调递增；S3：不再因 slice(-12) 截断而失效）
-  if (view.logs.length !== lastLogN) {
-    if (view.logs.length < lastLogN) lastLogN = view.logs.length;   // 新对局：静默对齐
-    for (let i = lastLogN; i < view.logs.length; i++) {
+  // 事件打出 → 新闻（服务端环形缓冲：logHead 偏移 + 尾部 40 条，全局序号单调递增，截断不再导致永久失效）
+  const logBase = view.logHead || 0;
+  if (logBase + view.logs.length !== lastLogN) {
+    if (logBase + view.logs.length < lastLogN) lastLogN = logBase + view.logs.length;   // 新对局：静默对齐
+    for (let i = Math.max(0, lastLogN - logBase); i < view.logs.length; i++) {
       const lg = view.logs[i] || '';
       const m = lg.match(/打出事件【(.+?)】/);
       const m2 = lg.match(/法庭黑天鹅事件触发：【(.+?)】/);
@@ -3038,7 +3039,7 @@ function checkFxDiffs() {
         sfx('gavel');
       }
     }
-    lastLogN = view.logs.length;
+    lastLogN = logBase + view.logs.length;
   }
   // 游戏结束
   if (view.gameOver && !overFxDone) {

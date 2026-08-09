@@ -470,7 +470,7 @@
       permaRules: {},          // 黑天鹅永久规则：{fatigue, scandalCost, proceduralTax, underdog, witnessFatigue}[seat] = true
       blackSwanTriggered: {},  // 已触发的黑天鹅去重：key = 事件id_座位
       winner: null, gameOver: false,
-      logs: [], fxQueue: []
+      logs: []
     };
     // 每人 3 张候选角色（同时亮出）
     const pool = shuffle(CHARACTERS.slice(), rng);
@@ -1273,14 +1273,19 @@
     s.scandal = Math.min(5, (s.scandal || 0) + 1);
     state.logs.push('😈 丑闻曝光！【' + s.name + '】声誉受损，丑闻指数 ' + s.scandal + '/5');
   }
-  /* 票数最高的对方（平票取座位靠后者，避免同一目标被连续针对） */
+  /* 票数最高的对方（平票时随机抽签，避免同一目标被连续针对或可预测） */
   function highestEnemy(votes, owner, n) {
-    let best = -1, bv = -Infinity;
+    let bv = -Infinity;
     for (let i = 0; i < n; i++) {
       if (i === owner) continue;
-      if (votes[i] >= bv) { bv = votes[i]; best = i; }
+      if (votes[i] > bv) bv = votes[i];
     }
-    return best < 0 ? owner : best;
+    if (bv === -Infinity) return owner;
+    const ties = [];
+    for (let i = 0; i < n; i++) {
+      if (i !== owner && votes[i] === bv) ties.push(i);
+    }
+    return ties.length === 1 ? ties[0] : ties[Math.floor(Math.random() * ties.length)];
   }
 
   /* ---------------- 本轮排名 ---------------- */
@@ -1503,6 +1508,7 @@
       }
       case 'pickStarter': {
         if (state.phase !== 'chooseStarter') return { ok: false, msg: '当前不是选择起始玩家阶段' };
+        if (state.starterChosen) return { ok: false, msg: '起始玩家已选定，不能重复指定' };
         if (state.starterPicker !== seat) return { ok: false, msg: '不由你选择起始玩家' };
         if (action.starterSeat === undefined || action.starterSeat < 0 || action.starterSeat >= state.seatCount) return { ok: false, msg: '非法选择' };
         state.startingSeat = action.starterSeat;
