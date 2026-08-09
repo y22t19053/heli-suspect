@@ -14,6 +14,7 @@ html, body {
   font-family: "Microsoft YaHei", "PingFang SC", "Microsoft JhengHei", "Segoe UI", sans-serif;
   user-select: none;
   overflow: hidden;
+  touch-action: manipulation;   /* 消除移动端双击缩放延迟（canvas 自身保持 none，游戏手势自管） */
 }
 
 canvas {

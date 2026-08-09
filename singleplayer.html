@@ -364,6 +364,17 @@ function sfx(name){
     }
   } catch(e){ /* 静音兜底 */ }
 }
+/* 移动端触觉反馈（D 类审查）：iOS 不支持 vibrate 时自动忽略；节流防连发 */
+let lastHapticT = 0;
+function haptic(ms){
+  try {
+    if (!navigator.vibrate) return;
+    const now = Date.now();
+    if (now - lastHapticT < 60) return;   // 节流：60ms 内最多一次
+    lastHapticT = now;
+    navigator.vibrate(ms || 10);
+  } catch(e){ /* 触觉不可用则忽略 */ }
+}
 
 /* ============================ 4. FX 动画引擎 ============================ */
 /* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化） */
@@ -1150,12 +1161,8 @@ function drawFx(f){
   'use strict';
 
   /* 阶段流转常量：唯一源在 shared/game-core.js（超级更新#2），此处仅引用。
-   * 浏览器端 game-core 先行加载必命中；node 自检环境无 ElectionCore 时兜底。 */
-  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS) || [
-    ['pickChar', '抽取角色'], ['chooseStarter', '起始'], ['drawEvent', '抽事件'], ['drawVoter', '发选民'],
-    ['buy', '取证'], ['play', '举证'], ['reveal', '亮出'], ['preEvent', '前庭审'], ['count', '审议'],
-    ['postEvent', '后庭审'], ['rank', '排名'], ['settle', '结算'], ['discard', '整理'], ['income', '酬金'], ['gameover', '终局']
-  ];
+   * 浏览器端 game-core 先行加载必命中；node 自检环境无 ElectionCore 时兜底为空数组。 */
+  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS) || [];
 
   const UIPresenter = {
     PHASE_STEPS,
@@ -1781,11 +1788,7 @@ function applyUI() {
 }
 let eventPage = 0;      // 事件牌分批翻页（每页 4 张）
 // 回合进程状态条（阶段进度）：唯一源在 shared/game-core.js（超级更新#2），此处仅引用显示版
-const PHASE_STEPS = (typeof ElectionCore !== 'undefined' && ElectionCore.PHASE_STEPS_VISIBLE) || [
-  ['chooseStarter', '起始'], ['buy', '取证'], ['play', '举证'], ['reveal', '亮出'],
-  ['preEvent', '前庭审'], ['count', '审议'], ['postEvent', '后庭审'], ['rank', '排名'],
-  ['discard', '整理'], ['income', '酬金']
-];
+const PHASE_STEPS = (typeof ElectionCore !== 'undefined' && ElectionCore.PHASE_STEPS_VISIBLE) || [];
 function panelHeight(){
   // 顶部紧凑信息条：桌面 30 / 横屏触屏 20（由四档断点 UI.panelH 决定，P1-5）
   return UI.panelH;
@@ -2799,6 +2802,7 @@ function onClick(e){
   const b = findButton(p.x, p.y);
   if (b){
     sfx('click');
+    haptic(12);   // 移动端震动反馈（桌面自动忽略）
     handleButton(b, p);
   } else if (seedFocus){
     seedFocus = false; // #13 点击空白处取消种子输入框焦点
@@ -3433,6 +3437,26 @@ function diagOut(reason){
 }
 let lastDiagPhase = null;
 let lastT = 0;
+/* 渲染错误隔离（B 类审查）：连续 ERROR_FREEZE_THRESHOLD 帧抛错则冻结画面并显示错误屏，
+ * 避免"每帧 try-catch 吞掉、画面假活但 rAF 空转"。 */
+const ERROR_FREEZE_THRESHOLD = 5;
+let renderErrCount = 0;
+let renderFrozen = false;
+function freezeRender(err){
+  renderFrozen = true;
+  if (console && console.error) console.error('[render] 连续异常，已冻结画面：', err);
+  try {
+    ctx.save();
+    ctx.fillStyle = '#0e1117'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ff5a5a'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('渲染异常，已暂停', W / 2, H / 2 - 18);
+    ctx.fillStyle = '#e6e6e6'; ctx.font = '13px sans-serif';
+    ctx.fillText(String(err && err.message || err).slice(0, 120), W / 2, H / 2 + 6);
+    ctx.fillText('请刷新页面重试', W / 2, H / 2 + 26);
+    ctx.restore();
+  } catch (e2){ /* 连错误屏都画不出就算了 */ }
+  diagOut('渲染连续异常已冻结，最近事件黑匣子：');
+}
 function loop(t){
   if (!lastT) lastT = t;
   const dt = Math.min(50, t - lastT);
@@ -3441,7 +3465,10 @@ function loop(t){
     if (game && game.phase !== lastDiagPhase){ lastDiagPhase = game.phase; diagLog({ type: 'phase', msg: 'phase→' + game.phase + ' round ' + (game.round || 0) }); }
     update(dt);
     render();
+    renderErrCount = 0;   // 成功一帧即清零
   } catch (e){
+    renderErrCount++;
+    if (renderErrCount >= ERROR_FREEZE_THRESHOLD){ freezeRender(e); return; }   // 冻结：不再 requestAnimationFrame
     if (console && console.error) console.error('[render]', e);
     diagOut('渲染异常，最近事件黑匣子：');
   }

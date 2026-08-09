@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test _test_skill_combos.js && node --test _balance_test.js && node --test _smoke_game.js && node --test _render_test.js"
+    "test": "node --test _test_skill_combos.js && node --test _balance_test.js && node --test _smoke_game.js && node --test _render_test.js",
+    "ci": "node _ci_test.js"
   },
   "engines": {
     "node": ">=16"

@@ -133,6 +133,49 @@ function sanitizeAction(raw) {
   if (typeof raw.targetUid === 'string') a.targetUid = raw.targetUid.slice(0, 64);
   return Object.keys(a).length ? a : null;
 }
+/* 纵深防御（G 类审查）：引擎权威校验（Core.apply）之前的快速失败。
+ * 与 game-core 规则同语义，只做"确定非法"的提前拦截，不重复完整规则逻辑；
+ * 即使未来引擎校验被改动/绕过，畸形或越权操作也不会抵达内部逻辑。 */
+function preflightAction(st, seat, a) {
+  const s = st.seats[seat];
+  if (!s) return { ok: false, msg: '非法座位' };
+  const phaseOf = {
+    pickChar: 'pickChar', pickStarter: 'chooseStarter',
+    buyCard: 'buy', lockCard: 'buy', refreshMarket: 'buy', endBuy: 'buy',
+    playCards: 'play', finishPlay: 'play',
+    terroristTarget: 'reveal', swapTarget: 'count',
+    playEvent: null, passEvent: null,       // pre/post 均可，引擎精确校验
+    keepCard: 'discard', finishKeep: 'discard'
+  };
+  if (Object.prototype.hasOwnProperty.call(phaseOf, a.type)) {
+    const want = phaseOf[a.type];
+    if (want && st.phase !== want) return { ok: false, msg: '当前阶段不允许该操作' };
+  }
+  // 卡牌所有权：uids/uid 必须属于该玩家自己的手牌或取证架
+  if (a.type === 'playCards' && Array.isArray(a.uids)) {
+    for (const uid of a.uids) {
+      if (!s.hand.some(c => c.uid === uid)) return { ok: false, msg: '卡牌不在你的手中' };
+    }
+  }
+  if ((a.type === 'buyCard' || a.type === 'lockCard') && a.uid) {
+    if (!s.market.some(c => c.uid === a.uid)) return { ok: false, msg: '卡牌不在你的取证架中' };
+  }
+  if (a.type === 'keepCard' && a.uid) {
+    if (!s.hand.some(c => c.uid === a.uid)) return { ok: false, msg: '卡牌不在你的手中' };
+  }
+  if (a.type === 'playEvent' && a.uid) {
+    if (!s.events.some(e => e.uid === a.uid)) return { ok: false, msg: '事件牌不在你的手中' };
+  }
+  // 角色选择必须在候选中
+  if (a.type === 'pickChar' && a.charId) {
+    if (!(st.draftCandidates[seat] || []).some(c => c.id === a.charId)) return { ok: false, msg: '非法角色' };
+  }
+  // 事件目标不能是自己
+  if (a.type === 'playEvent' && a.targetSeat !== undefined && a.targetSeat === seat) {
+    return { ok: false, msg: '不能以自己为事件目标' };
+  }
+  return { ok: true };
+}
 function ensureRoomLimit(socket) {
   if (ROOMS.size >= MAX_ROOMS) {
     socket.emit('notice', '服务器房间已满，请稍后再试');
@@ -572,6 +615,8 @@ io.on('connection', (socket) => {
     if (st.seats[seat].isAI) return ack && ack({ ok: false, msg: '你已被 AI 接管（等待重连或下局）' });
     const clean = sanitizeAction(action);
     if (!clean) return ack && ack({ ok: false, msg: '非法操作' });
+    const pf = preflightAction(st, seat, clean);
+    if (!pf.ok) return ack && ack({ ok: false, msg: pf.msg || '操作被拒绝' });
     const res = Core.apply(st, seat, clean);
     if (!res.ok) { if (ack) ack({ ok: false, msg: res.msg || '操作失败' }); return; }
     if (res.msgs && res.msgs.length) pushLogs(room, res.msgs);
@@ -650,6 +695,28 @@ app.get('/health', (req, res) => {
     memMB: Math.round(process.memoryUsage().rss / 1048576)
   });
 });
+/* 房间列表 API（E 类审查）：只读概览，供运维/大厅页面使用 */
+app.get('/api/rooms', (req, res) => {
+  const list = [];
+  for (const room of ROOMS.values()) {
+    list.push({
+      code: room.code,
+      mode: room.mode,
+      maxSeats: room.maxSeats,
+      players: room.seats.filter(s => s.connected || s.isAI).length,
+      started: !!room.started,
+      gameOver: !!(room.state && room.state.gameOver)
+    });
+  }
+  res.json({ ok: true, count: list.length, rooms: list });
+});
+// ipCounts 定时清理（E 类审查）：冷却期过期的条目不常驻内存
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, c] of ipCounts) {
+    if (c.bannedUntil <= now && c.count <= 0) ipCounts.delete(ip);
+  }
+}, 60000).unref();
 // 关键事件 JSON 日志：房间创建 / 关闭 / 局末
 const _origCreateRoom = createRoom;
 createRoom = function (opts) {

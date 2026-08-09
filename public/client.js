@@ -377,6 +377,17 @@ function sfx(name) {
     }
   } catch (e) { if (!sfxWarned) { sfxWarned = true; console.warn('[sfx] 音频不可用：', e); } }
 }
+/* 移动端触觉反馈（D 类审查）：iOS 不支持 vibrate 时自动忽略；节流防连发 */
+let lastHapticT = 0;
+function haptic(ms) {
+  try {
+    if (!navigator.vibrate) return;
+    const now = Date.now();
+    if (now - lastHapticT < 60) return;   // 节流：60ms 内最多一次
+    lastHapticT = now;
+    navigator.vibrate(ms || 10);
+  } catch (e) { /* 触觉不可用则忽略 */ }
+}
 
 /* ============================ FX 动画引擎 ============================ */
 /* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化） */
@@ -1242,9 +1253,12 @@ function renderLobby() {
   else hide('btn-start');
 }
 
-/* ---------------- 发送操作（带互斥锁） ---------------- */
+/* ---------------- 发送操作（带互斥锁） ----------------
+ * 互斥锁以服务端 ack 为唯一解锁信号（防双击重复提交）。
+ * ACK_TIMEOUT_MS 仅为 ack 永远不回来（断网/服务器卡死）时的兜底，
+ * 避免永久锁死；正常路径下锁由 ack 回调显式释放。 */
 let isProcessing = false;
-const PROCESS_LOCK_MS = 500;
+const ACK_TIMEOUT_MS = 4000;
 function send(action, cb) {
   socket.emit('action', action, ack => {
     if (ack && !ack.ok) toast(ack.msg || '操作失败', true);
@@ -1259,7 +1273,7 @@ function doAction(action, cb) {
     isProcessing = false;
     if (cb) cb(ack);
   });
-  setTimeout(() => { isProcessing = false; }, PROCESS_LOCK_MS);
+  setTimeout(() => { isProcessing = false; }, ACK_TIMEOUT_MS);
 }
 
 /* ---------------- 布局函数 ---------------- */
@@ -1267,11 +1281,7 @@ const ROW_H = 150;      // HUD_H / PANEL_Y / HAND_AREA_H 已在顶部声明，re
 let eventPage = 0;      // 事件牌分批翻页（每页 4 张）
 // 回合进程状态条（阶段进度）
 /* 阶段进度条常量：唯一源在 shared/game-core.js（超级更新#2），此处仅引用显示版 */
-const PHASE_STEPS = (typeof ElectionCore !== 'undefined' && ElectionCore.PHASE_STEPS_VISIBLE) || [
-  ['chooseStarter', '起始'], ['buy', '取证'], ['play', '举证'], ['reveal', '亮出'],
-  ['preEvent', '前庭审'], ['count', '审议'], ['postEvent', '后庭审'], ['rank', '排名'],
-  ['discard', '整理'], ['income', '酬金']
-];
+const PHASE_STEPS = (typeof ElectionCore !== 'undefined' && ElectionCore.PHASE_STEPS_VISIBLE) || [];
 function panelHeight() {
   // 顶部紧凑信息条：桌面 30 / 横屏触屏 20（按四档断点动态调整）
   return UI.panelH;
@@ -2540,6 +2550,7 @@ function onClick() {
   if (btn) {
     if (termPopup) termPopup = null;
     btnFlash[btn.id] = 1;   // P1：点击闪光反馈
+    haptic(12);             // 移动端震动反馈（桌面无此 API 自动忽略）
     handleButton(btn.id);
     return;
   }
@@ -3026,6 +3037,30 @@ function SKILLS_LV(skill) {
 
 /* ---------------- 主循环 ---------------- */
 let lastT = 0;
+/* 渲染错误隔离：连续 ERROR_FREEZE_THRESHOLD 帧抛错则冻结画面并显示错误屏，
+ * 避免"每帧都 try-catch 吞掉、画面变黑但 rAF 还在空转"的假活状态（用户 B 类审查）。 */
+const ERROR_FREEZE_THRESHOLD = 5;
+let renderErrCount = 0;
+let renderFrozen = false;
+function freezeRender(err) {
+  renderFrozen = true;
+  if (console && console.error) console.error('[render] 连续异常，已冻结画面：', err);
+  const cv = document.querySelector('canvas');
+  if (cv) {
+    try {
+      const c2 = cv.getContext('2d');
+      c2.save();
+      c2.fillStyle = '#0e1117'; c2.fillRect(0, 0, cv.width, cv.height);
+      c2.fillStyle = '#ff5a5a'; c2.font = 'bold 18px sans-serif'; c2.textAlign = 'center';
+      c2.fillText('渲染异常，已暂停', cv.width / 2, cv.height / 2 - 18);
+      c2.fillStyle = '#e6e6e6'; c2.font = '13px sans-serif';
+      c2.fillText(String(err && err.message || err).slice(0, 120), cv.width / 2, cv.height / 2 + 6);
+      c2.fillText('请刷新页面重试', cv.width / 2, cv.height / 2 + 26);
+      c2.restore();
+    } catch (e2) { /* 连错误屏都画不出就算了 */ }
+  }
+  diagOut('渲染连续异常已冻结，最近事件黑匣子：');
+}
 function loop(t) {
   if (!lastT) lastT = t;
   const dt = Math.min(50, t - lastT);
@@ -3037,8 +3072,11 @@ function loop(t) {
     if (thinkSeat >= 0 && Date.now() - thinkT > 1200) thinkSeat = -1;   // 思考遮罩兜底（防 end 丢失卡住）
     if (screen === 'game' || screen === 'draft' || screen === 'over') checkFxDiffs();
     render();
+    renderErrCount = 0;   // 成功一帧即清零
   } catch (e) {
-    if (console && console.error) console.error('[render]', e);   // M1：渲染异常不中断主循环，避免画面永久冻结
+    renderErrCount++;
+    if (renderErrCount >= ERROR_FREEZE_THRESHOLD) { freezeRender(e); return; }   // 冻结：不再 requestAnimationFrame
+    if (console && console.error) console.error('[render]', e);   // M1：单帧异常不中断主循环，避免画面永久冻结
     diagOut('渲染异常，最近事件黑匣子：');   // 输出诊断日志快照（程序意见3）
   }
   requestAnimationFrame(loop);

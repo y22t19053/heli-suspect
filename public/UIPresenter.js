@@ -38,12 +38,8 @@
   'use strict';
 
   /* 阶段流转常量：唯一源在 shared/game-core.js（超级更新#2），此处仅引用。
-   * 浏览器端 game-core 先行加载必命中；node 自检环境无 ElectionCore 时兜底。 */
-  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS) || [
-    ['pickChar', '抽取角色'], ['chooseStarter', '起始'], ['drawEvent', '抽事件'], ['drawVoter', '发选民'],
-    ['buy', '取证'], ['play', '举证'], ['reveal', '亮出'], ['preEvent', '前庭审'], ['count', '审议'],
-    ['postEvent', '后庭审'], ['rank', '排名'], ['settle', '结算'], ['discard', '整理'], ['income', '酬金'], ['gameover', '终局']
-  ];
+   * 浏览器端 game-core 先行加载必命中；node 自检环境无 ElectionCore 时兜底为空数组。 */
+  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS) || [];
 
   const UIPresenter = {
     PHASE_STEPS,

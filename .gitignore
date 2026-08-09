@@ -11,3 +11,6 @@ Thumbs.db
 
 # 日志
 *.log
+
+# CI 测试产物
+junit.xml
