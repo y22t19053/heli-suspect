@@ -2051,7 +2051,10 @@ function renderDraft(){
   }
   if (me && !me.char){
     const cands = game.draftCandidates[mySeat] || [];
-    const cw = 190, ch = 250, gap = 34;
+    // P1 修复：窄屏收缩卡宽（原固定 190px，<600px 宽屏 3 张必然溢出）
+    const gap = 34;
+    const cw = clamp((W - 40 - (cands.length - 1) * gap) / cands.length, 60, 190);
+    const ch = 250;
     const total = cands.length * cw + (cands.length - 1) * gap;
     let cx = (W - total) / 2;
     const cy = H * 0.30;
@@ -2775,10 +2778,18 @@ function renderOver(){
     drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W/2, y - 16, 15, i === 0 ? contrast(campColor(s.seat)) : '#111111', { align: 'center' });
     y += 44;
   });
-  const cb = btn(W/2 - 340, H - 104, 220, 50, '📋 复制战绩', PAL.ui.a);
+  // 窄屏收缩：按钮宽度/间距按 W 自适应，避免出屏（P1 修复）
+  let cbx = W/2 - 340, rbx = W/2 - 110, cbw = 220;
+  if (W < 700) {
+    cbw = Math.min(220, (W - 30) / 2);
+    const cgap = Math.max(8, (W - cbw * 2 - 20) / 3);
+    cbx = Math.max(10, W/2 - (cbw * 2 + cgap) / 2);
+    rbx = cbx + cbw + cgap;
+  }
+  const cb = btn(cbx, H - 104, cbw, 50, '📋 复制战绩', PAL.ui.a);
   cb.act = 'copyReport';
   buttons.push(cb); drawBtn(cb);
-  const rb = btn(W/2 - 110, H - 104, 220, 50, '再来一局', PAL.accent.a);
+  const rb = btn(rbx, H - 104, cbw, 50, '再来一局', PAL.accent.a);
   rb.act = 'restart';
   buttons.push(rb); drawBtn(rb);
   const mb = btn(W/2 - 110, H - 48, 220, 40, '返回主菜单', PAL.ui.a);
@@ -2894,7 +2905,9 @@ function handleButton(b, p){
     if (b.candId && game && !game.seats[mySeat].char){
       // 选中：其余两张碎裂
       const cands = game.draftCandidates[mySeat] || [];
-      const cw = 190, ch = 250, gap = 34;
+      const gap = 34;
+      const cw = clamp((W - 40 - (cands.length - 1) * gap) / cands.length, 60, 190);
+      const ch = 250;
       const total = cands.length * cw + (cands.length - 1) * gap;
       let cx = (W - total) / 2;
       const cy = H * 0.30;

@@ -1225,7 +1225,8 @@ socket.on('state', (st) => {
   deadline = null;
   selected = [];
   eventPick = null;
-  lastStarterSeat = st.startingSeat;   // 对齐起始者，避免重连/开局误触发轮盘
+  // 注意：不再在此处同步 lastStarterSeat（曾无条件对齐导致轮盘 FX 永不触发）——
+  // 改为 checkFxDiffs 的新局/重连分支对齐，正常轮次由 diff 检测触发轮盘
   hide('menu');
   hide('lobby');
   show('game');
@@ -1946,7 +1947,8 @@ function canClickHand(card) {
 }
 function keepMax() {
   const s = view.seats[mySeat];
-  return 1 + (s.char && s.char.skill && s.char.skill.type === 'keepPlus' ? s.char.skill.v : 0);
+  // 官方规则=基础 2 张 + keepPlus 加成（曾误写 1+，单机正确、联机少 1 个保留位 → 对齐）
+  return 2 + (s.char && s.char.skill && s.char.skill.type === 'keepPlus' ? s.char.skill.v : 0);
 }
 function isEventUsable(ev) {
   if (!view || ev.used || ev.hidden) return false;
@@ -2163,8 +2165,16 @@ function renderOver() {
     drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W / 2, y - 16, 16, i === 0 ? contrast(campColor(s.seat)) : '#111111', { align: 'center' });
     y += 46;
   });
-  addButton('copyReport', W / 2 - 340, H - 104, 220, 50, '📋 复制战绩', {});
-  addButton('backMenu', W / 2 - 110, H - 104, 220, 50, '返回大厅', { primary: true });
+  // 窄屏收缩：按钮宽度/间距按 W 自适应，避免出屏（P1 修复）
+  let cbx = W / 2 - 340, bbx = W / 2 - 110, cbw = 220;
+  if (W < 700) {
+    cbw = Math.min(220, (W - 30) / 2);
+    const cgap = Math.max(8, (W - cbw * 2 - 20) / 3);
+    cbx = Math.max(10, W / 2 - (cbw * 2 + cgap) / 2);
+    bbx = cbx + cbw + cgap;
+  }
+  addButton('copyReport', cbx, H - 104, cbw, 50, '📋 复制战绩', {});
+  addButton('backMenu', bbx, H - 104, cbw, 50, '返回大厅', { primary: true });
 }
 
 /* #13 战绩文本快照（纯文本，可粘贴分享/复盘） */
@@ -2897,6 +2907,7 @@ function checkFxDiffs() {
     lastLogN = (view.logHead || 0) + view.logs.length;
     overFxDone = view.gameOver;
     sideRevealDone = false;   // 新对局/重连：允许重新播放抛硬币
+    lastStarterSeat = view.startingSeat;   // 新对局/重连：静默对齐起始者，不触发轮盘 FX
   }
   lastV = view.version;
   const n = view.seatCount;
@@ -2930,7 +2941,9 @@ function checkFxDiffs() {
     }
   }
   // 起始玩家确定 → 轮盘（startingSeat 变化时触发，保证 winner 为新值）
-  if (view.startingSeat !== lastStarterSeat && lastStarterSeat !== null && view.phase !== 'pickChar') {
+  // 首次加载（lastStarterSeat 仍为 null）只对齐不触发，避免开局误播
+  if (lastStarterSeat === null) lastStarterSeat = view.startingSeat;
+  else if (view.startingSeat !== lastStarterSeat && view.phase !== 'pickChar') {
     lastStarterSeat = view.startingSeat;
     if (view.round >= 1) {
       const seats = view.seats.map(s2 => ({ name: s2.name, col: campColor(s2.seat) }));
