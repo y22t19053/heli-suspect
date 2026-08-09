@@ -42,11 +42,12 @@ function genCode() {
   return code;
 }
 
-function createRoom({ mode, maxSeats, hostName }) {
+function createRoom({ mode, maxSeats, hostName, seed }) {
   const code = genCode();
   const room = {
     code, mode,
     maxSeats: clampInt(maxSeats, 2, 4),
+    seed: (typeof seed === 'string' && seed.trim() !== '') ? seed.trim().slice(0, 40) : null,   // 房主种子码（留空=随机，分享战绩用）
     seats: [],
     state: null,
     started: false,
@@ -239,6 +240,7 @@ function makeView(st, mySeat) {
     winType: st.winType || 'support',
     winner: st.winner,
     gameOver: st.gameOver,
+    seed: st.seed,              // 种子码（可复现，分享战绩用）
     logs: st.logs,          // 环形缓冲（logHead 偏移 + 尾部 MAX_LOG 条）：length 单调递增，客户端按全局序号增量扫描
     logHead: st.logHead || 0  // 已被截断丢弃的头部条数（客户端全局序号 = logHead + index）
   };
@@ -476,7 +478,7 @@ io.on('connection', (socket) => {
     const mode = data.mode === 'solo' ? 'solo' : 'multi';
     const maxSeats = clampInt(data.maxSeats, 2, 4);
     if (SOCK_TO_ROOM.has(socket.id)) return ack && ack({ ok: false, msg: '你已在房间中' });
-    const room = createRoom({ mode, maxSeats, hostName: name });
+    const room = createRoom({ mode, maxSeats, hostName: name, seed: data.seed });
     // 房主入座 0
     room.seats[0] = { name, isAI: false, connected: true };
     room.hostSeat = 0;
@@ -546,7 +548,7 @@ io.on('connection', (socket) => {
     const names = room.seats.map(s => s.name || ('AI 对手' + s.seat));
     const aiMask = room.seats.map(s => s.isAI);
     room.state = Core.createGame({
-      seed: Math.floor(Math.random() * 0x7fffffff),
+      seed: room.seed || Math.floor(Math.random() * 0x7fffffff),   // 房主指定种子可复现（同种子=同一对局）
       seatCount: room.maxSeats,
       names,
       aiMask

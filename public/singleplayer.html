@@ -1748,6 +1748,10 @@ let vm = null;                  // P1-8：UIPresenter.project(game) 投影 ViewM
 let seatCount = 2;
 // #108 恢复上次参选人数（localStorage；file:// 与隐私模式下 try-catch 防抛错）
 try { const _s = localStorage.getItem('elec_seats'); if (_s && ['2', '3', '4'].indexOf(_s) >= 0) seatCount = +_s; } catch (e) { /* 忽略 */ }
+// #13 种子码（可选，留空=随机；同种子=同一对局可复现；分享战绩用）
+let seedInput = '';
+let seedFocus = false;
+try { const _sd = localStorage.getItem('elec_seed'); if (_sd != null) seedInput = _sd; } catch (e) { /* 忽略 */ }
 let mySeat = 0;
 let selected = [];
 let buyMode = 'buy';
@@ -1915,6 +1919,22 @@ function renderMenu(){
     drawPixelText(m.sym + ' ' + m.name, px0 + pw/2, H * 0.385 + 22, 16, contrast(m.col), { align: 'center' });
     px0 += pw + pg;
   });
+  // #13 种子码输入框（可选，留空=随机；同一种子 = 同一对局可复现）
+  const seedW = 300, seedH = 34, seedX = W / 2 + 46, seedY = H * 0.53 - 44;
+  drawPixelText('种子码（留空随机）', seedX - 12, seedY + seedH / 2 + 5, 13, '#C9D6EA', { align: 'right', shadow: false });
+  pxRect(seedX, seedY, seedW, seedH, '#101418');
+  pxBorder(seedX, seedY, seedW, seedH, seedFocus ? '#FFD60A' : '#3A4258', seedFocus ? 2.5 : 2);
+  if (seedInput){
+    const sf = fitText(seedInput, seedW - 28, 15);
+    const mw = drawPixelText(sf.text, seedX + 14, seedY + seedH / 2 + 5, sf.size, '#FFFFFF', { align: 'left', shadow: false }).w;
+    if (seedFocus && Math.floor(performance.now() / 500) % 2 === 0) pxRect(seedX + 14 + mw, seedY + 9, 2, seedH - 18, '#FFD60A');
+  } else {
+    drawPixelText('同一种子 = 同一对局', seedX + 14, seedY + seedH / 2 + 5, 13, '#5A6478', { align: 'left', shadow: false });
+    if (seedFocus && Math.floor(performance.now() / 500) % 2 === 0) pxRect(seedX + 14, seedY + 9, 2, seedH - 18, '#FFD60A');
+  }
+  const seedBtn = btn(seedX, seedY, seedW, seedH, '', PAL.ui.a);
+  seedBtn.seedField = true;
+  buttons.push(seedBtn);
   // 参选人数
   const counts = [2, 3, 4];
   const bw = 140, gap = 24;
@@ -2740,6 +2760,8 @@ function renderOver(){
   else if (game.winType === 'juryNull') winSub = '🕊️ 陪审团否决：人民拒绝适用恶法';
   drawPixelText(winSub, W/2, H*0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? '#FFFFFF' : '#FFD60A', { align: 'center' });
   drawPixelText('—— 最终陪审团倾向 ——', W/2, H*0.585, 18, '#FFFFFF', { align: 'center' });
+  // #13 种子码（可复现，分享战绩用）
+  if (game.seed != null) drawPixelText('🌱 种子 ' + game.seed, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
   const order = game.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
   let y = H * 0.635;
   order.forEach((s, i) => {
@@ -2752,12 +2774,51 @@ function renderOver(){
     drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W/2, y - 16, 15, i === 0 ? contrast(campColor(s.seat)) : '#111111', { align: 'center' });
     y += 44;
   });
+  const cb = btn(W/2 - 340, H - 104, 220, 50, '📋 复制战绩', PAL.ui.a);
+  cb.act = 'copyReport';
+  buttons.push(cb); drawBtn(cb);
   const rb = btn(W/2 - 110, H - 104, 220, 50, '再来一局', PAL.accent.a);
   rb.act = 'restart';
   buttons.push(rb); drawBtn(rb);
   const mb = btn(W/2 - 110, H - 48, 220, 40, '返回主菜单', PAL.ui.a);
   mb.act = 'toMenu';
   buttons.push(mb); drawBtn(mb);
+}
+// #13 战绩复制：纯文本战报 → 剪贴板（clipboard API + execCommand 兜底）
+function buildReportSP(g){
+  const seats = g.seats;
+  const order = seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
+  const win = order[0];
+  const winSide2 = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
+  const wt = g.winType === 'precedent' ? '⚖️ 先例胜利' : (g.winType === 'juryNull' ? '🕊️ 陪审团否决' : '最终陪审团倾向');
+  const lines = [
+    '【当庭揭示 · 世纪审判】战报',
+    '胜诉方：' + win.name + (winSide2 ? '（' + winSide2 + '）' : ''),
+    '胜诉方式：' + wt,
+    '进行轮次：' + (g.round != null ? g.round : '-') + ' / 5',
+    '种子码：' + (g.seed != null ? g.seed : '随机'),
+    '—— 最终陪审团倾向 ——'
+  ];
+  order.forEach((s, i) => lines.push((i + 1) + '. ' + s.name + ' — ' + s.support));
+  return lines.join('\n');
+}
+function copyReport(){
+  if (!game) return;
+  const txt = buildReportSP(game);
+  const done = () => flash('✅ 战绩已复制，可粘贴分享');
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) done(); else flash('复制失败，请手动复制');
+    } catch (e) { flash('复制失败，请手动复制'); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(done).catch(fallback);
+  } else fallback();
 }
 
 /* ============================ 10. 输入 ============================ */
@@ -2794,11 +2855,33 @@ function onClick(e){
   if (b){
     sfx('click');
     handleButton(b, p);
+  } else if (seedFocus){
+    seedFocus = false; // #13 点击空白处取消种子输入框焦点
   }
 }
+// #13 种子输入：seedFocus 时键盘输入（仅菜单屏；画布输入框无 DOM，需自收键盘）
+document.addEventListener('keydown', (e) => {
+  if (screen !== 'menu' || !seedFocus) return;
+  if (e.key === 'Escape' || e.key === 'Enter'){ seedFocus = false; return; }
+  if (e.key === 'Backspace'){
+    seedInput = seedInput.slice(0, -1);
+    try { localStorage.setItem('elec_seed', seedInput); } catch (err) { /* 忽略 */ }
+    e.preventDefault();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length === 1 && e.key !== ' '){
+    if (seedInput.length >= 20) return;
+    seedInput += e.key;
+    try { localStorage.setItem('elec_seed', seedInput); } catch (err) { /* 忽略 */ }
+    e.preventDefault();
+  }
+});
 function handleButton(b, p){
   if (screen === 'menu'){
     if (showAbout){ if (b.label === '关 闭'){ showAbout = false; } return; }
+    // #13 种子输入框：点击激活
+    if (b.seedField){ seedFocus = true; return; }
     if (b.count !== undefined){ seatCount = b.count; try { localStorage.setItem('elec_seats', String(b.count)); } catch (e) { /* 忽略 */ } return; }
     if (b.label === '开庭审理'){ startGame(); return; }
     if (b.label === '游戏规则'){ showRules = true; return; }
@@ -2832,6 +2915,7 @@ function handleButton(b, p){
     if (secondEventAsk && b.act !== 'eventYes' && b.act !== 'eventNo') return;
     if (b.act === 'restart'){ startGame(); return; }
     if (b.act === 'toMenu'){ toMenu(); return; }
+    if (b.act === 'copyReport'){ copyReport(); return; }
     if (b.act === 'refresh'){
       const r = ElectionCore.apply(game, mySeat, { type: 'refreshMarket' });
       if (r.ok) sfx('shatter'); else flash(r.msg);
@@ -3250,7 +3334,10 @@ function startGame(){
   aiQueue = []; aiTimer = 0; logExpanded = true;
   const names = ['你', 'AI·公诉', 'AI·被告', 'AI·第三方'];
   const aiMask = names.map((_, i) => i !== 0);
-  game = ElectionCore.createGame({ seatCount, names: names.slice(0, seatCount), aiMask: aiMask.slice(0, seatCount), seed: Math.floor(Math.random() * 1e9) });
+  // #13 种子码：留空=随机（同种子=同一对局可复现），并记住本次输入
+  const seedVal = seedInput.trim();
+  try { localStorage.setItem('elec_seed', seedInput); } catch (err) { /* 忽略 */ }
+  game = ElectionCore.createGame({ seatCount, names: names.slice(0, seatCount), aiMask: aiMask.slice(0, seatCount), seed: seedVal || Math.floor(Math.random() * 1e9) });
   lastV = game.version; lastPhase = game.phase;
   lastRowSig = sigOf(game.row); lastVotesSig = ''; lastRankSig = '';
   lastMoney = game.seats.map(s => s.money);

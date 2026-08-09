@@ -1249,6 +1249,9 @@ function initMenu() {
   // 恢复上次座位数设置（#108 localStorage）
   const savedSeats = localStorage.getItem('elec_seats');
   if (savedSeats && ['2', '3', '4'].indexOf(savedSeats) >= 0) $('sel-seats').value = savedSeats;
+  // #13 恢复上次种子码（可选，留空随机）
+  const savedSeed = localStorage.getItem('elec_seed');
+  if (savedSeed) $('inp-seed').value = savedSeed;
   $('btn-create').onclick = () => doCreate('multi');
   $('btn-solo').onclick = () => doCreate('solo');
   $('btn-join').onclick = () => doJoin();
@@ -1275,8 +1278,11 @@ function doCreate(mode) {
   const maxSeats = parseInt($('sel-seats').value, 10) || 2;
   localStorage.setItem('elec_seats', String(maxSeats));   // #108 保存座位数
   localStorage.setItem('elec_mode', mode);                // #108 保存模式（solo/multi）
+  // #13 种子码（可选，留空=服务器随机；同种子=同一对局，可复现）
+  const seed = $('inp-seed').value.trim();
+  localStorage.setItem('elec_seed', seed);
   setBusy(true);
-  socket.emit('createRoom', { name, mode, maxSeats }, ack => {
+  socket.emit('createRoom', { name, mode, maxSeats, seed }, ack => {
     setBusy(false);
     if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
     lastRoomCode = ack.code;
@@ -2143,6 +2149,8 @@ function renderOver() {
   else if (view.winType === 'juryNull') winSub = '🕊️ 陪审团否决：人民拒绝适用恶法';
   drawPixelText(winSub, W / 2, H * 0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? '#FFFFFF' : '#FFD400', { align: 'center' });
   drawPixelText('—— 最终陪审团倾向 ——', W / 2, H * 0.585, 18, '#FFFFFF', { align: 'center' });
+  // #13 种子码（可复现，分享战绩用）
+  if (view.seed != null) drawPixelText('🌱 种子 ' + view.seed, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
   const order = view.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
   let y = Math.min(H * 0.635, H - 130 - order.length * 46);   // S4：4 人局整体上移，避免与“返回大厅”按钮重叠
   order.forEach((s, i) => {
@@ -2154,7 +2162,42 @@ function renderOver() {
     drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W / 2, y - 16, 16, i === 0 ? contrast(campColor(s.seat)) : '#111111', { align: 'center' });
     y += 46;
   });
+  addButton('copyReport', W / 2 - 340, H - 104, 220, 50, '📋 复制战绩', {});
   addButton('backMenu', W / 2 - 110, H - 104, 220, 50, '返回大厅', { primary: true });
+}
+
+/* #13 战绩文本快照（纯文本，可粘贴分享/复盘） */
+function buildReport(seats, seedVal, winType) {
+  const win = seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat)[0];
+  const winSide = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
+  const wt = winType === 'precedent' ? '⚖️ 先例胜利' : (winType === 'juryNull' ? '🕊️ 陪审团否决' : '最终陪审团倾向');
+  const lines = [
+    '【当庭揭示 · 世纪审判】战报',
+    '胜诉方：' + win.name + (winSide ? '（' + winSide + '）' : ''),
+    '胜诉方式：' + wt,
+    '种子码：' + (seedVal != null ? seedVal : '随机'),
+    '—— 最终陪审团倾向 ——'
+  ];
+  const order = seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
+  order.forEach((s, i) => lines.push((i + 1) + '. ' + s.name + ' — ' + s.support));
+  return lines.join('\n');
+}
+/* #13 复制到剪贴板（clipboard API + execCommand 兜底） */
+function copyText(t, okMsg) {
+  const done = () => toast(okMsg || '✅ 已复制到剪贴板');
+  const fallback = () => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) done(); else toast('复制失败，请手动复制', true);
+    } catch (e) { toast('复制失败，请手动复制', true); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(t).then(done).catch(fallback);
+  } else fallback();
 }
 
 /* ---------------- 新手教程 / 术语百科（新规则 16 步） ---------------- */
@@ -2758,6 +2801,11 @@ function handleButton(id) {
     case 'backMenu':
       if (confirm('确定要离开当前对局吗？进度将丢失。')) location.reload();
       break;
+    case 'copyReport': {
+      // #13 分享战绩：生成纯文本快照并复制到剪贴板
+      if (view) copyText(buildReport(view.seats, view.seed, view.winType), '✅ 战绩已复制，可粘贴分享');
+      break;
+    }
     case 'wait': break;
   }
 }
