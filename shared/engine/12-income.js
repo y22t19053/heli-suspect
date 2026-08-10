@@ -16,9 +16,7 @@
         if (i === first) amt -= 1;  // 领先税：榜首 -1⊙（政治资本消耗）
         if (i === last) amt += 1;   // 保底酬金：末位 +1⊙（胜诉基金）
       }
-      // 永久规则（黑天鹅·疲劳轰炸）：每轮收入 -1⊙
-      if (state.permaRules && state.permaRules.fatigueTax && state.permaRules.fatigueTax[i]) amt -= 1;
-      // 收入保底：每轮至少 +1⊙（榜首 -1 + 疲劳轰炸 -1 时也不会白板回合）
+      // 收入保底：每轮至少 +1⊙（榜首 -1 时也不会白板回合）
       const pay = Math.max(1, amt);
       s.money += pay;
       state.logs.push('💰 【' + s.name + '】发放律师费 +' + pay + '⊙（累计 ' + s.money + '⊙）');
@@ -26,9 +24,6 @@
     state.logs.push(hasPrev
       ? '第 ' + state.round + ' 轮结束，发放律师费（榜首 -1⊙ / 末位 +1⊙）' + (tax ? '，连任榜首更换证物架成本 +1' : '')
       : '第 ' + state.round + ' 轮结束，发放启动酬金 +4⊙');
-    if (state.permaRules && state.permaRules.fatigueTax) {
-      state.seats.forEach((s, i) => { if (state.permaRules.fatigueTax[i]) state.logs.push('📜 疲劳轰炸：' + s.name + ' 每轮收入 -1⊙（超负荷庭审开销）'); });
-    }
     // 轮末：市场未买牌洗回，锁定牌留作下轮
     state.seats.forEach((s, i) => {
       s.lastLockedUids = s.lockedUids.slice();

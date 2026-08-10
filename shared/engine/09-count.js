@@ -10,24 +10,13 @@
     const n = state.seatCount;
     // 1. 基础票：每张未移除的牌投其 votes 票（单卡自带丑闻按 scandal 扣票）
     const votes = new Array(n).fill(0);
-    const pr = state.permaRules || {};
     state.row.forEach(r => {
       if (r.removed || r._nullified) return;
       let base = (r.card.votes || 1) - (r.card.scandal || 0);
-      // 永久规则（黑天鹅）：媒体围猎——该玩家丑闻牌 -1 票；证人疲劳——全场证人牌 -1 票
-      if (pr.mediaHunt && pr.mediaHunt[r.seat] && (r.card.scandal || 0) > 0) base -= 1;
-      if (pr.witnessFatigue && pr.witnessFatigue[r.seat]) base -= 1;
       votes[r.seat] += Math.max(0, base);
     });
     // 2. 计票前事件修正
     for (let i = 0; i < n; i++) votes[i] += state.voteMod[i];
-    // 2.5 永久规则（黑天鹅·树大招风）：落后 ≥2 票的一方获得 +1 票补偿（舆论倒向弱者）
-    if (pr.underdogBonus) {
-      const mx = Math.max(...votes);
-      state.seats.forEach((s, i) => {
-        if (mx - votes[i] >= 2) { votes[i] += 1; state.logs.push('🕊️ 陪审团倒向弱者：' + s.name + ' 落后 ≥2 票，+1 票补偿'); }
-      });
-    }
     // 4. 角色被动：组织能手 +1 票；AI 人格被动：激进人格 +票
     state.seats.forEach((s, i) => {
       if (s.char && s.char.skill.type === 'votePlus') votes[i] += s.char.skill.v;

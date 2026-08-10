@@ -22,11 +22,11 @@ const total = lines.length; // 末行若带 \n 则 split 后有尾部空串
 /* 每段：[文件名, 起始行号(1-based)]；段 = [start, 下段start-1] */
 const segs = [
   ['00-head.js', 1],      // UMD 外壳 + 工具函数
-  ['01-data.js', 40],     // CAMPS/CHARACTERS/SKILLS/SK_VAL/VOTER_TEMPLATES/PROCEDURAL_SKILLS/AI_PERSONALITIES/EVENT_TEMPLATES
+  ['01-data.js', 40],     // CAMPS/CHARACTERS/SKILLS/SK_VAL/VOTER_TEMPLATES/AI_PERSONALITIES/EVENT_TEMPLATES
   ['02-numeric.js', 341], // 数值函数（eventLvMax…lockMax）
   ['03-state.js', 364],   // makeSeat/makeVoter/makeEvent/buildDeck/buildEventDeck/createGame
   ['04-advance.js', 491], // advance（阶段推进状态机）
-  ['05-phases.js', 587],  // beginStarter + FEATURES + beginRound/beginVoter/beginBuy
+  ['05-phases.js', 587],  // beginStarter + beginRound/beginVoter/beginBuy
   ['06-actions.js', 655], // buyCard/lockCard/refreshMarket/reshuffle + beginPlay/nextPlaySeat/playCards/finishPlay
   ['07-reveal.js', 762],  // beginReveal/revealNext/resolveTerrorist + rowNeighbor/swapRow/applyMoves/resolveSwap
   ['08-events.js', 865],  // 事件阶段全套

@@ -15,29 +15,16 @@
     }
     state.phase = 'chooseStarter';
   }
-  /* 功能开关（Feature Toggle）——项目管理意见1 轻量版
-   * 默认全开；运行时可按需关闭某模块做灰度/回退，无需重新部署：
-   *   ElectionCore.setFeature('events', false)        → 开局不再发放事件牌
-   * 新玩法接入时在此登记开关并在对应逻辑处判断 feature('xxx') 即可。 */
-  const FEATURES = { events: true };
-  function feature(name) { return FEATURES[name] !== false; }
-  function setFeature(name, val) { FEATURES[name] = !!val; return Object.assign({}, FEATURES); }
-  function getFeatures() { return Object.assign({}, FEATURES); }
-
   function beginRound(state) {
     state.phase = 'drawEvent';
     state.turn = state.startingSeat;
     state.voteMod = new Array(state.seatCount).fill(0);
     state.supportBuff = new Array(state.seatCount).fill(0);
-    // 重置本轮行为统计（黑天鹅事件判定）
-    state.seats.forEach(s => { s.stats.roundPlayed = 0; s.stats.roundScandal = 0; s.stats.roundProcedural = 0; s.stats.roundWitness = 0; });
-    // 抽事件牌：从起始角色开始每人 1 张（FEATURES.events 关闭时跳过，状态机照常推进）
-    if (feature('events')) {
-      for (let k = 0; k < state.seatCount; k++) {
-        const s = state.seats[(state.startingSeat + k) % state.seatCount];
-        if (!state.eventDeck.length) state.eventDeck = buildEventDeck(state.rng);
-        s.events.push(state.eventDeck.pop());
-      }
+    // 抽事件牌：从起始角色开始每人 1 张（状态机照常推进）
+    for (let k = 0; k < state.seatCount; k++) {
+      const s = state.seats[(state.startingSeat + k) % state.seatCount];
+      if (!state.eventDeck.length) state.eventDeck = buildEventDeck(state.rng);
+      s.events.push(state.eventDeck.pop());
     }
     state.logs.push('—— 第 ' + state.round + ' 轮 ——');
   }

@@ -212,9 +212,6 @@
     { id: 'v104', name: '抽签质证',      cost: 2, votes: 1, skill: 'randomHit', v: 1, desc: '随机 1 张对方牌 -1 票' }
   ];
 
-  /* 程序性技能：黑天鹅【程序滥用】等事件判定用（动议/反对/时间线狙击/换位） */
-  const PROCEDURAL_SKILLS = ['swap', 'shiftLeft', 'shiftRight', 'objection', 'timelineSnipe', 'whistleblower'];
-
   /* AI 人格（从美式法律/政治文化提取）：
    * aggression 0~1：进攻性（影响攻击事件偏好/出牌数量）
    * economy 0~1：经济牌偏好（影响购买/刷新决策）
@@ -255,48 +252,6 @@
     { id: 'e37', name: '军售丑闻案',    lv: 2, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
     { id: 'e38', name: '桃色丑闻案',    lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
     { id: 'e40', name: '计票争议案',    lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e41', name: '水门案',        lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
-    /* ============ 法庭黑天鹅扩充包（e55+，基于行为模式触发，不进事件牌堆） ============
-     * 触发机制：不看轮次随机，而是看玩家「行为模式」——由 checkBlackSwan 在庭审前检查
-     *   s.stats.roundXxx（本轮已亮出牌的构成）与 leaderStreak（连续领跑轮数）
-     * 三种影响设计（每只黑天鹅都具备）：
-     *   ① 立即生效   → immediate() 立刻结算（票/⊙/丑闻/支持度）
-     *   ② 可被抵消   → counter() 若满足条件（持有特定技能牌）则免疫并反转叙事
-     *   ③ 永久改变规则 → perma() 写入 state.permaRules，此后每轮生效（收入税/罚款/票差惩罚） */
-    { id: 'e55', name: '疲劳轰炸', lv: 3, timing: 'auto', target: 'auto', blackSwan: true,
-      trigger: (st, s) => s.stats.roundPlayed >= 3,
-      counter: (st, s) => s.hand.some(c => c.skill === 'flipNarrative'),
-      counterText: '叙事大师掌控节奏，法官采信其陈词节奏，疲劳指控被当庭驳回',
-      immediate: (st, s) => { st.voteMod[s.seat] -= 1; st.logs.push('🦢 黑天鹅【疲劳轰炸】：' + st.seats[s.seat].name + ' 疲劳举证，证人证词前后矛盾——本轮 -1 票'); },
-      perma: (st, s) => { st.permaRules.fatigueTax = st.permaRules.fatigueTax || {}; st.permaRules.fatigueTax[s.seat] = true; st.logs.push('📜 永久规则：' + st.seats[s.seat].name + ' 此后每轮收入 -1⊙（超负荷庭审开销）'); },
-      desc: '庭审记录：连日盘问令证人形容枯槁，书记员逐字核对证词时发现多处矛盾……' },
-    { id: 'e56', name: '媒体围猎', lv: 3, timing: 'auto', target: 'auto', blackSwan: true,
-      trigger: (st, s) => s.stats.roundScandal >= 2,
-      counter: (st, s) => s.hand.some(c => c.skill === 'whistleblower'),
-      counterText: '内部吹哨人主动交代内幕，媒体焦点转向制度本身，围猎化解',
-      immediate: (st, s) => { for (let i = 0; i < st.seatCount; i++) applyScandalEffects(st, i); st.logs.push('🦢 黑天鹅【媒体围猎】：丑闻证据外泄引发媒体狂欢——所有玩家丑闻 +1'); },
-      perma: (st, s) => { st.permaRules.mediaHunt = st.permaRules.mediaHunt || {}; st.permaRules.mediaHunt[s.seat] = true; st.logs.push('📜 永久规则：' + st.seats[s.seat].name + ' 此后每张丑闻牌 -1 票（名声尽毁，越描越黑）'); },
-      desc: '庭审记录：庭审笔记经人泄露登上头版，旁听席座无虚席，陪审团不时瞥向记者席……' },
-    { id: 'e57', name: '程序滥用', lv: 3, timing: 'auto', target: 'auto', blackSwan: true,
-      trigger: (st, s) => s.stats.roundProcedural >= 2,
-      counter: (st, s) => s.hand.some(c => c.skill === 'objection'),
-      counterText: '法官认定反对有理有据，程序异议全部成立，罚款豁免',
-      immediate: (st, s) => { st.seats[s.seat].money = Math.max(0, st.seats[s.seat].money - 2); st.logs.push('🦢 黑天鹅【程序滥用】：' + st.seats[s.seat].name + ' 滥用程序动议拖延庭审——被处藐视法庭罚款 2⊙'); },
-      perma: (st, s) => { st.permaRules.proceduralTax = st.permaRules.proceduralTax || {}; st.permaRules.proceduralTax[s.seat] = true; st.logs.push('📜 永久规则：' + st.seats[s.seat].name + ' 此后每打出 1 张程序牌额外 -1⊙（罚款升级）'); },
-      desc: '庭审记录：休庭期间，主审法官在法官席后摇头——"本庭无意容忍无休止的动议轰炸。"……' },
-    { id: 'e58', name: '证人疲劳', lv: 3, timing: 'auto', target: 'auto', blackSwan: true,
-      trigger: (st, s) => s.stats.roundWitness >= 3,
-      counter: (st, s) => s.hand.some(c => c.skill === 'crossExam'),
-      counterText: '交叉询问当场澄清矛盾，证人可信度不降反升',
-      immediate: (st, s) => { st.voteMod[s.seat] -= 1; st.logs.push('🦢 黑天鹅【证人疲劳】：' + st.seats[s.seat].name + ' 连传多名证人，证词相互矛盾——本轮 -1 票'); },
-      perma: (st, s) => { st.permaRules.witnessFatigue = st.permaRules.witnessFatigue || {}; st.permaRules.witnessFatigue[s.seat] = true; st.logs.push('📜 永久规则：' + st.seats[s.seat].name + ' 此后每张证人牌 -1 票（证人名声已然透支）'); },
-      desc: '庭审记录：第四位证人走上证人席时，陪审团席传来一声几不可闻的叹息……' },
-    { id: 'e59', name: '树大招风', lv: 3, timing: 'auto', target: 'auto', blackSwan: true,
-      trigger: (st, s) => st.leaderStreak >= 2 && st.prevFirst === s.seat,
-      counter: (st, s) => s.hand.some(c => c.skill === 'reasonableDoubt'),
-      counterText: '以合理怀疑转移舆论焦点，领跑者反而赢得"受害者光环"',
-      immediate: (st, s) => { st.seats[s.seat].support = Math.max(0, st.seats[s.seat].support - 1); st.logs.push('🦢 黑天鹅【树大招风】：' + st.seats[s.seat].name + ' 连续领跑成为众矢之的——陪审团倾向 -1'); },
-      perma: (st, s) => { st.permaRules.underdogBonus = true; st.logs.push('📜 永久规则：此后每轮，落后 ≥2 票的一方获得 +1 票补偿（陪审团倒向弱者）'); },
-      desc: '庭审记录：法庭外抗议者高呼领跑方律师的名字，陪审团入场时神情各异……' }
+    { id: 'e41', name: '水门案',        lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' }
   ];
 

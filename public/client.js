@@ -2030,16 +2030,6 @@ const TUTORIAL_PAGES = [
     ]
   },
   {
-    title: '法庭黑天鹅',
-    body: [
-      { t: 'text', s: '庭审中会出现 5 种「黑天鹅」乱局，由行为模式触发（不是随机轮次）。' },
-      { t: 'text', s: '疲劳轰炸：本轮举证 ≥3 张 → 本轮 -1 票、此后每轮收入 -1⊙。媒体围猎：单轮丑闻 ≥2 → 全员丑闻 +1。' },
-      { t: 'text', s: '程序滥用：单轮程序牌 ≥2 → 罚 2⊙。证人疲劳：单轮证人牌 ≥3 → 本轮 -1 票、此后每张证人牌 -1 票。' },
-      { t: 'text', s: '树大招风：连续 2 轮领跑 → 陪审团倾向 -1，开启「反超补偿」（此后每轮落后 ≥2 票方 +1 票）。' },
-      { t: 'text', s: '若手中有对应克星技能牌（如「合理怀疑」克树大招风），可当场反驳抵消。' }
-    ]
-  },
-  {
     title: '三种胜诉路径',
     body: [
       { t: 'text', s: '常规：5 轮结束后倾向最高者胜诉。' },
@@ -2064,8 +2054,7 @@ const TERMS = [
   { id: 'draft', name: '律师身份', cat: '核心', text: '开局 3 选 1 的律师身份，提供被动技能：起始 ⊙+2、传唤折扣、换证折扣、证物架 +1 槽、审议 +1 票、留证上限 2 等。' },
   { id: 'income', name: '分发⊙', cat: '经济', text: '每轮结束全体获得固定 2⊙（首轮启动直接发 4⊙；此后榜首 -1⊙、末位 +1⊙，每轮保底 +1⊙）。' },
   { id: 'precedent', name: '先例胜利', cat: '胜利', text: '打出「确立先例」技能牌后记录先例标记。比赛结束时，若该方触发过先例事件则直接胜诉，即使倾向落后。源于英美法系「遵循先例」（stare decisis）原则：判例一旦确立，后世庭审必须遵循。' },
-  { id: 'juryNull', name: '陪审团否决', cat: '胜利', text: '打出「陪审团否决」技能牌可获得 1 名陪审员支持，集满 3 名立即胜诉。源于陪审团否决（Jury Nullification）制度：陪审团可以拒绝适用他们认为不正义的法律。历史上 Zenger 案（1735）和 William Penn 案（1670）均是陪审团否决的著名案例。' },
-  { id: 'blackSwan', name: '黑天鹅事件', cat: '事件', text: '5 种由行为模式触发的庭审乱局（疲劳轰炸/媒体围猎/程序滥用/证人疲劳/树大招风）。触发后立即生效并可能永久改变规则，若手中有对应克星技能可当场反驳抵消。' }
+  { id: 'juryNull', name: '陪审团否决', cat: '胜利', text: '打出「陪审团否决」技能牌可获得 1 名陪审员支持，集满 3 名立即胜诉。源于陪审团否决（Jury Nullification）制度：陪审团可以拒绝适用他们认为不正义的法律。历史上 Zenger 案（1735）和 William Penn 案（1670）均是陪审团否决的著名案例。' }
 ];
 function termPopupData(pp) {
   if (!pp) return null;
@@ -2849,13 +2838,12 @@ function checkFxDiffs() {
     for (let i = Math.max(0, lastLogN - logBase); i < view.logs.length; i++) {
       const lg = view.logs[i] || '';
       const m = lg.match(/打出事件【(.+?)】/);
-      const m2 = lg.match(/法庭黑天鹅事件触发：【(.+?)】/);
-      if (m || m2) {
-        const nm = m ? m[1] : m2[1];
+      if (m) {
+        const nm = m[1];
         const evT = (ElectionCore.data.EVENT_TEMPLATES || []).find(t => t.name === nm);
         addFx({ type: 'news', dur: 2000, title: nm, sub: evT ? evT.desc : '' });
         // 法庭高潮：事件生效瞬间全屏 OBJECTION!（法槌音效 + 冲击感）
-        addFx({ type: 'objection', dur: 1500, sub: m2 ? '法庭黑天鹅 · 行为触发' : '事件牌生效' });
+        addFx({ type: 'objection', dur: 1500, sub: '事件牌生效' });
         shakeAmp = Math.max(shakeAmp, 14);
         sfx('gavel');
       }

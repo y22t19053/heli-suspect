@@ -2,39 +2,11 @@
   /* ---------------- 事件牌阶段（计票前 / 计票后） ---------------- */
   function beginPreEvent(state) {
     state.phase = 'preEvent';
-    checkBlackSwan(state);   // 法庭黑天鹅：按行为模式触发（不进事件牌堆）
     startEventPhase(state);
   }
   function beginPostEvent(state) {
     state.phase = 'postEvent';
     startEventPhase(state);
-  }
-  /* 法庭黑天鹅：基于玩家"行为模式"触发（非随机轮次），每只仅触发一次
-   * 触发 → ① 立即生效；② 若满足抵消条件（持有特定技能牌）则免疫；③ 否则写入永久规则 */
-  function checkBlackSwan(state) {
-    const n = state.seatCount;
-    state.seats.forEach(s => {
-      // 防御：直接构造的测试 state 可能缺失 stats/permaRules 等
-      s.stats = s.stats || {};
-      state.permaRules = state.permaRules || {};
-      state.blackSwanTriggered = state.blackSwanTriggered || {};
-      state.voteMod = state.voteMod || new Array(n).fill(0);
-      EVENT_TEMPLATES.forEach(ev => {
-        if (!ev.blackSwan || !ev.trigger) return;
-        const key = ev.id + '_' + s.seat;
-        if (state.blackSwanTriggered[key]) return;
-        if (!ev.trigger(state, s)) return;
-        state.blackSwanTriggered[key] = true;
-        state.logs.push('⚡ 法庭黑天鹅事件触发：【' + ev.name + '】（对象：' + s.name + '）');
-        state.logs.push('📋 ' + ev.desc);
-        if (ev.counter && ev.counter(state, s)) {
-          state.logs.push('🛡️ 抵消成功：' + ev.counterText);
-          return;
-        }
-        ev.immediate(state, s);
-        if (ev.perma) ev.perma(state, s);
-      });
-    });
   }
   /* 由起始角色指定的角色开始（MVP：默认从起始角色开始） */
   function startEventPhase(state) {

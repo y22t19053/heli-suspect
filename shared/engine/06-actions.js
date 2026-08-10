@@ -74,19 +74,6 @@
     state.row.push({ seat: s.seat, card: card, revealed: false });
     s.played.push(card);
     s.stats.playedCards++;
-    s.stats.roundPlayed++;
-    if (card.scandal > 0) s.stats.roundScandal++;
-    if (PROCEDURAL_SKILLS.indexOf(card.skill) >= 0) s.stats.roundProcedural++;
-    if (!card.skill && (card.votes || 1) >= 1) s.stats.roundWitness++;
-    // 永久规则（黑天鹅）：程序滥用者打程序牌 +1⊙ 成本 / 丑闻围猎者打丑闻牌 +1⊙ 成本
-    if (state.permaRules && state.permaRules.proceduralTax && state.permaRules.proceduralTax[s.seat] && PROCEDURAL_SKILLS.indexOf(card.skill) >= 0) {
-      s.money = Math.max(0, s.money - 1);
-      state.logs.push('💸 缠讼罚款：' + s.name + ' 打出程序牌额外 -1⊙（黑天鹅·程序滥用）');
-    }
-    if (state.permaRules && state.permaRules.scandalCost && state.permaRules.scandalCost[s.seat] && card.scandal > 0) {
-      s.money = Math.max(0, s.money - 1);
-      state.logs.push('💸 公关成本：' + s.name + ' 打出丑闻牌额外 -1⊙（黑天鹅·媒体围猎）');
-    }
     state.logs.push(s.name + ' 暗置提交 1 份证据');
     // 轮转：还有手牌则轮到下一个可行动者（若只剩自己则继续轮到自己）
     if (s.hand.length > 0) {

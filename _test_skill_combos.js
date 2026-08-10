@@ -9,9 +9,8 @@
  *   E. 封神技·确立先例（v99）
  *   F. 封神技·陪审团否决（v100）
  *   G. finishGame 先例胜利 / 常规支持度胜利
- *   H. 黑天鹅事件行为触发（e55/e56/e59）
  *   I. 位置博弈系（v101 首座 / v102 末席 / v103 左翼 / v104 抽签）
- *   J. 收入保底（榜首 -1 + 疲劳轰炸 -1 仍 +1）+ 逐人日志
+ *   J. 收入分发（榜首 -1 / 末位 +1 / 保底 +1）+ 逐人日志
  *
  * 运行：node --test _test_skill_combos.js（或 npm test）
  * 说明：直接调用 Core 导出的测试钩子，构造完整结算状态，
@@ -188,49 +187,6 @@ test('组合 G2：常规支持度胜利', () => {
 });
 
 /* ============================================================
- * 组合 H：黑天鹅事件行为触发
- * ============================================================ */
-test('组合 H1：疲劳轰炸 e55 触发', () => {
-  // 疲劳轰炸 e55：本轮打出 ≥3 张 → voteMod -1；无 flipNarrative 不抵消
-  const st = makeCountState([], []);
-  st.seats[0].stats.roundPlayed = 4;
-  st.seats[0].hand.push({ skill: 'orator' });
-  Core.checkBlackSwan(st);
-  assert.deepEqual(st.voteMod, [-1, 0], '触发疲劳轰炸：A voteMod = -1');
-  assert.ok(st.permaRules.fatigueTax && st.permaRules.fatigueTax[0] === true, '永久规则写入 fatigueTax[0]');
-});
-
-test('组合 H2：疲劳轰炸被 flipNarrative 抵消', () => {
-  const st = makeCountState([], []);
-  st.seats[0].stats.roundPlayed = 4;
-  st.seats[0].hand.push({ skill: 'flipNarrative' });
-  Core.checkBlackSwan(st);
-  assert.deepEqual(st.voteMod, [0, 0], '被抵消：A voteMod 不变');
-  assert.ok(!st.permaRules.fatigueTax || !st.permaRules.fatigueTax[0], '抵消后不写永久规则');
-});
-
-test('组合 H3：媒体围猎 e56 触发', () => {
-  // 媒体围猎 e56：本轮打出 ≥2 张丑闻牌 → 全场丑闻 +1
-  const st = makeCountState([], []);
-  st.seats[0].stats.roundScandal = 2;
-  Core.checkBlackSwan(st);
-  assert.deepEqual(st.seats.map(s => s.scandal), [1, 1], '触发媒体围猎：双方丑闻 +1');
-  assert.ok(st.permaRules.mediaHunt && st.permaRules.mediaHunt[0] === true, '永久规则写入 mediaHunt[0]');
-});
-
-test('组合 H4：树大招风 e59 触发', () => {
-  // 树大招风 e59：连续领跑 2 轮 → 支持度 -1；无 reasonableDoubt 不抵消
-  const st = makeCountState([], []);
-  st.leaderStreak = 2;
-  st.prevFirst = 0;
-  st.seats[0].support = 5;
-  st.seats[0].hand.push({ skill: 'crossExam' });
-  Core.checkBlackSwan(st);
-  assert.deepEqual(st.seats.map(s => s.support), [4, 0], '触发树大招风：A 支持度 5→4');
-  assert.ok(st.permaRules.underdogBonus === true, '永久规则 underdogBonus 开启');
-});
-
-/* ============================================================
  * 组合 I：位置博弈系（v101 首座 / v102 末席 / v103 左翼 / v104 抽签）
  * ============================================================ */
 test('组合 I1：首座质证 v101', () => {
@@ -264,18 +220,17 @@ test('组合 I4：抽签质证 v104', () => {
 });
 
 /* ============================================================
- * 组合 J：收入保底（榜首 -1 + 疲劳轰炸 -1 时仍 +1，且逐人日志）
+ * 组合 J：收入分发（榜首 -1 / 末位 +1 / 保底 +1，逐人日志）
  * ============================================================ */
-test('组合 J：收入保底 + 逐人日志', () => {
+test('组合 J：收入分发 + 逐人日志', () => {
   const st = makeCountState([], []);
   st.round = 3;
   st.rankInfo = [{ seat: 0, support: 5 }, { seat: 1, support: 2 }];  // A 榜首 / B 末位
-  st.permaRules = { fatigueTax: [true, false] };
   st.seats[0].money = 3;
   st.seats[1].money = 3;
   Core.beginIncome(st);
-  // A：2 - 榜首1 - 疲劳1 = 0 → 保底 +1 → 4；B：2 + 末位1 = 3 → 6
-  assert.deepEqual(st.seats.map(s => s.money), [4, 6], 'A 保底 +1（3→4）、B 末位 +1（3→6）');
+  // A：2 - 榜首1 = 1 → 3+1=4；B：2 + 末位1 = 3 → 3+3=6
+  assert.deepEqual(st.seats.map(s => s.money), [4, 6], 'A 榜首 -1（3→4）、B 末位 +1（3→6）');
   assert.ok(st.logs.some(l => l.indexOf('发放律师费 +1⊙') >= 0), '逐人收入日志（含保底 +1⊙），logs=' + JSON.stringify(st.logs));
   assert.ok(st.logs.some(l => l.indexOf('发放律师费 +3⊙') >= 0), '逐人收入日志（含末位 +3⊙）');
 });

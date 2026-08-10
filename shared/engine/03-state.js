@@ -14,8 +14,7 @@
       buyDone: false, playDone: false, keepDone: false,
       eventCount: 0, eventPassed: false,
       stats: {
-        playedCards: 0, eventsPlayed: 0, roundsWon: 0,  // 历史累计
-        roundPlayed: 0, roundScandal: 0, roundProcedural: 0, roundWitness: 0  // 本轮行为（黑天鹅事件判定）
+        playedCards: 0, eventsPlayed: 0, roundsWon: 0  // 历史累计
       }
     };
   }
@@ -30,7 +29,7 @@
   }
   function buildEventDeck(rng) {
     const list = [];
-    EVENT_TEMPLATES.forEach(t => { if (!t.blackSwan) { list.push(makeEvent(t)); list.push(makeEvent(t)); } });
+    EVENT_TEMPLATES.forEach(t => { list.push(makeEvent(t)); list.push(makeEvent(t)); });
     return shuffle(list, rng);
   }
 
@@ -108,8 +107,6 @@
       precedentSeat: -1,       // 触发"确立先例"的座位（终局先例胜利判定）
       juryTokens: new Array(seatCount).fill(0),  // 各玩家陪审员支持（集满 3 立即胜诉）
       winType: 'support',      // 胜利类型：support / precedent / juryNull
-      permaRules: {},          // 黑天鹅永久规则：{fatigue, scandalCost, proceduralTax, underdog, witnessFatigue}[seat] = true
-      blackSwanTriggered: {},  // 已触发的黑天鹅去重：key = 事件id_座位
       winner: null, gameOver: false,
       logs: []
     };

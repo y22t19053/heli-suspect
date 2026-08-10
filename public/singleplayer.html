@@ -2664,12 +2664,6 @@ function renderRules(){
     '质证（相邻敌方证人 -1，带丑闻额外 -1）· 反对!（对方本场亮出②③级技能牌 → 最高敌 -1）· 证人信誉崩塌（对方有丑闻牌 → 最高敌 -1）',
     '内部吹哨人（结算后：丑闻最高对方 -1⊙ 且丑闻 +1）',
     '',
-    '【法庭黑天鹅 · 行为触发乱局】',
-    '疲劳轰炸：本轮举证≥3 张 → 本轮 -1 票、此后每轮收入 -1⊙ · 媒体围猎：单轮丑闻≥2 → 全员丑闻 +1（此后该方每张丑闻牌 -1 票）',
-    '程序滥用：单轮程序牌≥2 → 该方罚 2⊙（此后每打 1 张程序牌额外 -1⊙） · 证人疲劳：单轮证人牌≥3 → 本轮 -1 票、此后每张证人牌 -1 票',
-    '树大招风：连续 2 轮领跑 → 该方陪审团倾向 -1，开启「反超补偿」（此后每轮落后≥2 票方 +1 票）',
-    '若手中有对应克星技能牌可当场反驳抵消（合理怀疑克树大招风、反对!克程序滥用等）',
-    '',
     '【三种胜诉路径】',
     '常规：5 轮结束后倾向最高者胜诉',
     '先例胜利：确立先例的一方即使倾向落后也直接胜诉（判例重于民意）',
@@ -3555,10 +3549,10 @@ function answerSecondEvent(yes){
     eventPick = null;
   }
 }
-function fireNews(title, sub, swan){
+function fireNews(title, sub){
   addFx({ type: 'news', dur: 2000, title, sub });
   // 法庭高潮：事件生效瞬间全屏 OBJECTION!（法槌音效 + 冲击感）
-  addFx({ type: 'objection', dur: 1500, sub: swan ? '法庭黑天鹅 · 行为触发' : '事件牌生效' });
+  addFx({ type: 'objection', dur: 1500, sub: '事件牌生效' });
   shakeAmp = Math.max(shakeAmp, 14);
   sfx('gavel');
 }
@@ -3785,11 +3779,10 @@ function checkFxDiffs(){
       const lg = game.logs[i] || '';
       if (lg.indexOf(meName) === 0) continue;   // 跳过自己的日志
       const m = lg.match(/打出事件【(.+?)】/);
-      const m2 = lg.match(/法庭黑天鹅事件触发：【(.+?)】/);
-      if (m || m2){
-        const nm = m ? m[1] : m2[1];
+      if (m){
+        const nm = m[1];
         const evT = (ElectionCore.data.EVENT_TEMPLATES || []).find(t => t.name === nm);
-        fireNews(nm, evT ? evT.desc : '', !!m2);
+        fireNews(nm, evT ? evT.desc : '');
       }
     }
     lastLogN = game.logs.length;
