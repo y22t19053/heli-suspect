@@ -33,26 +33,31 @@ for (const c of cases) {
   const tag = c.name + `(mini=${lay.mini},small=${lay.small})`;
   // 技能名底 ≤ 效果顶（迷你档：名与效果应分离；small/normal 同理）
   check(tag + ' 技能名-效果不重叠', sn.y + sn.h <= se.y + 1, `sn=${sn.y + sn.h} se=${se.y}`);
+  // 大徽章下沿 < 技能名上沿（normal 档：中央技能徽章不得压技能名/效果）
+  if (!lay.mini && !lay.small) {
+    const badgeBot = lay.skillBadge.y + lay.skillBadge.h;
+    check(tag + ' 徽章-技能名不重叠', badgeBot <= sn.y + 1, `badge=${badgeBot} sn=${sn.y}`);
+  }
   // 效果至少 1 行能放下且不压价格条（normal 动态行数；small/mini 1 行）
   if (lay.mini || lay.small) {
     check(tag + ' 效果1行不压价格条', se.y + se.size <= cb.y + 1, `se底=${se.y + se.size} cb=${cb.y}`);
   } else {
-    const lineH = Math.max(8.5, c.h * 0.085);
+    const lineH = Math.max(9, c.h * 0.075);
     const maxLines = Math.max(1, Math.floor((cb.y - se.y - 3) / lineH));
     check(tag + ' 效果折行≥1行', maxLines >= 1, `maxLines=${maxLines}`);
     check(tag + ' 效果首行不压价格条', se.y + lineH <= cb.y + 1, `se+lineH=${se.y + lineH} cb=${cb.y}`);
   }
-  // 迷你档：名字/票数不与技能名重叠（技能名 y+0.44h 与票数徽章 y+0.2h）
+  // 迷你档：名字/票数不与技能名重叠（技能名 y+0.36h 与票数徽章 y+0.2h）
   if (lay.mini) {
     check(tag + ' mini 票数-技能名分离', lay.voteBadge.y + lay.voteBadge.h <= sn.y + 1, `vb=${lay.voteBadge.y + lay.voteBadge.h} sn=${sn.y}`);
   }
 }
 
-/* 3) 面板两行几何（renderPanelsOf 坐标，按 ph 手算关键值） */
+/* 3) 面板两行几何（renderPanelsOf 坐标，按新 ph/字号手算关键值） */
 const panelCases = [
-  { name: '桌面 ph=36', ph: 36, r1y: 15, r1size: 16, r2y: 30, r2size: 13 },
-  { name: '竖屏 ph=32', ph: 32, r1y: 15, r1size: 15, r2y: 26, r2size: 12 },
-  { name: '横屏触屏 ph=26', ph: 26, r1y: 12, r1size: 12, r2y: 20, r2size: 10 },
+  { name: '桌面 ph=42', ph: 42, r1y: 18, r1size: 17, r2y: 34, r2size: 15.5 },
+  { name: '竖屏 ph=40', ph: 40, r1y: 18, r1size: 17, r2y: 32, r2size: 15.5 },
+  { name: '横屏触屏 ph=34', ph: 34, r1y: 15, r1size: 12.5, r2y: 26, r2size: 11.5 },
 ];
 for (const p of panelCases) {
   const r1Top = p.r1y - p.r1size, r1Bot = p.r1y;
@@ -60,6 +65,10 @@ for (const p of panelCases) {
   const overlap = Math.min(r1Bot, r2Bot) - Math.max(r1Top, r2Top);
   check(p.name + ' 两行不重叠(≤2px)', overlap <= 2, `重叠=${overlap}px`);
   check(p.name + ' 行2在面板内', r2Bot <= p.ph, `r2Bot=${r2Bot} ph=${p.ph}`);
+  // 矩形方框头像垂直居中且不越界（avH compact=18 / 其他=24）
+  const avH = p.ph === 34 ? 18 : 24;
+  const avY = Math.max(3, (p.ph - 4) / 2 - (avH / 2));
+  check(p.name + ' 头像框在面板内', avY >= 1 && avY + avH <= p.ph - 1, `avY=${avY} bot=${avY + avH}`);
 }
 
 console.log(fails === 0 ? '\n全部通过' : `\n${fails} 项失败`);

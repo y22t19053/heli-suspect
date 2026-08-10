@@ -77,6 +77,21 @@
             if (allyNear) votes[owner] += 1;
             break;
           }
+          case 'chain': {
+            // 连横合纵：左右都是本方 → 本方所有已亮牌 +1；左右都是敌方 → 最高敌 -1（三态左右博弈）
+            const nbL = rowNeighbor(state, idx, -1);
+            const nbR = rowNeighbor(state, idx, 1);
+            const allyL = nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner;
+            const allyR = nbR && !nbR.removed && !nbR._nullified && nbR.seat === owner;
+            const foeL = nbL && !nbL.removed && !nbL._nullified && nbL.seat !== owner;
+            const foeR = nbR && !nbR.removed && !nbR._nullified && nbR.seat !== owner;
+            if (allyL && allyR) {
+              state.row.forEach(x => { if (!x.removed && !x._nullified && x.seat === owner) votes[x.seat] += (r.card.v || 1); });
+            } else if (foeL && foeR) {
+              votes[highestEnemy(votes, owner, n, state.rng)] -= (r.card.v || 1);
+            }
+            break;
+          }
           case 'pivot': {
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);

@@ -41,10 +41,13 @@ function connect() {
     s.on('connect_error', (e) => { try { s.close(); } catch (_) {} reject(e); });
   });
 }
-/* ack 回调 + 小延迟摊开限流窗口（RATE_MAX_ACTIONS=10/2s），避免测试误触发限流 */
+/* ack 回调 + 小延迟摊开限流窗口（RATE_MAX_ACTIONS=10/2s），避免测试误触发限流。
+ * 8s 超时兜底：若服务器未注册该事件处理器（例如连接被 guardConnection 拒绝），
+ * ack 永不回调 → 快速失败而不是无限挂起。 */
 function emitAck(sock, ev, data) {
-  return new Promise((resolve) => {
-    sock.emit(ev, data || {}, (r) => { sleep(220).then(() => resolve(r)); });
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('emitAck 超时: ' + ev)), 8000);
+    sock.emit(ev, data || {}, (r) => { clearTimeout(t); sleep(220).then(() => resolve(r)); });
   });
 }
 /* 等待 state 事件满足 pred；version 单调递增，pred 通常用 version 比较避免消费旧帧 */
@@ -63,8 +66,8 @@ function waitState(sock, pred, timeoutMs = 20000, label = '') {
 /* 先注册再触发的 waitState：服务器 afterStateChange 的广播可能在 ack 之前到达客户端，
  * 若等 emit 完成后再注册监听器会丢失该帧（socket.io 事件不缓存、不重放）→ 永远超时。
  * 调用方必须先拿到 promise 再 emit，最后 await。 */
-function waitStateP(sock, pred, timeoutMs = 20000) {
-  return waitState(sock, pred, timeoutMs);
+function waitStateP(sock, pred, timeoutMs = 20000, label = '') {
+  return waitState(sock, pred, timeoutMs, label);
 }
 /* 发送行动并等待 version 递增的新 state（先注册监听器再 emit，防丢帧） */
 async function myAction(sock, v, action) {
@@ -78,19 +81,45 @@ function keepMaxOf(seatView) {
   const sk = seatView && seatView.char && seatView.char.skill;
   return 2 + ((sk && sk.type === 'keepPlus') ? sk.v : 0);
 }
+/* 从当前状态一路推进到 discard（或 gameover）：沿途处理人类 0 号的所有可选行动——
+ * play 轮转轮到 0 → finishPlay；reveal 恐怖分子选目标；preEvent/postEvent → passEvent；
+ * count 政治操盘选目标。AI 座位由服务器自动处理，无需测试干预。
+ * 原因：每轮每人发 1 张事件牌，seat 0 可能拿到可用的 pre/post 事件而必须行动；
+ * 若不做任何操作会等满 SEAT_TIMEOUT_MS(30s) 才被 AI 接管，测试等 discard 会超时。 */
+async function driveToDiscard(A, v, max = 40) {
+  let g = 0;
+  while (!['discard', 'gameover'].includes(v.phase) && g++ < max) {
+    if (v.phase === 'play' && v.turn === 0 && !v.seats[0].playDone) {
+      v = await myAction(A, v, { type: 'finishPlay' });
+    } else if (v.phase === 'reveal' && v.revealPending && v.revealPending.owner === 0) {
+      const tgt = (v.row || []).find(r => r.revealed && r.seat !== 0 && !r.removed);
+      v = await myAction(A, v, { type: 'terroristTarget', targetUid: tgt ? tgt.card.uid : v.revealPending.cardUid });
+    } else if ((v.phase === 'preEvent' || v.phase === 'postEvent') && v.eventTurnSeat === 0) {
+      v = await myAction(A, v, { type: 'passEvent' });
+    } else if (v.phase === 'count' && v.swapPending && v.swapPending.owner === 0) {
+      const cand = (v.swapPending.candidates || [])[0];
+      v = await myAction(A, v, { type: 'swapTarget', targetUid: cand });
+    } else {
+      v = await waitState(A, vv => vv.version > v.version, 15000);
+    }
+  }
+  return v;
+}
 
 /* ---------- 测试 1：掉线-重连全程（快照恢复 + 托管不消费） ---------- */
 test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，行动权回归', async () => {
-  const A = await connect();
-  const r1 = await emitAck(A, 'createRoom', { name: 'A1', mode: 'solo', maxSeats: 2, seed: 'rc-1' });
+  let A = null, B = null;
+  try {
+    A = await connect();
+    const r1 = await emitAck(A, 'createRoom', { name: 'A1', mode: 'solo', maxSeats: 2, seed: 'rc-1' });
   assert.ok(r1.ok, '建房失败: ' + r1.msg);
   const code = r1.code;
-  assert.ok((await emitAck(A, 'startGame')).ok, '开局失败');
-
   // 选角 → 定起始 → （可能的事件选择）→ buy
-  // 注意：第 1 轮起始玩家自动随机（game-core beginStarter：starterPicker=-1 直接 beginRound），
-  // 服务器 pumpAutoAdvance 在广播前就推进过 chooseStarter，客户端永远收不到该阶段广播 → 直接等 buy
-  let v = await waitState(A, vv => vv.phase === 'pickChar' && vv.draftCandidates.length);
+  // 注意：startGame 的 pickChar 广播可能在 ack 之前到达客户端（afterStateChange 在 ack 前触发），
+  // 若等 ack 完成后再注册监听器会丢帧 → 永远超时。因此必须先拿到 waitStateP 的 promise 再 startGame。
+  const v1P = waitStateP(A, vv => vv.phase === 'pickChar' && vv.draftCandidates.length);
+  assert.ok((await emitAck(A, 'startGame')).ok, '开局失败');
+  let v = await v1P;
   v = await myAction(A, v, { type: 'pickChar', charId: v.draftCandidates[0].id });
   v = await waitState(A, vv => vv.phase === 'buy');
   // buy 初始手牌为 0（beginBuy 不发牌，手牌靠买证/技能/事件获得）：
@@ -109,16 +138,18 @@ test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，�
 
   // 保守托管基准：不买不锁不刷新，直接 endBuy
   v = await myAction(A, v, { type: 'endBuy' });
-  v = await waitState(A, vv => vv.phase === 'play');
-  if (v.turn === 0 && !v.seats[0].playDone) v = await myAction(A, v, { type: 'finishPlay' });
-  // 推进到 discard 阶段后掉线（此时 AI 需替 A 处理弃牌）
-  v = await waitState(A, vv => vv.phase === 'discard', 25000);
+  // 一路推进到 discard：沿途处理人类 0 号在 play/reveal/事件/换位阶段的可选行动
+  v = await driveToDiscard(A, v);
+  // driveToDiscard 返回时已消费 discard state（v.phase === 'discard'）。
+  // 注意不能再 waitState(discard)：discard state 已被消费，下一个版本要等人类弃牌
+  // （SEAT_TIMEOUT 30s 或 AI 接管）→ 会超时。直接掉线，让 AI 接管处理弃牌。
+  assert.equal(v.phase, 'discard', '应推进到 discard，实际 ' + v.phase);
   A.disconnect();
   await sleep(2500);   // AI 托管推进（ghostAct）
 
   // 同名重连（先注册 state 监听器，避免 joinRoom ack 前的 state 广播丢帧）
-  const B = await connect();
-  const v2P = waitStateP(B, () => true);
+  B = await connect();
+  const v2P = waitStateP(B, () => true, 15000, '重连B');
   const r2 = await emitAck(B, 'joinRoom', { code, name: 'A1' });
   assert.ok(r2.ok && r2.reconnected, '重连失败: ' + JSON.stringify(r2));
   assert.equal(r2.seat, 0);
@@ -147,19 +178,25 @@ test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，�
   }
   // 必须 close() 而非仅 disconnect()：否则 socket.io-client manager 的 ping 定时器
   // 会挂住事件循环，node --test 测试全部通过后进程无法退出（npm test 卡死）
-  B.close && B.close();
-  A.close && A.close();
+  // 且连接计数（guardConnection 按 IP 计数）若泄漏会令后续测试连接被 ban → 务必 finally 关闭
+  } finally {
+    try { B && B.close && B.close(); } catch (e) {}
+    try { A && A.close && A.close(); } catch (e) {}
+  }
 });
 
 /* ---------- 测试 2：ghostAct discard 多手牌（只保留 keepMax 张，顺序保持） ---------- */
 test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活', async () => {
-  const A = await connect();
+  let A = null, B = null;
+  try {
+    A = await connect();
   const r1 = await emitAck(A, 'createRoom', { name: 'A2', mode: 'solo', maxSeats: 2, seed: 'rc-2' });
   assert.ok(r1.ok, '建房失败: ' + r1.msg);
   const code = r1.code;
+  // 同测试 1：startGame 的 pickChar 广播可能在 ack 前到达，先注册监听器再 startGame 防丢帧
+  const v1P = waitStateP(A, vv => vv.phase === 'pickChar' && vv.draftCandidates.length);
   assert.ok((await emitAck(A, 'startGame')).ok, '开局失败');
-
-  let v = await waitState(A, vv => vv.phase === 'pickChar' && vv.draftCandidates.length);
+  let v = await v1P;
   v = await myAction(A, v, { type: 'pickChar', charId: v.draftCandidates[0].id });
   // 第 1 轮起始玩家自动随机，chooseStarter 阶段不广播 → 直接等 buy
   v = await waitState(A, vv => vv.phase === 'buy');
@@ -181,11 +218,12 @@ test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活
     break;
   }
   v = await myAction(A, v, { type: 'endBuy' });
-  v = await waitState(A, vv => vv.phase === 'play');
-  if (v.turn === 0 && !v.seats[0].playDone) v = await myAction(A, v, { type: 'finishPlay' });
-
-  // 进入 discard，记录断线时手牌
-  v = await waitState(A, vv => vv.phase === 'discard', 30000);
+  // 一路推进到 discard：沿途处理人类 0 号在 play/reveal/事件/换位阶段的可选行动。
+  // driveToDiscard 返回时已消费 discard state（v.phase === 'discard'），
+  // 不能再 waitState(discard)：discard state 已被消费，下一个版本要等人类弃牌
+  // （SEAT_TIMEOUT 30s 或 AI 接管）→ 会超时。直接记录手牌后掉线。
+  v = await driveToDiscard(A, v);
+  assert.equal(v.phase, 'discard', '应推进到 discard，实际 ' + v.phase);
   const h0 = (v.seats[0].hand || []).map(c => c.uid);
   const keepMax = keepMaxOf(v.seats[0]);
   const n = Math.min(keepMax, h0.length);
@@ -195,7 +233,7 @@ test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活
   A.disconnect();
   await sleep(6000);   // AI 托管推进：ghostAct 处理 A 的 discard 并继续
 
-  const B = await connect();
+  B = await connect();
   // 重连后等 A 的弃牌完成（可能仍在 discard，ghostAct 已处理则 keepDone）；先注册防丢帧
   const v2P = waitStateP(B, vv => vv.seats[0].keepDone === true || vv.phase !== 'discard' || vv.gameOver, 15000);
   const r2 = await emitAck(B, 'joinRoom', { code, name: 'A2' });
@@ -216,6 +254,8 @@ test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活
   }
   // 每张断线手牌要么保留在手、要么被归档（不会凭空消失成"卡牌复制"）：
   // 保留子集全在手牌中（前 n 张已验证）；归档子集已断言不复活。✓
-  B.close && B.close();   // close() 而非 disconnect()：清理 manager ping 定时器，进程可退出
-  A.close && A.close();
+  } finally {
+    try { B && B.close && B.close(); } catch (e) {}
+    try { A && A.close && A.close(); } catch (e) {}
+  }
 });

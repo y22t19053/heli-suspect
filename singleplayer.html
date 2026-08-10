@@ -845,7 +845,7 @@ function drawFx(f){
     fan: '⭐', troll: '🖤', orator: '🎤', scandal: '📰', wave: '🌊',
     idol: '🌟', megaScandal: '💣', comeback: '🔥', pivot: '🎲', donor: '💰',
     buyback: '💵', terrorist: '🚫', swap: '🔄', shiftLeft: '⬅️', shiftRight: '➡️',
-    counsel: '🤝', flank: '⚔️', poach: '🪤', rally: '📣', tagBoost: '🎯',
+    counsel: '🤝', flank: '⚔️', poach: '🪤', rally: '📣', chain: '🔗', tagBoost: '🎯',
     tagHate: '🛑', edge: '📍', rowL: '◀️', rowR: '▶️', leftFoe: '👈',
     rightFoe: '👉', majority: '📈', minority: '📉', shame: '😈', threat: '👑',
     crossExam: '🔍', objection: '⚡', reasonableDoubt: '🧤', timelineSnipe: '🕰️',
@@ -876,7 +876,8 @@ function drawFx(f){
     v86: '护士', v87: '古董', v88: '算法', v89: '并肩', v90: '反水',
     v91: '质证', v92: '反对', v93: '手套', v94: '收据', v95: '原则',
     v96: '豪赌', v97: '伪证', v98: '吹哨', v99: '先例', v100: '人民',
-    v101: '首座', v102: '末席', v103: '方阵', v104: '抽签'
+    v101: '首座', v102: '末席', v103: '方阵', v104: '抽签',
+    v105: '连横', v106: '左旗', v107: '右旗', v108: '对调'
   };
 
   /* 技能 → 飘字 + 触发色（唯一源：双端不再手抄，见 _build_ui 内联） */
@@ -899,6 +900,7 @@ function drawFx(f){
     flank: { txt: '连坐 -1', col: '#D82E2F' },
     poach: { txt: '连坐挖票', col: '#E8A418' },
     rally: { txt: '声援 +1', col: '#0E8A5F' },
+    chain: { txt: '连横 +N', col: '#E8A418' },
     pivot: { txt: '反超 +2', col: '#E8A418' },
     tagBoost: { txt: '共鸣 +1', col: '#1E4FB5' },
     tagHate: { txt: '压制 -1', col: '#D82E2F' },
@@ -938,21 +940,22 @@ function drawFx(f){
   function planCard(x, y, w, h) {
     const ratio = w / h;
     const mini = w < 70 || h < 62 || ratio < 0.52;          // 迷你：名字+票数+价格
-    const small = !mini && (w < 116 || h < 96 || ratio < 0.8); // 小档：技能图标小字+条
+    const small = !mini && (w < 116 || h < 96 || ratio < 0.62); // 小档：高瘦或过矮才降级（150×206 手牌卡保持 normal 折行效果）
     const pad = 4;
     const vbW = Math.min(48, w * 0.36);
     const vbH = Math.min(20, h * 0.2);
     const nameSize = Math.max(9, Math.min(h * (mini ? 0.10 : 0.14), 22));
-    const badgeSize = Math.max(14, Math.min(h * 0.28, 40));
+    // 技能大徽章：整体下移且缩小（badge 下沿让位给技能名，杜绝重叠）
+    const badgeSize = Math.max(14, Math.min(h * 0.22, 34));
     return {
       mini, small, ratio,
       voteBadge: { x: x + pad, y: y + pad, w: vbW, h: vbH },
       name: { x: x + vbW + 8, y: y + h * (mini ? 0.04 : 0.06), w: w - vbW - 14, h: nameSize * 1.4, size: nameSize },
-      skillBadge: { x, y: y + h * (mini ? 0.5 : 0.34), w, h: badgeSize * 1.6, size: badgeSize },
-      skillName: { x, y: y + h * (mini ? 0.36 : (small ? 0.44 : 0.62)), w, h: Math.max(mini ? 10 : 14, h * 0.08), size: Math.max(8, Math.min(h * 0.07, 13)) },
+      skillBadge: { x, y: y + h * (mini ? 0.5 : 0.33), w, h: badgeSize * 1.15, size: badgeSize },
+      skillName: { x, y: y + h * (mini ? 0.36 : (small ? 0.42 : 0.60)), w, h: Math.max(mini ? 10 : 14, h * 0.08), size: Math.max(small ? 9 : 8, Math.min(h * 0.07, 13)) },
       // 技能效果区（卡面明写技能；mini/small 1 行，normal 按可用高度折行）
-      skillEff: { x: x + 4, y: y + h * (mini ? 0.52 : (small ? 0.60 : 0.72)), w: w - 8, size: Math.max(mini ? 6 : (small ? 6.5 : 8), Math.min(h * (mini ? 0.10 : (small ? 0.085 : 0.075)), mini ? 7.5 : (small ? 9 : 10.5))) },
-      cost: { x: x + w / 2 - Math.min(30, w * 0.25), y: y + h - 20, w: Math.min(60, w * 0.5), h: 16, size: Math.max(10, h * 0.082) },
+      skillEff: { x: x + 4, y: y + h * (mini ? 0.52 : (small ? 0.58 : 0.70)), w: w - 8, size: Math.max(mini ? 6 : (small ? 7 : 9), Math.min(h * (mini ? 0.10 : (small ? 0.09 : 0.08)), mini ? 7.5 : (small ? 9.5 : 11))) },
+      cost: { x: x + w / 2 - Math.min(30, w * 0.25), y: y + h - Math.min(20, h * 0.34), w: Math.min(60, w * 0.5), h: Math.min(16, h * 0.3), size: Math.max(10, h * 0.082) },
       camp: { x, y: y + 1, w: 3, h: h - 2 }
     };
   }
@@ -1044,6 +1047,18 @@ function drawFx(f){
       border(x, y + 1, 3, h - 2, '#111111', 1);
     }
 
+    // 超矮行卡（h<34，如手机横屏 4 人局）：只画票徽+名字，杜绝元素重叠
+    const ultraTiny = h < 34;
+    if (ultraTiny) {
+      const vb2 = lay.voteBadge;
+      rect(vb2.x, vb2.y, vb2.w, vb2.h, '#111111');
+      border(vb2.x, vb2.y, vb2.w, vb2.h, '#111111', 1);
+      text('⚖' + (card.votes || 1), vb2.x + vb2.w / 2, vb2.y + vb2.h / 2, Math.max(9, h * 0.14), '#FFD60A', { align: 'center', shadow: false });
+      const fN2 = fit(card.name, w - vb2.w - 14, Math.max(9, h * 0.18));
+      text(fN2.text, x + vb2.w + 8 + (w - vb2.w - 14) / 2, y + h / 2, fN2.size, '#111111', { align: 'center', shadow: false });
+      return;
+    }
+
     // ① 票数金徽（左上，StS 费用位）
     const vb = lay.voteBadge;
     rect(vb.x, vb.y, vb.w, vb.h, '#111111');
@@ -1072,10 +1087,6 @@ function drawFx(f){
         rect(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, fxc + '44');
         border(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, fxc, 2.5);
         text(icon, sb.x + sb.w / 2, sb.y + sb.h / 2, sb.size, '#FFFFFF', { align: 'center' });
-      } else if (icon && lay.small) {
-        // 小档：技能图标（无大徽章底，居中偏上）
-        const fxc = (SKILL_FX[card.skill] && SKILL_FX[card.skill].col) || '#1E4FB5';
-        text(icon, sb.x + sb.w / 2, sb.y + sb.h / 2, Math.max(12, sb.size * 0.6), fxc, { align: 'center', shadow: false });
       } else if (!sk && !lay.small) {
         // 铁证：绿色 ⚖ 徽章
         rect(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, 'rgba(14,138,95,0.5)');
@@ -1090,20 +1101,22 @@ function drawFx(f){
       if (lay.mini) {
         text(icon + ' ' + lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), '#4A3100', { align: 'center', shadow: false });
       } else if (lay.small) {
+        // 小档：黑条内合并「图标 + 等级名」（不再单独画中央小图标，杜绝与技能名重叠）
         rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#7A0E0E' : '#111111');
-        text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
+        text(icon + ' ' + lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
       } else {
         text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
       }
       // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数），small/mini 单行截断
+      //    行卡（noDesc:true）不画效果，悬停详情才展示，避免矮卡重叠
       const se = lay.skillEff;
       const effTxt = effText(card, sk);
-      if (effTxt) {
+      if (effTxt && !o.noDesc) {
         if (lay.mini || lay.small) {
           const fEf = fit(effTxt, se.w, se.size);
           text(fEf.text, x + w / 2, se.y + se.size, fEf.size, '#333333', { align: 'center', shadow: false });
         } else {
-          const lineH = Math.max(8.5, h * 0.085);
+          const lineH = Math.max(9, h * 0.075);
           const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
           wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
         }
@@ -1929,71 +1942,87 @@ function drawFx(f){
       if (show.handN && isMe) flow.push({ txt: '手牌' + s.handCount, col: '#333333' });
       if (copy.lockShow ? copy.lockShow(s, isMe, g) : (show.locked && s.lockedCount)) flow.push({ txt: '🔒' + s.lockedCount, col: copy.lockCol || '#0A84FF' });
       if (env.compact) {
-        const av = 14, avY = y + 1;
+        /* 矩形方框头像（大）+ 两行大字（行1 名字/阵营/徽章，行2 角色名/数值流/状态标签） */
+        const avW = 20, avH = 18, avX0 = x + 6, avY = y + Math.max(3, (ph - 4) / 2 - 9);
         const pt = partyOf(i);
-        pxRect(x + 6, avY, av, av, campColor(i));
-        pxBorder(x + 6, avY, av, av, '#111111', 2);
-        drawPixelText(pt.sym, x + 6 + av / 2, avY + av / 2, 9, contrast(campColor(i)), { align: 'center', shadow: false });
-        // 行1：名字（大）+ 阵营
-        let nx1 = x + 24;
-        const nmR1 = drawPixelText(s.name + (isMe ? '（你）' : '') + crown, nx1, y + 12, 12, '#111111', { shadow: false });
-        nx1 += nmR1.w + 4;
-        if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 12, 9, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
-        // 行2：角色名（红）→ 数值流 → 状态标签
-        let nx2 = x + 8;
-        if (s.char) {
-          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.22), 10);
-          drawPixelText(fCh.text, nx2, y + ph - 6, fCh.size, copy.charCol || '#C0392B', { shadow: false });
-          nx2 += fCh.w + 12;
-          env.hoverCards.push({ x: nx2 - fCh.w - 12, y: y + 10, w: Math.min(170, w * 0.34), h: 16, kind: 'charSkill', data: { ch: s.char } });
-        }
-        const nxF = RC._panelFlowOf(env, nx2, y + ph - 6, Math.max(9.5, env.UI.fs.num - 1), flow);
-        if (isActing) RC._statusTagOf(env, nxF + 4, y + ph - 6, isPlayAct ? '⚡ 举证中' : '▶ 行动中', 9.5);
-      } else {
-        const av = 18, avY = y + 2;
-        const pt = partyOf(i);
-        pxRect(x + 6, avY, av, av, campColor(i));
-        pxBorder(x + 6, avY, av, av, '#111111', 2);
-        drawPixelText(pt.sym, x + 6 + av / 2, avY + av / 2, 10.5, contrast(campColor(i)), { align: 'center', shadow: false });
-        // 行1：头像 + 名字（大粗）+ 阵营 + 角色名（红）
+        pxRect(avX0, avY, avW, avH, campColor(i));
+        pxBorder(avX0, avY, avW, avH, '#111111', 2);
+        drawPixelText(pt.sym, avX0 + avW / 2, avY + avH / 2, 10.5, contrast(campColor(i)), { align: 'center', shadow: false });
+        // 行1：名字（大，fit 限宽）+ 阵营 + 右侧徽章（陪审/先例，右对齐）
         let nx1 = x + 30;
-        const nmR2 = drawPixelText(s.name + (isMe ? '（你）' : '') + crown, nx1, y + 15, Math.min(16, env.UI.fs.name + 1), '#111111', { shadow: false });
-        nx1 += nmR2.w + 6;
-        if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 15, 11, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
+        const nmT1 = fitText(s.name + (isMe ? '（你）' : '') + crown, Math.max(64, w * 0.34), Math.max(12, env.UI.fs.name - 0.5));
+        const nmR1 = drawPixelText(nmT1.text, nx1, y + 15, nmT1.size, '#111111', { shadow: false });
+        nx1 += nmR1.w + 6;
+        if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 15, 10.5, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
+        let rx1 = x + w - 8;
+        if (show.jury && s.juryTokens > 0) {
+          const t1 = '🕊' + s.juryTokens + '/3';
+          rx1 -= textWidth(t1, '700 11px ' + fontBase) + 8;
+          drawPixelText(t1, rx1, y + 15, 11, '#7B4FC9', { shadow: false });
+        }
+        if (show.prev && g.precedentSeat === i) {
+          const t2 = '⚖️先例';
+          rx1 -= textWidth(t2, '700 11px ' + fontBase) + 8;
+          drawPixelText(t2, rx1, y + 15, 11, '#7B4FC9', { shadow: false });
+        }
+        // 行2：角色名（红）→ 数值流（大）→ 状态标签（红底白字）
+        let nx2 = x + 30;
         if (s.char) {
-          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.26), 11.5);
-          drawPixelText(fCh2.text, x + 30, y + 15, fCh2.size, copy.charCol || '#C0392B', { shadow: false });
-          env.hoverCards.push({ x: x + 30, y: y + 8, w: Math.min(170, w * 0.34), h: 16, kind: 'charSkill', data: { ch: s.char } });
+          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.18), 10.5);
+          drawPixelText(fCh.text, nx2, y + ph - 8, fCh.size, copy.charCol || '#C0392B', { shadow: false });
+          nx2 += fCh.w + 14;
+          env.hoverCards.push({ x: nx2 - fCh.w - 14, y: y + ph - 8 - 15, w: Math.min(180, w * 0.34), h: 26, kind: 'charSkill', data: { ch: s.char } });
+        }
+        const nxF = RC._panelFlowOf(env, nx2, y + ph - 8, Math.max(11, env.UI.fs.num - 0.5), flow);
+        if (isActing) RC._statusTagOf(env, nxF + 4, y + ph - 8, isPlayAct ? '⚡ 举证中' : '▶ 行动中', 11);
+      } else {
+        /* 矩形方框头像（更大）+ 两行大字（行1 名字/阵营/角色名/徽章，行2 数值流/状态标签/丑闻条） */
+        const avW = 26, avH = 24, avX0 = x + 6, avY = y + Math.max(3, (ph - 4) / 2 - 12);
+        const pt = partyOf(i);
+        pxRect(avX0, avY, avW, avH, campColor(i));
+        pxBorder(avX0, avY, avW, avH, '#111111', 2);
+        drawPixelText(pt.sym, avX0 + avW / 2, avY + avH / 2, 12, contrast(campColor(i)), { align: 'center', shadow: false });
+        // 行1：头像 + 名字（大粗，fit 限宽）+ 阵营 + 角色名（红，接在名字后不再盖字）
+        let nx1 = x + 36;
+        const nmT2 = fitText(s.name + (isMe ? '（你）' : '') + crown, Math.max(72, w * 0.28), Math.min(17, env.UI.fs.name + 2));
+        const nmR2 = drawPixelText(nmT2.text, nx1, y + 18, nmT2.size, '#111111', { shadow: false });
+        nx1 += nmR2.w + 8;
+        if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 18, 12, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
+        nx1 += textWidth((s.side === 'prosecutor' ? '·检方' : '·辩护方'), '700 12px ' + fontBase) + 10;
+        if (s.char) {
+          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.2), 12.5);
+          drawPixelText(fCh2.text, nx1, y + 18, fCh2.size, copy.charCol || '#C0392B', { shadow: false });
+          env.hoverCards.push({ x: nx1, y: y + 8, w: Math.min(180, w * 0.34), h: 24, kind: 'charSkill', data: { ch: s.char } });
         }
         // 行1 右侧徽章：陪审 / 先例（右对齐）
         let rx = x + w - 10;
         if (show.jury && s.juryTokens > 0) {
           const t1 = '🕊' + s.juryTokens + '/3';
-          rx -= textWidth(t1, '700 12px ' + fontBase) + 10;
-          drawPixelText(t1, rx, y + 15, 12, '#7B4FC9', { shadow: false });
+          rx -= textWidth(t1, '700 13px ' + fontBase) + 10;
+          drawPixelText(t1, rx, y + 18, 13, '#7B4FC9', { shadow: false });
         }
         if (show.prev && g.precedentSeat === i) {
           const t2 = '⚖️先例';
-          rx -= textWidth(t2, '700 12px ' + fontBase) + 10;
-          drawPixelText(t2, rx, y + 15, 12, '#7B4FC9', { shadow: false });
+          rx -= textWidth(t2, '700 13px ' + fontBase) + 10;
+          drawPixelText(t2, rx, y + 18, 13, '#7B4FC9', { shadow: false });
         }
         // 行2：数值流（大粗）→ 状态标签（红底白字，醒目）
-        const nx2 = RC._panelFlowOf(env, x + 8, y + ph - 6, 13, flow);
-        if (isActing) RC._statusTagOf(env, nx2 + 6, y + ph - 6, isPlayAct ? '⚡ 举证中' : '▶ 行动中', 11);
+        const nx2 = RC._panelFlowOf(env, x + 36, y + ph - 8, Math.max(12.5, env.UI.fs.num - 0.5), flow);
+        if (isActing) RC._statusTagOf(env, nx2 + 6, y + ph - 8, isPlayAct ? '⚡ 举证中' : '▶ 行动中', 12.5);
         // 行2 右侧：丑闻条（右对齐，不再压数值流）+ 结案陈词
         if (copy.scandalBar ? copy.scandalBar(s, sc) : show.scandalBar) {
-          const sbx = x + w - (inPlay ? 116 : 62);
-          pxRect(sbx, y + ph - 16, 46, 7, '#3A2A2A');
-          pxBorder(sbx, y + ph - 16, 46, 7, '#111111', 1);
+          const sbx = x + w - (inPlay ? 126 : 68);
+          pxRect(sbx, y + ph - 17, 50, 8, '#3A2A2A');
+          pxBorder(sbx, y + ph - 17, 50, 8, '#111111', 1);
           if (sc > 0) {
             const scCol = sc <= 1 ? '#7DCEA0' : (sc <= 3 ? '#F1C40F' : (copy.scandalCol || '#E04343'));
-            pxRect(sbx + 2, y + ph - 14, Math.max(2, 42 * Math.min(1, sc / 5)), 3, scCol);
+            pxRect(sbx + 2, y + ph - 15, Math.max(2, 46 * Math.min(1, sc / 5)), 4, scCol);
           }
         }
-        if (inPlay) drawPixelText('🎙 结案陈词', x + w - 14, y + ph - 6, 12, '#B8860B', { align: 'right', shadow: false });
+        if (inPlay) drawPixelText('🎙 结案陈词', x + w - 14, y + ph - 8, 12.5, '#B8860B', { align: 'right', shadow: false });
       }
-      // 事件目标选择 / 选择起始玩家（点击头像）
-      const avX = 6, avY2 = env.compact ? y + 1 : y + 2, avSz = env.compact ? 14 : 18;
+      // 事件目标选择 / 选择起始玩家（点击头像，命中区=方框+边距）
+      const avX = 6, avY2 = env.compact ? y + Math.max(3, (ph - 4) / 2 - 9) : y + Math.max(3, (ph - 4) / 2 - 12), avSz = env.compact ? 20 : 26;
       if ((g.phase === 'preEvent' || g.phase === 'postEvent') && env.eventPick && env.eventPick.seat === env.mySeat && i !== env.mySeat) {
         pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, copy.pickCol || '#FF5A4E', 4);
         env.hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'eventTarget', data: { targetSeat: i } });
@@ -2515,18 +2544,19 @@ function applyUI() {
   s.handH = portraitMode ? (ph === 'tiny' ? 300 : 270)
     : compact ? (ph === 'tiny' ? 118 : 140)
     : (ph === 'narrow' ? 168 : (ph === 'tiny' ? 132 : (isMobile ? 190 : 230)));
-  s.panelH = compact ? 26 : (portraitMode ? 32 : (ph === 'tiny' ? 28 : (ph === 'narrow' ? 30 : 36)));
-  s.fs.name = compact ? (ph === 'tiny' ? 10 : 11) : (ph === 'tiny' ? 11.5 : (ph === 'narrow' ? 12.5 : 14));
-  s.fs.num = compact ? (ph === 'tiny' ? 9.5 : 11) : (ph === 'tiny' ? 12 : (ph === 'narrow' ? 13 : 15));
-  s.fs.stat = compact ? (ph === 'tiny' ? 8.5 : 9.5) : (ph === 'tiny' ? 10.5 : (ph === 'narrow' ? 11.5 : 12.5));
-  s.fs.small = compact ? 9 : (ph === 'tiny' ? 9.5 : 10.5);
-  // 窄屏信息降级：tiny 隐藏丑闻条/锁/先例/陪审徽章（hover 或面板仍可查看数值）
-  s.show.scandalBar = ph !== 'tiny';
-  s.show.handN = ph !== 'tiny';
-  s.show.locked = ph !== 'tiny';
+  s.panelH = compact ? 34 : (portraitMode ? 40 : (ph === 'tiny' ? 32 : (ph === 'narrow' ? 34 : 42)));
+  s.fs.name = compact ? (ph === 'tiny' ? 12 : 13) : (ph === 'tiny' ? 12.5 : (ph === 'narrow' ? 13.5 : 15));
+  s.fs.num = compact ? (ph === 'tiny' ? 11 : 12) : (ph === 'tiny' ? 13 : (ph === 'narrow' ? 14 : 16));
+  s.fs.stat = compact ? (ph === 'tiny' ? 10 : 11) : (ph === 'tiny' ? 11.5 : (ph === 'narrow' ? 12.5 : 13.5));
+  s.fs.small = compact ? 10 : (ph === 'tiny' ? 10.5 : 11.5);
+  // 窄屏信息降级：仅「桌面小窗」隐藏次要徽章；触屏/竖屏手机保证资源（钱/支持/丑闻/手牌/锁/陪审）始终可见
+  const thin = !isMobile && ph === 'tiny';
+  s.show.scandalBar = !thin;
+  s.show.handN = !thin;
+  s.show.locked = !thin;
   s.show.act = true;
-  s.show.prev = ph !== 'tiny';
-  s.show.jury = ph !== 'tiny';
+  s.show.prev = !thin;
+  s.show.jury = !thin;
   HUD_H = s.hudH; PANEL_Y = s.panelY; HAND_AREA_H = s.handH;
   if (!portraitMode) handScroll = 0;   // 切回横屏/桌面时重置抽屉页
 }

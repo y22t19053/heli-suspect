@@ -78,6 +78,7 @@
     flank:       { name: '左右夹击', lv: 2, when: 'count',  desc: '审议时：相邻有本方牌则票数最高的对方 -1 票（抱团者易被夹击）', src: '双律师质证战术：正反夹击使证人自相矛盾' },
     poach:       { name: '当庭挖票', lv: 2, when: 'count',  desc: '审议时：相邻有本方牌则偷票数最高的对方 1 票（敌 -1、本方 +1）', src: '陪审团争夺战：庭外调查员的策反艺术' },
     rally:       { name: '旁听声援', lv: 2, when: 'count',  desc: '审议时：相邻有本方牌则本方 +1 票（连坐人气，分散则哑火）', src: '大审判旁听席的民意压力：观众席也是一种法庭力量' },
+    chain:       { name: '连横合纵', lv: 2, when: 'count',  desc: '审议时：左右都是本方牌则本方所有已亮牌 +1 票；左右都是对方牌则票数最高的对方 -1 票', src: '连横合纵术：把盟友连成一线得全局之势，把孤敌困在中央逐一击破' },
     idol:        { name: '明星证人', lv: 3, when: 'count',  desc: '审议时：本方 +2 票', src: '迈克尔·杰克逊案明星证人团：知名度本身就是杀伤力' },
     megaScandal: { name: '致命污点', lv: 3, when: 'count',  desc: '审议时：票数最高的对方 -2 票', src: '水门录音带：实锤证据一锤定音' },
     comeback:    { name: '绝地反击', lv: 3, when: 'count',  desc: '审议时：若本方落后，+1 票', src: '丹罗在斯科普斯案的绝地翻盘：败局中的烈士辩护' },
@@ -115,10 +116,10 @@
   };
   /* 技能价值表（AI 选牌/买卖用；非列表内技能回退 2）—— 数值已按 ±1 化微调 */
   const SK_VAL = {
-    fan: 2, troll: 2.2, terrorist: 2, swap: 1.6, shiftLeft: 1.4, shiftRight: 1.4, counsel: 2.6,
-    orator: 2.6, scandal: 2.6, wave: 2.8, flank: 2.4, poach: 2.4, rally: 2.4, idol: 3.4, megaScandal: 3.4,
+    fan: 2, troll: 2.2, terrorist: 2, swap: 1.8, shiftLeft: 1.6, shiftRight: 1.6, counsel: 2.6,
+    orator: 2.6, scandal: 2.6, wave: 2.8, flank: 2.4, poach: 2.4, rally: 2.4, chain: 2.6, idol: 3.4, megaScandal: 3.4,
     comeback: 2.2, pivot: 3.0, donor: 2, buyback: 2.2, tagBoost: 2, tagHate: 2.2, edge: 2,
-    rowL: 1.6, rowR: 1.6, leftFoe: 1.6, rightFoe: 1.6, majority: 1.6, minority: 1.6,
+    rowL: 1.7, rowR: 1.7, leftFoe: 1.7, rightFoe: 1.7, majority: 1.6, minority: 1.6,
     shame: 2.2, threat: 2.4,
     crossExam: 3, objection: 2, reasonableDoubt: 3.8, timelineSnipe: 3.4, flipNarrative: 3.2,
     careerGamble: 3.2, credCollapse: 2.8, whistleblower: 2.4, precedent: 3.8, juryNull: 3.6,
@@ -247,7 +248,12 @@
     { id: 'v101', name: '首座证言',      cost: 2, votes: 1, skill: 'firstSeat', v: 1, desc: '若行首（最左）是对方牌，该牌 -1 票' },
     { id: 'v102', name: '末席证词',      cost: 2, votes: 1, skill: 'lastSeat', v: 1, desc: '若行尾（最右）是对方牌，该牌 -1 票' },
     { id: 'v103', name: '左翼方阵',      cost: 3, votes: 1, skill: 'leftWall', v: 1, desc: '本方所有位于行左半区的牌各 +1 票' },
-    { id: 'v104', name: '抽签质证',      cost: 2, votes: 1, skill: 'randomHit', v: 1, desc: '随机 1 张对方牌 -1 票' }
+    { id: 'v104', name: '抽签质证',      cost: 2, votes: 1, skill: 'randomHit', v: 1, desc: '随机 1 张对方牌 -1 票' },
+    /* ============ 左右/换位博弈扩充包（v105+：连横合纵/左右旗手/对调策划） ============ */
+    { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
+    { id: 'v106', name: '左席旗手',      cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '位于亮出行左半区时，本方 +1 票' },
+    { id: 'v107', name: '右席旗手',      cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '位于亮出行右半区时，本方 +1 票' },
+    { id: 'v108', name: '对调策划',      cost: 4, votes: 1, skill: 'swap', v: 1, desc: '与场上任意一张其他牌互换位置' }
   ];
 
   /* AI 人格（从美式法律/政治文化提取）：
@@ -1009,6 +1015,21 @@
             const allyNear = (nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner)
               || (nbR && !nbR.removed && !nbR._nullified && nbR.seat === owner);
             if (allyNear) votes[owner] += 1;
+            break;
+          }
+          case 'chain': {
+            // 连横合纵：左右都是本方 → 本方所有已亮牌 +1；左右都是敌方 → 最高敌 -1（三态左右博弈）
+            const nbL = rowNeighbor(state, idx, -1);
+            const nbR = rowNeighbor(state, idx, 1);
+            const allyL = nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner;
+            const allyR = nbR && !nbR.removed && !nbR._nullified && nbR.seat === owner;
+            const foeL = nbL && !nbL.removed && !nbL._nullified && nbL.seat !== owner;
+            const foeR = nbR && !nbR.removed && !nbR._nullified && nbR.seat !== owner;
+            if (allyL && allyR) {
+              state.row.forEach(x => { if (!x.removed && !x._nullified && x.seat === owner) votes[x.seat] += (r.card.v || 1); });
+            } else if (foeL && foeR) {
+              votes[highestEnemy(votes, owner, n, state.rng)] -= (r.card.v || 1);
+            }
             break;
           }
           case 'pivot': {

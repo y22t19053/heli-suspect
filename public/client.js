@@ -54,18 +54,19 @@ function applyUI() {
   s.handH = portraitMode ? (ph === 'tiny' ? 300 : 270)
     : compact ? (ph === 'tiny' ? 118 : 140)
     : (ph === 'narrow' ? 168 : (ph === 'tiny' ? 132 : (isMobile ? 190 : 230)));
-  s.panelH = compact ? 26 : (portraitMode ? 32 : (ph === 'tiny' ? 28 : (ph === 'narrow' ? 30 : 36)));
-  s.fs.name = compact ? (ph === 'tiny' ? 10 : 11) : (ph === 'tiny' ? 11.5 : (ph === 'narrow' ? 12.5 : 14));
-  s.fs.num = compact ? (ph === 'tiny' ? 9.5 : 11) : (ph === 'tiny' ? 12 : (ph === 'narrow' ? 13 : 15));
-  s.fs.stat = compact ? (ph === 'tiny' ? 8.5 : 9.5) : (ph === 'tiny' ? 10.5 : (ph === 'narrow' ? 11.5 : 12.5));
-  s.fs.small = compact ? 9 : (ph === 'tiny' ? 9.5 : 10.5);
-  // 窄屏信息降级：tiny 隐藏丑闻条/锁/先例/陪审徽章（hover 或面板仍可查看数值）
-  s.show.scandalBar = ph !== 'tiny';
-  s.show.handN = ph !== 'tiny';
-  s.show.locked = ph !== 'tiny';
+  s.panelH = compact ? 34 : (portraitMode ? 40 : (ph === 'tiny' ? 32 : (ph === 'narrow' ? 34 : 42)));
+  s.fs.name = compact ? (ph === 'tiny' ? 12 : 13) : (ph === 'tiny' ? 12.5 : (ph === 'narrow' ? 13.5 : 15));
+  s.fs.num = compact ? (ph === 'tiny' ? 11 : 12) : (ph === 'tiny' ? 13 : (ph === 'narrow' ? 14 : 16));
+  s.fs.stat = compact ? (ph === 'tiny' ? 10 : 11) : (ph === 'tiny' ? 11.5 : (ph === 'narrow' ? 12.5 : 13.5));
+  s.fs.small = compact ? 10 : (ph === 'tiny' ? 10.5 : 11.5);
+  // 窄屏信息降级：仅「桌面小窗」隐藏次要徽章；触屏/竖屏手机保证资源（钱/支持/丑闻/手牌/锁/陪审）始终可见
+  const thin = !isMobile && ph === 'tiny';
+  s.show.scandalBar = !thin;
+  s.show.handN = !thin;
+  s.show.locked = !thin;
   s.show.act = true;
-  s.show.prev = ph !== 'tiny';
-  s.show.jury = ph !== 'tiny';
+  s.show.prev = !thin;
+  s.show.jury = !thin;
   HUD_H = s.hudH; PANEL_Y = s.panelY; HAND_AREA_H = s.handH;
   if (!portraitMode) handScroll = 0;   // 切回横屏/桌面时重置抽屉页
 }

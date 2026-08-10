@@ -22,7 +22,7 @@
     fan: '⭐', troll: '🖤', orator: '🎤', scandal: '📰', wave: '🌊',
     idol: '🌟', megaScandal: '💣', comeback: '🔥', pivot: '🎲', donor: '💰',
     buyback: '💵', terrorist: '🚫', swap: '🔄', shiftLeft: '⬅️', shiftRight: '➡️',
-    counsel: '🤝', flank: '⚔️', poach: '🪤', rally: '📣', tagBoost: '🎯',
+    counsel: '🤝', flank: '⚔️', poach: '🪤', rally: '📣', chain: '🔗', tagBoost: '🎯',
     tagHate: '🛑', edge: '📍', rowL: '◀️', rowR: '▶️', leftFoe: '👈',
     rightFoe: '👉', majority: '📈', minority: '📉', shame: '😈', threat: '👑',
     crossExam: '🔍', objection: '⚡', reasonableDoubt: '🧤', timelineSnipe: '🕰️',
@@ -53,7 +53,8 @@
     v86: '护士', v87: '古董', v88: '算法', v89: '并肩', v90: '反水',
     v91: '质证', v92: '反对', v93: '手套', v94: '收据', v95: '原则',
     v96: '豪赌', v97: '伪证', v98: '吹哨', v99: '先例', v100: '人民',
-    v101: '首座', v102: '末席', v103: '方阵', v104: '抽签'
+    v101: '首座', v102: '末席', v103: '方阵', v104: '抽签',
+    v105: '连横', v106: '左旗', v107: '右旗', v108: '对调'
   };
 
   /* 技能 → 飘字 + 触发色（唯一源：双端不再手抄，见 _build_ui 内联） */
@@ -76,6 +77,7 @@
     flank: { txt: '连坐 -1', col: '#D82E2F' },
     poach: { txt: '连坐挖票', col: '#E8A418' },
     rally: { txt: '声援 +1', col: '#0E8A5F' },
+    chain: { txt: '连横 +N', col: '#E8A418' },
     pivot: { txt: '反超 +2', col: '#E8A418' },
     tagBoost: { txt: '共鸣 +1', col: '#1E4FB5' },
     tagHate: { txt: '压制 -1', col: '#D82E2F' },
@@ -115,21 +117,22 @@
   function planCard(x, y, w, h) {
     const ratio = w / h;
     const mini = w < 70 || h < 62 || ratio < 0.52;          // 迷你：名字+票数+价格
-    const small = !mini && (w < 116 || h < 96 || ratio < 0.8); // 小档：技能图标小字+条
+    const small = !mini && (w < 116 || h < 96 || ratio < 0.62); // 小档：高瘦或过矮才降级（150×206 手牌卡保持 normal 折行效果）
     const pad = 4;
     const vbW = Math.min(48, w * 0.36);
     const vbH = Math.min(20, h * 0.2);
     const nameSize = Math.max(9, Math.min(h * (mini ? 0.10 : 0.14), 22));
-    const badgeSize = Math.max(14, Math.min(h * 0.28, 40));
+    // 技能大徽章：整体下移且缩小（badge 下沿让位给技能名，杜绝重叠）
+    const badgeSize = Math.max(14, Math.min(h * 0.22, 34));
     return {
       mini, small, ratio,
       voteBadge: { x: x + pad, y: y + pad, w: vbW, h: vbH },
       name: { x: x + vbW + 8, y: y + h * (mini ? 0.04 : 0.06), w: w - vbW - 14, h: nameSize * 1.4, size: nameSize },
-      skillBadge: { x, y: y + h * (mini ? 0.5 : 0.34), w, h: badgeSize * 1.6, size: badgeSize },
-      skillName: { x, y: y + h * (mini ? 0.36 : (small ? 0.44 : 0.62)), w, h: Math.max(mini ? 10 : 14, h * 0.08), size: Math.max(8, Math.min(h * 0.07, 13)) },
+      skillBadge: { x, y: y + h * (mini ? 0.5 : 0.33), w, h: badgeSize * 1.15, size: badgeSize },
+      skillName: { x, y: y + h * (mini ? 0.36 : (small ? 0.42 : 0.60)), w, h: Math.max(mini ? 10 : 14, h * 0.08), size: Math.max(small ? 9 : 8, Math.min(h * 0.07, 13)) },
       // 技能效果区（卡面明写技能；mini/small 1 行，normal 按可用高度折行）
-      skillEff: { x: x + 4, y: y + h * (mini ? 0.52 : (small ? 0.60 : 0.72)), w: w - 8, size: Math.max(mini ? 6 : (small ? 6.5 : 8), Math.min(h * (mini ? 0.10 : (small ? 0.085 : 0.075)), mini ? 7.5 : (small ? 9 : 10.5))) },
-      cost: { x: x + w / 2 - Math.min(30, w * 0.25), y: y + h - 20, w: Math.min(60, w * 0.5), h: 16, size: Math.max(10, h * 0.082) },
+      skillEff: { x: x + 4, y: y + h * (mini ? 0.52 : (small ? 0.58 : 0.70)), w: w - 8, size: Math.max(mini ? 6 : (small ? 7 : 9), Math.min(h * (mini ? 0.10 : (small ? 0.09 : 0.08)), mini ? 7.5 : (small ? 9.5 : 11))) },
+      cost: { x: x + w / 2 - Math.min(30, w * 0.25), y: y + h - Math.min(20, h * 0.34), w: Math.min(60, w * 0.5), h: Math.min(16, h * 0.3), size: Math.max(10, h * 0.082) },
       camp: { x, y: y + 1, w: 3, h: h - 2 }
     };
   }
@@ -221,6 +224,18 @@
       border(x, y + 1, 3, h - 2, '#111111', 1);
     }
 
+    // 超矮行卡（h<34，如手机横屏 4 人局）：只画票徽+名字，杜绝元素重叠
+    const ultraTiny = h < 34;
+    if (ultraTiny) {
+      const vb2 = lay.voteBadge;
+      rect(vb2.x, vb2.y, vb2.w, vb2.h, '#111111');
+      border(vb2.x, vb2.y, vb2.w, vb2.h, '#111111', 1);
+      text('⚖' + (card.votes || 1), vb2.x + vb2.w / 2, vb2.y + vb2.h / 2, Math.max(9, h * 0.14), '#FFD60A', { align: 'center', shadow: false });
+      const fN2 = fit(card.name, w - vb2.w - 14, Math.max(9, h * 0.18));
+      text(fN2.text, x + vb2.w + 8 + (w - vb2.w - 14) / 2, y + h / 2, fN2.size, '#111111', { align: 'center', shadow: false });
+      return;
+    }
+
     // ① 票数金徽（左上，StS 费用位）
     const vb = lay.voteBadge;
     rect(vb.x, vb.y, vb.w, vb.h, '#111111');
@@ -249,10 +264,6 @@
         rect(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, fxc + '44');
         border(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, fxc, 2.5);
         text(icon, sb.x + sb.w / 2, sb.y + sb.h / 2, sb.size, '#FFFFFF', { align: 'center' });
-      } else if (icon && lay.small) {
-        // 小档：技能图标（无大徽章底，居中偏上）
-        const fxc = (SKILL_FX[card.skill] && SKILL_FX[card.skill].col) || '#1E4FB5';
-        text(icon, sb.x + sb.w / 2, sb.y + sb.h / 2, Math.max(12, sb.size * 0.6), fxc, { align: 'center', shadow: false });
       } else if (!sk && !lay.small) {
         // 铁证：绿色 ⚖ 徽章
         rect(sb.x + sb.w * 0.18, sb.y, sb.w * 0.64, sb.h, 'rgba(14,138,95,0.5)');
@@ -267,20 +278,22 @@
       if (lay.mini) {
         text(icon + ' ' + lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), '#4A3100', { align: 'center', shadow: false });
       } else if (lay.small) {
+        // 小档：黑条内合并「图标 + 等级名」（不再单独画中央小图标，杜绝与技能名重叠）
         rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#7A0E0E' : '#111111');
-        text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
+        text(icon + ' ' + lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
       } else {
         text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
       }
       // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数），small/mini 单行截断
+      //    行卡（noDesc:true）不画效果，悬停详情才展示，避免矮卡重叠
       const se = lay.skillEff;
       const effTxt = effText(card, sk);
-      if (effTxt) {
+      if (effTxt && !o.noDesc) {
         if (lay.mini || lay.small) {
           const fEf = fit(effTxt, se.w, se.size);
           text(fEf.text, x + w / 2, se.y + se.size, fEf.size, '#333333', { align: 'center', shadow: false });
         } else {
-          const lineH = Math.max(8.5, h * 0.085);
+          const lineH = Math.max(9, h * 0.075);
           const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
           wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
         }
