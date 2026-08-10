@@ -85,13 +85,14 @@ function deserializeRooms(list, factory) {
   return rooms;
 }
 
-/* 原子写入快照文件（tmp + rename） */
-function writeSnapshotFile(dir, rooms) {
+/* 原子写入快照文件（tmp + rename）。file 可选：测试可用独立快照文件，避免与主服务器冲突 */
+function writeSnapshotFile(dir, rooms, file) {
   try {
-    const file = path.join(dir, SNAPSHOT_FILE);
-    const tmp = file + '.tmp';
+    const name = file || SNAPSHOT_FILE;
+    const fp = path.join(dir, name);
+    const tmp = fp + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(serializeRooms(rooms), null, 1), 'utf8');
-    fs.renameSync(tmp, file);
+    fs.renameSync(tmp, fp);
     return true;
   } catch (e) {
     console.error('[room-snapshot] 写入失败：' + e.message);
@@ -99,12 +100,13 @@ function writeSnapshotFile(dir, rooms) {
   }
 }
 
-/* 读取快照文件（文件不存在返回 []，损坏返回 [] 并告警） */
-function readSnapshotFile(dir) {
-  const file = path.join(dir, SNAPSHOT_FILE);
+/* 读取快照文件（文件不存在返回 []，损坏返回 [] 并告警）。file 可选，同 writeSnapshotFile */
+function readSnapshotFile(dir, file) {
+  const name = file || SNAPSHOT_FILE;
+  const fp = path.join(dir, name);
   try {
-    if (!fs.existsSync(file)) return [];
-    const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!fs.existsSync(fp)) return [];
+    const data = JSON.parse(fs.readFileSync(fp, 'utf8'));
     return Array.isArray(data) ? data : [];
   } catch (e) {
     console.error('[room-snapshot] 读取失败（忽略损坏快照）：' + e.message);

@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test _test_skill_combos.js && node --test _balance_test.js && node --test _smoke_game.js && node --test --test-force-exit _test_reconnect.js && node --test _test_snapshot.js && node --test _render_test.js",
+    "test": "node --test _test_skill_combos.js && node --test _balance_test.js && node --test _smoke_game.js && node --test --test-force-exit _test_reconnect.js && node --test _test_snapshot.js && node --test _test_restart.js && node --test _render_test.js",
     "ci": "node _ci_test.js"
   },
   "engines": {

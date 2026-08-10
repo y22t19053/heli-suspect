@@ -38,8 +38,24 @@ test.before(async (t) => {
 test.after(async () => { if (browser) await browser.close(); });
 
 /* ---------- 帮助函数 ---------- */
-async function newPage() {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+/* 顾问评审 6/8.1：newPage 支持移动竖屏（hasTouch→isMobile/portraitMode）
+ * 与低配机模拟（initScript 覆盖 deviceMemory/hardwareConcurrency→主动低画质） */
+async function newPage(opts) {
+  opts = opts || {};
+  const page = await browser.newPage({
+    viewport: opts.viewport || { width: 1280, height: 800 },
+    deviceScaleFactor: opts.deviceScaleFactor || 1,
+    hasTouch: !!opts.hasTouch,
+    isMobile: !!opts.hasTouch,   // 触屏即移动视口：触发 portraitMode 断点
+  });
+  if (opts.lowSpec) {
+    await page.addInitScript(() => {
+      try {
+        Object.defineProperty(navigator, 'deviceMemory', { get: () => 2, configurable: true });
+        Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 2, configurable: true });
+      } catch (e) { /* 个别内核只读则跳过 */ }
+    });
+  }
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
   page.on('console', m => {
@@ -269,4 +285,139 @@ test('对比：单机 vs 联机截图健康度', (t) => {
   // 渲染健康度粗检：两张截图都应有可观体积（不是纯色空白）
   assert.ok(spS > 5000, '单机截图不应是空白页（实际 ' + spS + 'B）');
   assert.ok(mpS > 5000, '联机截图不应是空白页（实际 ' + mpS + 'B）');
+});
+
+/* ---------- 顾问评审 6/8.1：移动竖屏 + 主动低画质 ---------- */
+/* canvas 视口溢出检查：CSS 矩形不超出视口且宽高为正 */
+async function canvasFitsViewport(page) {
+  return page.evaluate(() => {
+    const cv = document.querySelector('canvas');
+    if (!cv) return { fits: false, reason: 'no canvas' };
+    const r = cv.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (r.width <= 0 || r.height <= 0) return { fits: false, reason: 'empty canvas rect ' + r.width + 'x' + r.height };
+    if (r.left < -1 || r.top < -1 || r.right > vw + 1 || r.bottom > vh + 1)
+      return { fits: false, reason: 'overflow rect=' + JSON.stringify({ l: r.left, t: r.top, r: r.right, b: r.bottom, w: vw, h: vh }) };
+    return { fits: true, rect: { w: r.width, h: r.height }, vw, vh };
+  });
+}
+
+test('竖屏：375×667 单机对局（portraitMode 底栏抽屉）+ 无溢出', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
+  const { page, errors } = await newPage({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 3, hasTouch: true });
+  await page.goto(BASE + '/singleplayer.html');
+  await page.waitForTimeout(1200);
+  // 竖屏触屏：portraitMode 应为 true（isMobile=true && vh>vw），底栏切换为纵向手牌抽屉
+  const mode = await page.evaluate(() => ({
+    portraitMode: window.portraitMode !== undefined ? window.portraitMode : eval('portraitMode'),
+    W: eval('W'), H: eval('H'),
+  }));
+  assert.ok(mode.portraitMode === true, '竖屏视口下 portraitMode 应为 true，实际 ' + JSON.stringify(mode));
+  // 菜单渲染 + 溢出检查
+  const fitsMenu = await canvasFitsViewport(page);
+  assert.ok(fitsMenu.fits, '竖屏菜单 canvas 不应溢出视口：' + fitsMenu.reason);
+  // 进对局
+  const rect = await page.evaluate(() => {
+    const r = document.querySelector('canvas').getBoundingClientRect();
+    return { w: r.width, h: r.height };
+  });
+  await page.mouse.click(rect.w / 2, rect.h * 0.68 + 31);
+  const result = await page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const t0 = Date.now();
+    const phases = [];
+    let lastPh = null;
+    while (Date.now() - t0 < 45000) {
+      const g = eval('game');
+      if (!g || g.gameOver) break;
+      if (g.phase !== lastPh) { lastPh = g.phase; phases.push(lastPh); }
+      const need = ElectionCore.needsAIAction(g);
+      if (need.length) { for (const s of need) ElectionCore.aiAct(g, s); await wait(20); continue; }
+      const me = g.seats[0];
+      switch (g.phase) {
+        case 'pickChar':
+          if (!me.char && g.draftCandidates && g.draftCandidates[0] && g.draftCandidates[0].length)
+            ElectionCore.apply(g, 0, { type: 'pickChar', charId: g.draftCandidates[0][0].id });
+          break;
+        case 'buy':
+          if (!me.buyDone) ElectionCore.apply(g, 0, { type: 'endBuy' });
+          break;
+        case 'play':
+          if (g.turn === 0 && !me.playDone) {
+            if (me.hand && me.hand.length) ElectionCore.apply(g, 0, { type: 'playCards', uids: [me.hand[0].uid] });
+            else ElectionCore.apply(g, 0, { type: 'finishPlay' });
+          }
+          break;
+        case 'preEvent': case 'postEvent':
+          if (g.eventTurnSeat === 0) ElectionCore.apply(g, 0, { type: 'passEvent' });
+          break;
+        case 'reveal':
+          if (g.revealPending && g.revealPending.owner === 0) {
+            const cands = g.revealPending.candidates || [];
+            if (cands.length) ElectionCore.apply(g, 0, { type: 'terroristTarget', targetUid: cands[0] });
+            else ElectionCore.advance(g);
+          }
+          break;
+        case 'count':
+          if (g.swapPending && g.swapPending.owner === 0) {
+            const cands = g.swapPending.candidates || [];
+            if (cands.length) ElectionCore.apply(g, 0, { type: 'swapTarget', targetUid: cands[0] });
+            else ElectionCore.advance(g);
+          }
+          break;
+        case 'discard':
+          if (g.discardSeat === 0 && !me.keepDone) {
+            const keepMax = Math.min(2, me.hand.length);
+            for (let k = 0; k < keepMax; k++) ElectionCore.apply(g, 0, { type: 'keepCard', uid: me.hand[k].uid });
+            ElectionCore.apply(g, 0, { type: 'finishKeep' });
+          }
+          break;
+        default:
+          ElectionCore.advance(g);
+      }
+      await wait(25);
+    }
+    const g = eval('game');
+    return { phase: g ? g.phase : null, round: g ? g.round : null, phases };
+  });
+  await page.waitForTimeout(1000);
+  const st = await canvasStats(page);
+  const fits = await canvasFitsViewport(page);
+  assert.ok(st && st.ratio > 0.02, '竖屏对局 canvas 应有内容，实际 ' + (st && st.ratio));
+  assert.ok(fits.fits, '竖屏对局 canvas 不应溢出视口：' + fits.reason);
+  await page.screenshot({ path: shot('sp_portrait.png') });
+  assert.deepEqual(errors, [], '竖屏对局不应有 JS 错误：' + errors.join(' | '));
+  assert.ok(result.phases.length >= 2, '竖屏对局应推进至少 2 个阶段，实际 ' + JSON.stringify(result.phases));
+  console.log('[竖屏] ' + mode.W + 'x' + mode.H + ' 阶段 ' + result.phases.join(' → ')
+    + ' canvas=' + st.w + 'x' + st.h + ' 内容占比 ' + st.ratio + ' 视图 ' + JSON.stringify(fits.rect));
+  await page.close();
+});
+
+test('低画质：低内存低核移动端主动降级（LOW_Q）', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
+  const { page, errors } = await newPage({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 3, hasTouch: true, lowSpec: true });
+  await page.goto(BASE + '/singleplayer.html');
+  await page.waitForTimeout(1000);
+  // 主动低画质判定：deviceMemory<=2 && hardwareConcurrency<=4 且 isMobile → LOW_Q=true、FX_MAX=24、fxLowQ=true
+  const q = await page.evaluate(() => ({
+    LOW_Q: eval('LOW_Q'),
+    FX_MAX: eval('FX_MAX'),
+    fxLowQ: eval('fxLowQ'),
+    dm: navigator.deviceMemory,
+    hc: navigator.hardwareConcurrency,
+  }));
+  assert.ok(q.dm <= 2 && q.hc <= 4, '低配模拟应生效（deviceMemory/hardwareConcurrency），实际 ' + JSON.stringify({ dm: q.dm, hc: q.hc }));
+  assert.ok(q.LOW_Q === true, '低配移动端应触发主动低画质，实际 ' + JSON.stringify(q));
+  assert.ok(q.FX_MAX === 24, '低画质下 FX_MAX 应为 24，实际 ' + q.FX_MAX);
+  assert.ok(q.fxLowQ === true, '低画质下 fxLowQ 应恒为 true，实际 ' + q.fxLowQ);
+  // 低画质下渲染仍应正常（跳过网点/聚光灯装饰但不黑屏）
+  const st = await canvasStats(page);
+  assert.ok(st && st.ratio > 0.02, '低画质菜单仍应渲染内容，实际 ' + (st && st.ratio));
+  const fits = await canvasFitsViewport(page);
+  assert.ok(fits.fits, '低画质 canvas 不应溢出视口：' + fits.reason);
+  await page.screenshot({ path: shot('sp_lowq.png') });
+  assert.deepEqual(errors, [], '低画质不应有 JS 错误：' + errors.join(' | '));
+  console.log('[低画质] LOW_Q=' + q.LOW_Q + ' FX_MAX=' + q.FX_MAX + ' fxLowQ=' + q.fxLowQ
+    + ' canvas=' + st.w + 'x' + st.h + ' 内容占比 ' + st.ratio);
+  await page.close();
 });

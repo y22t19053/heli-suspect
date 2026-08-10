@@ -855,11 +855,13 @@ server.listen(PORT, () => {
 // 落盘间隔：默认 10 分钟；可用环境变量覆盖（测试/运维场景，如 SNAP_INTERVAL_MS=1500）
 const SNAP_INTERVAL_MS = (Number(process.env.SNAP_INTERVAL_MS) > 0)
   ? Number(process.env.SNAP_INTERVAL_MS) : 10 * 60 * 1000;
+// 快照文件名：默认 rooms-snapshot.json；测试可用 SNAP_FILE 指向独立文件（_test_restart.js 隔离重启验证）
+const SNAP_FILE = process.env.SNAP_FILE || null;
 
-function snapshotRooms() { writeSnapshotFile(__dirname, ROOMS); }
+function snapshotRooms() { writeSnapshotFile(__dirname, ROOMS, SNAP_FILE); }
 
 function restoreRooms() {
-  const list = readSnapshotFile(__dirname);
+  const list = readSnapshotFile(__dirname, SNAP_FILE);
   if (!list.length) return;
   const now = Date.now();
   const restored = deserializeRooms(list, (code, opts) => createRoom(Object.assign({}, opts, { code })));

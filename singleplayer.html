@@ -154,13 +154,16 @@ const ctx = canvas.getContext('2d');
 /* ============================ 2. 文字测量（P0：真实测量，取代估算） ============================ */
 const _FONT_BASE = '"Microsoft YaHei","PingFang SC","Impact","Arial Black",sans-serif';
 const _twCache = new Map();
+const _fitCache = new Map();   // 顾问评审 8.2：fitText 同帧结果缓存（防重复循环测量）
 function textWidth(text, font) {
   const k = font + '\u0000' + text;
   let v = _twCache.get(k);
   if (v === undefined) {
-    ctx.save(); ctx.font = font;
+    // 只保存/恢复 font（save/restore 会快照整个画布状态栈，成本高；本函数只改 font）
+    const prev = ctx.font;
+    ctx.font = font;
     v = ctx.measureText(text).width;
-    ctx.restore();
+    ctx.font = prev;
     if (_twCache.size > 6000) _twCache.clear();
     _twCache.set(k, v);
   }
@@ -168,13 +171,19 @@ function textWidth(text, font) {
 }
 function fitText(text, maxW, size, o) {
   o = o || {};
+  const key = String(text) + '|' + maxW + '|' + size + '|' + (o.bold === false ? '0' : '1');
+  const hit = _fitCache.get(key);
+  if (hit) return { text: hit.text, size: hit.size, w: hit.w };
   let s = Math.max(9, size), t = String(text);
   const bold = o.bold === false ? '' : '700 ';
   const fontFor = ss => bold + ss + 'px ' + _FONT_BASE;
   while (s > 9 && textWidth(t, fontFor(s)) > maxW) s -= 0.5;
   while (t.length > 1 && textWidth(t + '…', fontFor(s)) > maxW) t = t.slice(0, -1);
   if (t !== String(text) && textWidth(t + '…', fontFor(s)) <= maxW) t += '…';
-  return { text: t, size: s, w: textWidth(t, fontFor(s)) };
+  const r = { text: t, size: s, w: textWidth(t, fontFor(s)) };
+  if (_fitCache.size > 2000) _fitCache.clear();
+  _fitCache.set(key, r);
+  return r;
 }
 /* ============================ 3. 绘制原语 ============================ */
 function drawPixelText(text, x, y, size, color, o){
@@ -303,6 +312,8 @@ function inBtn(b, x, y){ return b && x >= b.x && x <= b.x + b.w && y >= b.y && y
 /* 报纸网点暗纹（美漫底色） */
 function drawBg(theme){
   pxRect(0, 0, W, H, theme.a);
+  // 低画质（LOW_Q）：跳过网点装饰，保帧率（顾问评审 8.1）
+  if (LOW_Q) return;
   ctx.save();
   ctx.fillStyle = theme.b;
   ctx.globalAlpha = 0.35;
@@ -377,11 +388,15 @@ function haptic(ms){
 }
 
 /* ============================ 4. FX 动画引擎 ============================ */
-/* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化） */
+/* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化）
+ * 顾问评审 8.1：主动低画质（不再等 FX 超载被动减速）——低内存（deviceMemory<=2）
+ * 或低核（4 核内）移动设备，开局即降级：FX 上限减半、粒子密度减半、背景网点跳过、
+ * 大字描边关闭。isMobile 在后文定义（TDZ），LOW_Q/FX_MAX 在此声明、isMobile 后评估。 */
 const FX = [];
 let shakeAmp = 0;
-const FX_MAX = 48;            // FX 总量上限：超出丢弃最旧（防粒子爆炸拖垮低端机）
-let fxLowQ = false;           // 低质量模式：降级粒子密度/跳过重特效
+let LOW_Q = false;            // 主动低画质：在 isMobile 定义后评估（见 resize 前）
+let FX_MAX = 48;              // FX 总量上限：超出丢弃最旧（防粒子爆炸拖垮低端机）
+let fxLowQ = LOW_Q;           // 低质量模式：降级粒子密度/跳过重特效
 const _fxPool = [];           // FX 对象池：复用对象，减少每帧 GC 压力
 function recycleFx(f){ for (const k in f) delete f[k]; if (_fxPool.length < 32) _fxPool.push(f); }
 let waitUntil = 0;             // 动画演出期：暂停引擎推进
@@ -402,8 +417,8 @@ function updateFx(dt){
   }
   shakeAmp *= 0.86;
   if (shakeAmp < 0.4) shakeAmp = 0;
-  // #60：移动端 FX 高负载 → 自动降级粒子密度，保帧率
-  fxLowQ = isMobile && FX.length > 24;
+  // #60：移动端 FX 高负载 → 自动降级粒子密度，保帧率（主动低画质设备恒为 true）
+  fxLowQ = LOW_Q || (isMobile && FX.length > 24);
 }
 function ttOf(f){ return Math.max(0, f.t - (f.delay || 0)); }
 function renderFx(){
@@ -2296,6 +2311,12 @@ function handGridRects(n, y, h) {
 const isMobile = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 let compact = false;      // 横屏触屏：紧凑布局（HUD/信息条/底栏压缩，文字 1:1 不缩小）
 let portraitMode = false; // 竖屏触屏：底栏纵向手牌抽屉（超级更新#37）
+/* 顾问评审 8.1：主动低画质（低内存/低核移动设备开局即降级，不被动等超载） */
+LOW_Q = isMobile && (
+  (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 2) ||
+  (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4)
+);
+if (LOW_Q) { FX_MAX = 24; fxLowQ = true; }
 let handScroll = 0;       // 竖屏抽屉当前页（0 起）
 let HUD_H = 52, ROW_H = 150, PANEL_Y = 56;
 // 底部大卡牌区高度（杀戮尖塔式全宽底栏；桌面 230 / 触屏 190 / 横屏触屏 140）

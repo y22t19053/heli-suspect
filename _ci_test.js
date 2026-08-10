@@ -21,7 +21,8 @@ const BASE = [
   '_balance_test.js',
   '_smoke_game.js',
   '_test_reconnect.js',
-  '_test_snapshot.js'
+  '_test_snapshot.js',
+  '_test_restart.js'   // 顾问评审 9：服务器重启恢复集成（独立端口 3198 + 独立快照文件）
 ];
 const JUNIT = path.join(__dirname, 'junit.xml');
 

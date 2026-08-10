@@ -215,24 +215,34 @@ function textWidth(text, font) {
   const k = font + '\u0000' + text;
   let v = _twCache.get(k);
   if (v === undefined) {
-    ctx.save(); ctx.font = font;
+    // 只保存/恢复 font（save/restore 会快照整个画布状态栈，成本高；本函数只改 font）
+    const prev = ctx.font;
+    ctx.font = font;
     v = ctx.measureText(text).width;
-    ctx.restore();
+    ctx.font = prev;
     if (_twCache.size > 6000) _twCache.clear();
     _twCache.set(k, v);
   }
   return v;
 }
-/** 自动缩字/截断：文本超过 maxW 时先降字号，仍超则截断加省略号（P0-4b：下限 9px，放不下就省略号） */
+/** 自动缩字/截断：文本超过 maxW 时先降字号，仍超则截断加省略号（P0-4b：下限 9px，放不下就省略号）
+ * 顾问评审 8.2：同 (text,maxW,size,bold) 同帧只算一次（fitText 结果缓存，防重复循环） */
+const _fitCache = new Map();
 function fitText(text, maxW, size, o) {
   o = o || {};
+  const key = String(text) + '|' + maxW + '|' + size + '|' + (o.bold === false ? '0' : '1');
+  const hit = _fitCache.get(key);
+  if (hit) return { text: hit.text, size: hit.size, w: hit.w };
   let s = Math.max(9, size), t = String(text);
   const bold = o.bold === false ? '' : '700 ';
   const fontFor = ss => bold + ss + 'px ' + _FONT_BASE;
   while (s > 9 && textWidth(t, fontFor(s)) > maxW) s -= 0.5;
   while (t.length > 1 && textWidth(t + '…', fontFor(s)) > maxW) t = t.slice(0, -1);
   if (t !== String(text) && textWidth(t + '…', fontFor(s)) <= maxW) t += '…';
-  return { text: t, size: s, w: textWidth(t, fontFor(s)) };
+  const r = { text: t, size: s, w: textWidth(t, fontFor(s)) };
+  if (_fitCache.size > 2000) _fitCache.clear();
+  _fitCache.set(key, r);
+  return r;
 }
 /** 美漫矢量文字：大字 900 粗体 + 粗黑墨线描边（P0-4a：≤13px 一律无粗体无描边，靠对比色区分）
  * 返回值 w 为精确测量宽度（非估算），供后续元素流式定位 */
@@ -400,11 +410,18 @@ function haptic(ms) {
 }
 
 /* ============================ FX 动画引擎 ============================ */
-/* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化） */
+/* #60/#61：对象池复用 + 总量上限 + 高负载自动降级（低端机/移动端优化）
+ * 顾问评审 8.1：主动低画质（不再等 FX 超载被动减速）——
+ * 低内存（deviceMemory<=2）或低核（4 核内）移动设备，开局即降级：FX 上限减半、
+ * 粒子密度减半、背景网点/聚光灯跳过、大字描边关闭。 */
+const LOW_Q = isMobile && (
+  (typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 2) ||
+  (typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4)
+);
 const FX = [];
 let shakeAmp = 0;
-const FX_MAX = 48;            // FX 总量上限：超出丢弃最旧（防粒子爆炸拖垮低端机）
-let fxLowQ = false;           // 低质量模式：降级粒子密度/跳过重特效
+const FX_MAX = LOW_Q ? 24 : 48;   // FX 总量上限：低画质减半，超出丢弃最旧（防粒子爆炸拖垮低端机）
+let fxLowQ = LOW_Q;               // 低质量模式：主动判定（低端机）+ 运行时 FX 超载自动降级
 const _fxPool = [];           // FX 对象池：复用对象，减少每帧 GC 压力
 function recycleFx(f) { for (const k in f) delete f[k]; if (_fxPool.length < 32) _fxPool.push(f); }
 function addFx(f) {
@@ -423,8 +440,8 @@ function updateFx(dt) {
   }
   shakeAmp *= 0.86;
   if (shakeAmp < 0.4) shakeAmp = 0;
-  // #60：移动端 FX 高负载 → 自动降级粒子密度，保帧率
-  fxLowQ = isMobile && FX.length > 24;
+  // #60：移动端 FX 高负载 → 自动降级粒子密度，保帧率（主动低画质设备恒为 true）
+  fxLowQ = LOW_Q || (isMobile && FX.length > 24);
 }
 function ttOf(f) { return Math.max(0, f.t - (f.delay || 0)); }
 function easeOutBack(p) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); }
@@ -1435,7 +1452,8 @@ function renderGame() {
   const env = renderEnv();
   env.drawBackdrop = () => {
     pxRect(0, 0, W, H, PAL.bg.a);
-    // 演播室背景：斜向速度线 + 顶部聚光灯锥
+    // 演播室背景：斜向速度线 + 顶部聚光灯锥（低画质 LOW_Q 跳过装饰，保帧率）
+    if (LOW_Q) return;
     ctx.save();
     ctx.strokeStyle = 'rgba(255,255,255,0.045)';
     ctx.lineWidth = 1.5;
