@@ -31,6 +31,7 @@ let portraitMode = false; // 竖屏触屏：底栏纵向手牌抽屉（超级更
 let handScroll = 0;       // 竖屏抽屉当前页（0 起）
 let HUD_H = 52, PANEL_Y = 56;
 let HAND_AREA_H = isMobile ? 190 : 230;
+const PORTRAIT_ACT_H = 48;   // Task 5 竖屏固定操作栏高度（含上下留白）
 /* 四档屏幕断点：wide(>1280) / normal(≥800) / narrow(≥600) / tiny(<600)
  * 每档独立调整 HUD/面板/底栏高度与字号，信息条字段按档位级联隐藏 */
 const UI = {
@@ -70,6 +71,7 @@ function applyUI() {
 }
 /* 安全区：刘海/底部横条（逻辑像素，由 CSS env(safe-area-inset-*) 提供） */
 let SAFE = { top: 0, bottom: 0, left: 0, right: 0 };
+let keyboardOpen = false;   // Task 5：键盘/工具栏占据判断（visualViewport 明显小于布局视口时）
 function safeArea() {
   try {
     const cs = getComputedStyle(document.documentElement);
@@ -94,12 +96,15 @@ function resize() {
   const portrait = vh > vw;
   compact = isMobile && !portrait;
   portraitMode = isMobile && portrait;
+  // Task 5 键盘识别：可视视口比布局视口矮 120px+ → 键盘/工具栏占据（允许画布更矮，避免内容被遮）
+  keyboardOpen = !!(vv && window.innerHeight - vv.height > 120);
   const w = Math.max(340, vw - SAFE.left - SAFE.right);
-  const h = Math.max(480, vh - SAFE.top - SAFE.bottom);
-  // P0：画布 CSS 尺寸跟随逻辑尺寸并平移到安全区内（刘海/Home 条不再遮 HUD 与底栏按钮）
+  const h = Math.max(keyboardOpen ? 300 : 480, vh - SAFE.top - SAFE.bottom);
+  // P0：画布 CSS 尺寸跟随逻辑尺寸并平移到安全区内（刘海/Home 条不再遮 HUD 与底栏按钮）；
+  // Task 5：键盘弹出时 visualViewport.offsetTop 变化 → 画布随可视区上移/恢复
   canvas.style.position = 'fixed';
   canvas.style.left = SAFE.left + 'px';
-  canvas.style.top = SAFE.top + 'px';
+  canvas.style.top = (SAFE.top + (vv ? vv.offsetTop : 0)) + 'px';
   canvas.style.width = w + 'px';
   canvas.style.height = h + 'px';
   canvas.width = Math.round(w * DPR);
@@ -109,6 +114,11 @@ function resize() {
   applyUI();
 }
 window.addEventListener('resize', resize);
+// Task 5 键盘弹出画布上移：visualViewport resize/scroll（键盘弹出不触发 window resize）
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resize);
+  window.visualViewport.addEventListener('scroll', resize);
+}
 resize();
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
@@ -1461,6 +1471,7 @@ function renderEnv() {
     ctx, W, H, PAL, screen,
     G: () => view,
     mySeat, HAND_AREA_H, HUD_H,
+    actH: portraitMode ? PORTRAIT_ACT_H : 0,   // Task 5 竖屏固定操作栏高：内容区下移让位
     UI, PHASE_STEPS,
     fontBase: _FONT_BASE,
     selected, eventPick, buyMode,
@@ -1713,6 +1724,64 @@ function renderActionButtons(me) {
   // 操作按钮：手牌区上方一行横排（贴近手牌，不遮挡卡牌），宽度自适应 + 自动缩字
   const g = view;
   if (!me) return;   // 观战者不渲染行动按钮
+  /* Task 5 竖屏重设计：底部固定操作栏（阶段化通栏大按钮）
+   * 1~3 个按钮横贯底栏顶部，底栏内容区（手牌/市场/事件网格）下移 PORTRAIT_ACT_H 让位；
+   * 提示类文本（政治操盘/揭示/选起始）居中显示于操作条位置。 */
+  if (portraitMode) {
+    const actH = PORTRAIT_ACT_H, gap = 8;
+    const yAct = H - HAND_AREA_H + 8, hBtn = actH - 14;
+    const hint = (t, col) => drawPixelText(t, W / 2, yAct + hBtn / 2, 13, col, { align: 'center', shadow: false });
+    const items = [];
+    const mk = (label, act, enabled, col2) => items.push({ label, act, enabled, col2 });
+    switch (g.phase) {
+      case 'buy':
+        if (!me.buyDone) {
+          mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.accent.a);
+          mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.ui.a);
+          mk('结束取证', 'endBuy', true, PAL.ui.a);
+        } else {
+          hint('已结束取证', '#C9D6EA');
+        }
+        break;
+      case 'play':
+        if (g.turn === mySeat && !me.playDone) {
+          mk('举证（' + selected.length + '/1）', 'playSel', selected.length > 0, PAL.accent.a);
+          mk('结束举证', 'finishPlay', true, PAL.ui.a);
+          hint('每回合举证 1 份', '#C9D6EA');
+        } else if (g.playLastSeat === mySeat && !me.playDone) {
+          mk('结束举证', 'finishPlay', true, PAL.ui.a);
+        }
+        break;
+      case 'preEvent': case 'postEvent':
+        if (g.eventTurnSeat === mySeat) {
+          mk('打出选中事件', 'playEventSel', eventPick !== null && eventPick.seat === mySeat && eventPick.target >= 0, PAL.accent.a);
+          mk('不打出', 'passEvent', true, PAL.ui.a);
+          hint('最多连续 2 张 · 点事件牌', '#C9D6EA');
+        }
+        break;
+      case 'discard':
+        if (g.discardSeat === mySeat && !me.keepDone) {
+          mk('确认保留（' + selected.length + '/' + Math.min(keepMax(), me.hand.length) + '）', 'finishKeep', selected.length >= Math.min(keepMax(), me.hand.length), PAL.accent.a);
+          hint('保留最多 ' + keepMax() + ' 张', '#C9D6EA');
+        }
+        break;
+      case 'count':
+        if (g.swapPending && g.swapPending.owner === mySeat) hint('政治操盘：点击场上任意其他牌互换', '#C9D6EA');
+        break;
+      case 'reveal':
+        if (g.revealPending && g.revealPending.owner === mySeat) hint('点击对手已亮出的证据', '#FF5A4E');
+        break;
+      case 'chooseStarter':
+        if (g.starterPicker === mySeat && !g.starterChosen) hint('点击选择本轮起始玩家', '#FFD60A');
+        break;
+    }
+    if (items.length) {
+      const n = items.length;
+      const bw = (W - 20 - (n - 1) * gap) / n;
+      items.forEach((A, i) => addActionBtn(10 + i * (bw + gap), bw, yAct, A.label, A.act, A.enabled, A.col2));
+    }
+    return;
+  }
   const btnH = compact ? 38 : (isMobile ? 50 : 46);
   const btnW0 = 126, gap = 8;
   const y = H - HAND_AREA_H - btnH - 8;

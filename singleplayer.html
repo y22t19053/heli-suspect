@@ -941,15 +941,56 @@ function drawFx(f){
   }
 
   /* ---------------- 卡背（唯一源：由双端抽入，超级更新#5） ---------------- */
+  /* 卡背：机密档案封面「真相，由证据编织」（Task 4 叙事层） */
   function drawCardBackAt(ctx, x, y, w, h, col) {
     const shadow = E('comicShadow'), rect = E('pxRect'), border = E('pxBorder'), text = E('drawPixelText');
     const PAL = E('PAL') || {};
     const bc = col || (PAL.ui && PAL.ui.b) || '#14213D';
     shadow(x, y, w, h, 3, 3);
-    rect(x, y, w, h, '#222222');
+    rect(x, y, w, h, '#1C2530');                       // 深蓝黑档案袋底
     border(x, y, w, h, bc, 2.5);
-    rect(x + w * 0.18, y + h * 0.16, w * 0.64, h * 0.68, 'rgba(255,255,255,0.08)');
-    text('?', x + w / 2, y + h / 2, h * 0.36, bc, { align: 'center', shadow: false });
+    // 顶部机密条（红色封条）
+    const barH = Math.max(11, h * 0.11);
+    rect(x + 3, y + 3, w - 6, barH, '#7A0E0E');
+    border(x + 3, y + 3, w - 6, barH, '#111111', 1);
+    text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), '#FFFFFF', { align: 'center', shadow: false });
+
+    const mini = w < 70 || h < 62;                     // 迷你尺寸降级：只保留封条 + 问号
+    if (mini) {
+      text('?', x + w / 2, y + h / 2 + 3, h * 0.30, bc, { align: 'center', shadow: false });
+      return;
+    }
+
+    // 档案四角金属护片（小三角）
+    const c = Math.max(6, w * 0.06), e = 3;
+    ctx.fillStyle = '#B8B8B8';
+    ctx.beginPath();
+    ctx.moveTo(x + c, y + e); ctx.lineTo(x + e, y + e); ctx.lineTo(x + e, y + c);
+    ctx.moveTo(x + w - c, y + e); ctx.lineTo(x + w - e, y + e); ctx.lineTo(x + w - e, y + c);
+    ctx.moveTo(x + c, y + h - e); ctx.lineTo(x + e, y + h - e); ctx.lineTo(x + e, y + h - c);
+    ctx.moveTo(x + w - c, y + h - e); ctx.lineTo(x + w - e, y + h - e); ctx.lineTo(x + w - e, y + h - c);
+    ctx.fill();
+
+    // 中央 ⚖ 金章（圆印）
+    const cx = x + w / 2, cy = y + h * 0.40;
+    const r = Math.min(w, h) * 0.22;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(232,164,24,0.12)'; ctx.fill();
+    ctx.strokeStyle = '#E8A418'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(232,164,24,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+    text('⚖', cx, cy, r * 1.1, '#E8A418', { align: 'center', shadow: false });
+
+    // 主标题：真相，由证据编织
+    text('真相', cx, y + h * 0.63, Math.min(w * 0.30, h * 0.15), '#F6E9C8', { align: 'center', shadow: false });
+    text('由证据编织', cx, y + h * 0.75, Math.max(8, h * 0.065), '#9AA5B5', { align: 'center', shadow: false });
+
+    // 底部档案底注
+    const baseY = y + h - 12;
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + 8, baseY); ctx.lineTo(x + w - 8, baseY); ctx.stroke();
+    text('机密档案', x + 8, baseY + 8, Math.max(6, h * 0.045), '#6B7686', { shadow: false });
+    text('CASE FILE', x + w - 8, baseY + 8, Math.max(5.5, h * 0.04), '#4E5866', { align: 'right', shadow: false });
   }
 
   /* ---------------- 组装：drawCard（供 drawVoterCard 薄封装调用） ---------------- */
@@ -1036,30 +1077,41 @@ function drawFx(f){
     text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, '#4A3100', { align: 'center', shadow: false, lineW: 0 });
   }
 
-  /* ---------------- 事件牌（CONFIDENTIAL 机密卡，唯一源） ---------------- */
+  /* ---------------- 事件牌（报纸头条「号外」，唯一源） ---------------- */
   function drawEventCard(ctx, x, y, w, h, ev, o) {
     o = o || {};
     const text = E('drawPixelText'), rect = E('pxRect'), border = E('pxBorder'),
-          shadow = E('comicShadow'), wrap = E('drawWrapText'), lv = E('lvMark'),
-          PAL = E('PAL') || { events: { a: '#14213D', b: '#FFD60A' }, accent: { b: '#111111' }, paper: '#F6E9C8' };
+          shadow = E('comicShadow'), wrap = E('drawWrapText');
     if (ev.hidden) { drawCardBackAt(ctx, x, y, w, h, '#2A3A5A'); return; }
     const used = ev.used;
-    const col = used ? '#5A5A5A' : (o.col || PAL.events.a);
+    // 报纸：新闻纸米黄底（已用 → 陈旧灰）
+    const paper = used ? '#B9B2A0' : '#EDE3CC';
     shadow(x, y, w, h, 3, 3);
-    rect(x, y, w, h, col);
-    border(x, y, w, h, used ? '#333333' : '#111111', 2);
-    // 机密条
-    rect(x, y, w, 12, used ? '#444444' : '#7A0E0E');
-    text(used ? '已归档' : 'CONFIDENTIAL', x + 4, y + 6, 9, '#FFFFFF', { shadow: false });
-    text(lv(ev.lv) + ev.name, x + w / 2, y + h * 0.26, Math.max(10, h * 0.1), used ? '#BBBBBB' : PAL.events.b, { align: 'center', shadow: false });
-    const evDescLines = Math.max(1, Math.floor((h * 0.5 - 22) / Math.max(9, h * 0.09)));   // 底部标签之上截断
-    wrap(ev.desc, x + 5, y + h * 0.52, Math.max(8.5, h * 0.066), used ? '#999999' : '#FFFFFF', w - 10, Math.max(9, h * 0.09), { maxLines: evDescLines });
-    // 效果章
+    rect(x, y, w, h, paper);
+    border(x, y, w, h, used ? '#555555' : '#111111', 2);
+    // 报头条：号外（红） + 报眉：庭审公报
+    const barH = Math.max(11, h * 0.115);
+    rect(x, y, w, barH, used ? '#666666' : '#7A0E0E');
+    text(used ? '归档' : '号外', x + 4, y + barH / 2, Math.max(8.5, h * 0.07), '#FFFFFF', { shadow: false });
+    text('庭审公报 · 卷宗' + (ev.id || ''), x + w - 4, y + barH / 2, Math.max(6.5, h * 0.055), 'rgba(255,255,255,0.85)', { align: 'right', shadow: false });
+    // 头条大字：事件名（黑体）+ 红双下划线
+    const tSize = Math.max(10.5, Math.min(w * 0.082, h * 0.115));
+    text(ev.name, x + w / 2, y + h * 0.30, tSize, used ? '#666666' : '#111111', { align: 'center', shadow: false });
+    const ruleY = y + h * 0.38;
+    ctx.fillStyle = used ? '#777777' : '#7A0E0E';
+    ctx.fillRect(x + w * 0.12, ruleY, w * 0.76, 2.5);
+    ctx.fillRect(x + w * 0.20, ruleY + 4.5, w * 0.60, 1.5);
+    // 正文（报道）
+    const evDescLines = Math.max(1, Math.floor((h * 0.50 - 20) / Math.max(8.5, h * 0.085)));
+    wrap(ev.desc, x + 6, y + h * 0.55, Math.max(8, h * 0.06), used ? '#777777' : '#3A3A3A', w - 12, Math.max(8.5, h * 0.085), { maxLines: evDescLines });
+    // 效果章（报纸边栏小注，保留原语义）
     const effTxt = ev.eff ? (ev.eff.type === 'vote' ? (ev.eff.val > 0 ? '+票' : '−票') : ev.eff.type === 'money' ? (ev.eff.val > 0 ? '+⊙' : '−⊙') : ev.eff.type === 'support' ? '倾向' : '加成') : '';
     const stampCol = ev.eff && ev.eff.val < 0 ? '#E6392F' : '#0E8A5F';
     rect(x + 4, y + h - 18, 46, 14, used ? '#555555' : stampCol);
+    border(x + 4, y + h - 18, 46, 14, '#111111', 1);
     text(ev.timing === 'pre' ? '庭审前' : '庭审后', x + 27, y + h - 11, 10, '#FFFFFF', { align: 'center', shadow: false });
     rect(x + w - 50, y + h - 18, 46, 14, used ? '#555555' : '#111111');
+    border(x + w - 50, y + h - 18, 46, 14, '#111111', 1);
     text(effTxt, x + w - 27, y + h - 11, 10.5, used ? '#AAAAAA' : '#FFD60A', { align: 'center', shadow: false });
   }
 
@@ -1319,6 +1371,7 @@ function drawFx(f){
       const PANEL_Y = opts.PANEL_Y || 56;
       const panelH = opts.panelH || 30;
       const reserveR = opts.reserveR || 0;   // 右侧按钮区让位（单机版双列按钮 212px；联机 0）
+      const actH = opts.portraitActH || 0;   // Task 5 竖屏固定操作栏高（内容区下移让位；联机未传 → 0）
       const seats = view.seats || [];
       const n = seats.length;
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -1326,12 +1379,13 @@ function drawFx(f){
       /* 顶部紧凑信息条（每座位一条） */
       const panelRects = seats.map((s, i) => ({ seat: i, x: 10, y: PANEL_Y + i * (panelH + 6), w: W - 20, h: panelH - 4 }));
 
-      /* 中央辩论台：从信息条下方延伸到底栏上方（按钮行让位） */
+      /* 中央辩论台：从信息条下方延伸到底栏上方（按钮行让位）
+       * 单机竖屏（actH>0）：按钮在底栏内顶部 → 行区少让位；其余（含联机竖屏按钮在底栏上方）保持 btnH+8 */
       const row = view.row || [];
       const rw = clamp(Math.min(118, (W - 60) / Math.max(1, row.length) - 12), 40, 118);
       const cy = PANEL_Y + n * (panelH + 6) + (compact ? 10 : 30);
       const btnH = compact ? 38 : (isMobile ? 50 : 46);
-      const availRh = H - HAND_AREA_H - (btnH + 8) - cy;
+      const availRh = H - HAND_AREA_H - ((portraitMode && actH > 0) ? 8 : btnH + 8) - cy;
       const rh = clamp(availRh, compact ? 64 : 88, H * 0.5);
       const total = row.length * (rw + 10) - 10;
       let cx = (W - total) / 2;
@@ -1360,21 +1414,21 @@ function drawFx(f){
         }
         return out;
       };
-      const handItems = (me.hand && me.hand.length && hh >= 64)
+      const handItems = (me.hand && me.hand.length && hh - actH >= 64)
         ? (portraitMode
-          ? _grid(me.hand.length, handY, hh, reserveR, 200).map((r, i) => Object.assign({ card: me.hand[i] }, r))
+          ? _grid(me.hand.length, handY + actH, hh - actH, reserveR, 200).map((r, i) => Object.assign({ card: me.hand[i] }, r))
           : this._flexRects(me.hand.length, handY, hh, 12, 200, reserveR, W).map((r, i) => Object.assign({ card: me.hand[i] }, r)))
         : [];
       const mk = me.market || [];
       const marketItems = mk.length
         ? (portraitMode
-          ? _grid(mk.length, H - HAND_AREA_H + 28, HAND_AREA_H - 40, reserveR, 200).map((r, i) => Object.assign({ card: mk[i] }, r))
+          ? _grid(mk.length, H - HAND_AREA_H + 28 + actH, HAND_AREA_H - 40 - actH, reserveR, 200).map((r, i) => Object.assign({ card: mk[i] }, r))
           : this._flexRects(mk.length, H - HAND_AREA_H + 28, HAND_AREA_H - 40, 12, 200, reserveR, W).map((r, i) => Object.assign({ card: mk[i] }, r)))
         : [];
       const evs = (me.events || []).slice(eventPage * 4, eventPage * 4 + 4);
       const eventItems = evs.length
         ? (portraitMode
-          ? _grid(evs.length, H - HAND_AREA_H + 34, HAND_AREA_H - 56, reserveR, 150).map((r, i) => Object.assign({ ev: evs[i] }, r))
+          ? _grid(evs.length, H - HAND_AREA_H + 34 + actH, HAND_AREA_H - 56 - actH, reserveR, 150).map((r, i) => Object.assign({ ev: evs[i] }, r))
           : this._flexRects(evs.length, H - HAND_AREA_H + 34, HAND_AREA_H - 56, 12, 150, reserveR, W).map((r, i) => Object.assign({ ev: evs[i] }, r)))
         : [];
 
@@ -1865,12 +1919,14 @@ function drawFx(f){
     if (env.renderActionButtons) env.renderActionButtons(me);
   };
 
-  /* 证物架：标题 + 槽位卡片（点牌传唤/留证） */
+  /* 证物架：标题 + 槽位卡片（点牌传唤/留证）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderMarketOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
-    const x = 10, y = y0 + 28, w = env.portraitMode ? W - 20 : W - 260, h = env.HAND_AREA_H - 40;
-    drawPixelText(env.buyMode === 'lock' ? '🔒 留证模式（点牌留证）' : '证物架 · 点牌传唤（⊙' + me.money + '）', 10, y0 + 12, 14, copy.marketTitleCol || '#FFD60A', { shadow: false });
+    const actH = env.actH || 0;
+    const x = 10, y = y0 + 28 + actH, w = env.portraitMode ? W - 20 : W - 260, h = env.HAND_AREA_H - 40 - actH;
+    drawPixelText(env.buyMode === 'lock' ? '🔒 留证模式（点牌留证）' : '证物架 · 点牌传唤（⊙' + me.money + '）', 10, y0 + 12 + actH, 14, copy.marketTitleCol || '#FFD60A', { shadow: false });
     (env.marketSlots ? env.marketSlots(me) : []).forEach(r => {
       const card = r.card;
       const locked = me.lockedUids.indexOf(card.uid) >= 0;
@@ -1891,21 +1947,23 @@ function drawFx(f){
     });
   };
 
-  /* 事件牌区：翻页 + 事件卡（可用于目标选择） */
+  /* 事件牌区：翻页 + 事件卡（可用于目标选择）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderEventsOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
+    const actH = env.actH || 0;
     const evs = me.events || [];
     const maxPage = Math.max(0, Math.ceil(evs.length / 4) - 1);
     let ep = env.eventPage();
     if (ep > maxPage) { ep = maxPage; env.setEventPage(ep); }
-    drawPixelText('事件牌（' + evs.length + '）', 10, y0 + 14, 14, '#FFD60A', { shadow: false });
+    drawPixelText('事件牌（' + evs.length + '）', 10, y0 + 14 + actH, 14, '#FFD60A', { shadow: false });
     if (maxPage > 0) {
       if (env.navBtn) {
-        env.navBtn('evPrev', 118, y0 + 3, 40, 26, '◀', ep > 0);
-        env.navBtn('evNext', 162, y0 + 3, 40, 26, '▶', ep < maxPage);
+        env.navBtn('evPrev', 118, y0 + 3 + actH, 40, 26, '◀', ep > 0);
+        env.navBtn('evNext', 162, y0 + 3 + actH, 40, 26, '▶', ep < maxPage);
       }
-      drawPixelText((ep + 1) + '/' + (maxPage + 1), 210, y0 + 16, 11, copy.pageCol || '#C9D6EA', { shadow: false });
+      drawPixelText((ep + 1) + '/' + (maxPage + 1), 210, y0 + 16 + actH, 11, copy.pageCol || '#C9D6EA', { shadow: false });
     }
     (env.eventSlots ? env.eventSlots() : []).forEach(r => {
       const ev = r.ev;
@@ -1917,15 +1975,17 @@ function drawFx(f){
       if (copy.eventBtn) copy.eventBtn(r.x, r.y, r.w, r.h, ev, usable);
       if (ev.used) drawPixelText('✓ 已使用', r.x + r.w / 2, r.y + r.h - 12, 11, '#5AC8FA', { align: 'center', shadow: false });
     });
-    if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60, 13, copy.emptyCol || '#7E93B0', { shadow: false });
+    if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60 + actH, 13, copy.emptyCol || '#7E93B0', { shadow: false });
   };
 
-  /* 手牌区：分页/横排 + 卡牌（选择举证/保留） */
+  /* 手牌区：分页/横排 + 卡牌（选择举证/保留）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderHandOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
-    const handY = y0 + 28;
-    const hh = env.HAND_AREA_H - 40;
+    const actH = env.actH || 0;
+    const handY = y0 + 28 + actH;
+    const hh = env.HAND_AREA_H - 40 - actH;
     const minH = copy.handMinH ? copy.handMinH() : 64;
     if (hh >= minH && me.hand.length) {
       if (env.portraitMode) {
@@ -1937,12 +1997,12 @@ function drawFx(f){
         if (hs < 0) hs = 0;
         env.setHandScroll(hs);
         const from = hs * perPage, to = Math.min(rects.length, from + perPage);
-        drawPixelText(copy.handTitle ? copy.handTitle(me, from, to, rects.length) : ('手牌 ' + me.hand.length + ' 张'), 12, y0 + 13, copy.handTitleSize || 12.5, copy.handTitleCol || '#FFD60A', { shadow: false });
+        drawPixelText(copy.handTitle ? copy.handTitle(me, from, to, rects.length) : ('手牌 ' + me.hand.length + ' 张'), 12, y0 + 13 + actH, copy.handTitleSize || 12.5, copy.handTitleCol || '#FFD60A', { shadow: false });
         if (pages > 1) {
-          drawPixelText((hs + 1) + '/' + pages, W / 2, y0 + 13, 12.5, copy.pageCol || '#C9D6EA', { align: 'center', shadow: false });
+          drawPixelText((hs + 1) + '/' + pages, W / 2, y0 + 13 + actH, 12.5, copy.pageCol || '#C9D6EA', { align: 'center', shadow: false });
           if (env.navBtn) {
-            env.navBtn('handPrev', W - 92, y0 + 2, 40, 24, '◀', hs > 0);
-            env.navBtn('handNext', W - 48, y0 + 2, 40, 24, '▶', hs < pages - 1);
+            env.navBtn('handPrev', W - 92, y0 + 2 + actH, 40, 24, '◀', hs > 0);
+            env.navBtn('handNext', W - 48, y0 + 2 + actH, 40, 24, '▶', hs < pages - 1);
           }
         }
         for (let i = from; i < to; i++) {
@@ -1980,7 +2040,7 @@ function drawFx(f){
         });
       }
     } else if (me.hand.length) {
-      drawPixelText(copy.handEmpty ? copy.handEmpty(me) : ('手牌 ' + me.hand.length + ' 张'), 10, y0 + 40, copy.handEmptySize || 14.5, copy.handEmptyCol || '#9FB3CE', { shadow: false });
+      drawPixelText(copy.handEmpty ? copy.handEmpty(me) : ('手牌 ' + me.hand.length + ' 张'), 10, y0 + 40 + actH, copy.handEmptySize || 14.5, copy.handEmptyCol || '#9FB3CE', { shadow: false });
     }
   };
 
@@ -2213,10 +2273,13 @@ function flexRects(n, y, h, gap, maxW, reserveR) {
   for (let i = 0; i < n; i++) out.push({ x: 10 + i * (cw + gap), y, w: cw, h });
   return out;
 }
-// 单机版操作按钮双列仍在底栏内右侧（约 212px），卡牌区右侧让位
-function bottomReserve(){ return Math.min(212, W * 0.45); }
-/* 竖屏手牌抽屉：2 列网格（纵向排布），每页 PORTRAIT_PER_PAGE 张（超级更新#37） */
+// 单机版操作按钮双列仍在底栏内右侧（约 212px），卡牌区右侧让位；
+// 竖屏（Task 5）：按钮改底部通栏 → 右侧无需让位，网格全宽
+function bottomReserve(){ return portraitMode ? 0 : Math.min(212, W * 0.45); }
+/* 竖屏手牌抽屉：2 列网格（纵向排布），每页 PORTRAIT_PER_PAGE 张（超级更新#37）
+ * Task 5 竖屏重设计：底部固定操作栏高（通栏大按钮，底栏内容区下移让位） */
 const PORTRAIT_PER_PAGE = 6;
+const PORTRAIT_ACT_H = 48;   // 竖屏固定操作栏高度（含上下留白）
 function handGridRects(n, y, h) {
   const cols = 2;
   const gap = 10;
@@ -2283,7 +2346,7 @@ function panelHeight(){
 /* P1-6：布局唯一源在 UIPresenter.layouts()（双端收口），以下均为薄封装 */
 function _layouts() {
   if (!game) return null;
-  return UIPresenter.layouts(game, { W, H, compact, isMobile, portraitMode, mySeat, eventPage, HAND_AREA_H, PANEL_Y, panelH: panelHeight(), reserveR: bottomReserve() });
+  return UIPresenter.layouts(game, { W, H, compact, isMobile, portraitMode, mySeat, eventPage, HAND_AREA_H, PANEL_Y, panelH: panelHeight(), reserveR: bottomReserve(), portraitActH: portraitMode ? PORTRAIT_ACT_H : 0 });
 }
 function panelRect(seat){
   const L = _layouts();
@@ -2574,6 +2637,8 @@ function renderEnv(){
     mySeat, HAND_AREA_H,
     UI, PHASE_STEPS, fontBase: _FONT_BASE,
     selected, eventPick, buyMode, portraitMode, compact, isMobile,
+    // Task 5 竖屏：底部固定操作栏高（renderBottomOf 三分支内容下移让位；联机端未传 → 0 无影响）
+    actH: portraitMode ? PORTRAIT_ACT_H : 0,
     eventPage: () => eventPage, setEventPage: (v) => { eventPage = v; },
     handScroll: () => handScroll, setHandScroll: (v) => { handScroll = v; },
     vm: () => vm, panelRect: (i) => panelRect(i), panelHeight: () => panelHeight(),
@@ -2839,6 +2904,72 @@ function isEventUsable(ev){
 function renderActionButtons(me){
   // 操作按钮：双列大按钮，挂底部大卡牌区右侧
   const g = game;
+  /* Task 5 竖屏重设计：底部固定操作栏（阶段化通栏大按钮）
+   * 1~3 个按钮横贯底栏顶部，底栏内容区（手牌/市场/事件网格）下移 PORTRAIT_ACT_H 让位；
+   * 提示类文本（政治操盘/揭示/选起始）居中显示于操作条位置。 */
+  if (portraitMode){
+    const actH = PORTRAIT_ACT_H, gap = 8;
+    const yAct = H - HAND_AREA_H + 8, hBtn = actH - 14;
+    const hint = (t, col) => drawPixelText(t, W / 2, yAct + hBtn / 2, 13, col, { align: 'center', shadow: false });
+    const acts = [];
+    switch (g.phase){
+      case 'buy':
+        if (!me.buyDone){
+          acts.push({ label: '换证 ⊙' + ElectionCore.refreshCostOf(me), act: 'refresh', enabled: me.money >= ElectionCore.refreshCostOf(me), col: PAL.accent.a });
+          acts.push({ label: buyMode === 'lock' ? '切到传唤' : '切到留证', act: 'toggleBuyMode', enabled: true, col: PAL.ui.a });
+          acts.push({ label: '结束取证', act: 'endBuy', enabled: true, col: PAL.ui.a });
+        } else {
+          hint('已结束取证', '#4A3820');
+        }
+        break;
+      case 'play':
+        if (g.turn === mySeat && !me.playDone){
+          acts.push({ label: '举证（' + selected.length + '/1）', act: 'playSel', enabled: selected.length === 1, col: PAL.accent.a });
+          acts.push({ label: '结束举证', act: 'finishPlay', enabled: true, col: PAL.ui.a });
+          hint('每回合举证 1 份', '#7A4A10');
+        } else if (g.playLastSeat === mySeat && !me.playDone){
+          acts.push({ label: '结束举证', act: 'finishPlay', enabled: true, col: PAL.ui.a });
+        }
+        break;
+      case 'preEvent': case 'postEvent':
+        if (g.eventTurnSeat === mySeat){
+          acts.push({ label: '打出选中事件', act: 'playEventSel', enabled: eventPick !== null && eventPick.seat === mySeat, col: PAL.accent.a });
+          acts.push({ label: '不打出', act: 'passEvent', enabled: true, col: PAL.ui.a });
+          hint('最多连续 2 张 · 点事件牌', '#7A4A10');
+        }
+        break;
+      case 'discard':
+        if (g.discardSeat === mySeat && !me.keepDone){
+          acts.push({ label: '确认保留（' + selected.length + '/' + Math.min(keepMax(), me.hand.length) + '）', act: 'finishKeep', enabled: selected.length >= Math.min(keepMax(), me.hand.length), col: PAL.accent.a });
+          hint('保留最多 ' + keepMax() + ' 张', '#7A4A10');
+        }
+        break;
+      case 'count':
+        if (g.swapPending && g.swapPending.owner === mySeat) hint('政治操盘：点击场上任意其他牌互换', '#A9B8CC');
+        break;
+      case 'reveal':
+        if (g.revealPending && g.revealPending.owner === mySeat) hint('点击对手已亮出的证据', '#E6392F');
+        break;
+      case 'chooseStarter':
+        if (g.starterPicker === mySeat) hint('点击选择本轮起始玩家', '#FFD60A');
+        break;
+      case 'gameover':
+        acts.push({ label: '再来一局', act: 'restart', enabled: true, col: PAL.accent.a });
+        break;
+    }
+    if (acts.length){
+      const n = acts.length;
+      const bw = (W - 20 - (n - 1) * gap) / n;
+      acts.forEach((A, i) => {
+        const b = btn(10 + i * (bw + gap), yAct, bw, hBtn, A.label, A.col, A.enabled);
+        b.act = A.act;
+        buttons.push(b);
+        drawBtn(b);
+      });
+    }
+    return;
+  }
+  // 非竖屏（桌面/横屏触屏）：原双列按钮保留
   const cw = 96, chh = compact ? 38 : (isMobile ? 50 : 44), gap = compact ? 6 : 8;
   // P0：窄屏（横屏手机）时按钮右移贴近右侧，防止 W<212 出屏
   const btnColX = Math.max(12, W - 212);
@@ -3747,8 +3878,10 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 /* 自适应：桌面/竖屏等比缩放（不变形）；横屏手机铺满窗口（逻辑坐标=窗口尺寸，文字 1:1 清晰）+ 横屏提示
- * P0：安全区（刘海/Home 条）让位，canvas 平移进安全区内 */
+ * P0：安全区（刘海/Home 条）让位，canvas 平移进安全区内
+ * Task 5：键盘弹出/地址栏伸缩 → visualViewport 高度收缩，画布跟随可视区（顶部不动、底部上移） */
 let SAFE = { top: 0, bottom: 0, left: 0, right: 0 };
+let keyboardOpen = false;   // 键盘/工具栏占据判断（visualViewport 明显小于布局视口时）
 function safeArea(){
   try {
     const cs = getComputedStyle(document.documentElement);
@@ -3771,12 +3904,15 @@ function resize(){
   const portrait = vh > vw;
   compact = isMobile && !portrait;
   portraitMode = isMobile && portrait;
+  // Task 5 键盘识别：可视视口比布局视口矮 120px+ → 键盘/工具栏占据（允许画布更矮，避免内容被遮）
+  keyboardOpen = !!(vv && window.innerHeight - vv.height > 120);
   W = Math.max(340, vw - SAFE.left - SAFE.right);
-  H = Math.max(480, vh - SAFE.top - SAFE.bottom);
-  // 画布 CSS 尺寸跟随逻辑尺寸并平移到安全区内（刘海/Home 条不再遮 HUD 与底栏按钮）
+  H = Math.max(keyboardOpen ? 300 : 480, vh - SAFE.top - SAFE.bottom);
+  // 画布 CSS 尺寸跟随逻辑尺寸并平移到安全区内（刘海/Home 条不再遮 HUD 与底栏按钮）；
+  // 键盘弹出时 visualViewport.offsetTop 变化 → 画布随可视区上移/恢复
   canvas.style.position = 'fixed';
   canvas.style.left = SAFE.left + 'px';
-  canvas.style.top = SAFE.top + 'px';
+  canvas.style.top = (SAFE.top + (vv ? vv.offsetTop : 0)) + 'px';
   canvas.style.width = W + 'px';
   canvas.style.height = H + 'px';
   canvas.width = Math.round(W * DPR);
@@ -3785,6 +3921,11 @@ function resize(){
   applyUI();
 }
 window.addEventListener('resize', resize);
+// Task 5 键盘弹出画布上移：visualViewport resize/scroll（键盘弹出不触发 window resize）
+if (window.visualViewport){
+  window.visualViewport.addEventListener('resize', resize);
+  window.visualViewport.addEventListener('scroll', resize);
+}
 canvas.addEventListener('mousemove', onMouseMove);
 canvas.addEventListener('click', e => {
   if (Date.now() - lastTouchTime < 600) return;   // 触屏合成 click：touchend 已处理

@@ -133,15 +133,56 @@
   }
 
   /* ---------------- 卡背（唯一源：由双端抽入，超级更新#5） ---------------- */
+  /* 卡背：机密档案封面「真相，由证据编织」（Task 4 叙事层） */
   function drawCardBackAt(ctx, x, y, w, h, col) {
     const shadow = E('comicShadow'), rect = E('pxRect'), border = E('pxBorder'), text = E('drawPixelText');
     const PAL = E('PAL') || {};
     const bc = col || (PAL.ui && PAL.ui.b) || '#14213D';
     shadow(x, y, w, h, 3, 3);
-    rect(x, y, w, h, '#222222');
+    rect(x, y, w, h, '#1C2530');                       // 深蓝黑档案袋底
     border(x, y, w, h, bc, 2.5);
-    rect(x + w * 0.18, y + h * 0.16, w * 0.64, h * 0.68, 'rgba(255,255,255,0.08)');
-    text('?', x + w / 2, y + h / 2, h * 0.36, bc, { align: 'center', shadow: false });
+    // 顶部机密条（红色封条）
+    const barH = Math.max(11, h * 0.11);
+    rect(x + 3, y + 3, w - 6, barH, '#7A0E0E');
+    border(x + 3, y + 3, w - 6, barH, '#111111', 1);
+    text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), '#FFFFFF', { align: 'center', shadow: false });
+
+    const mini = w < 70 || h < 62;                     // 迷你尺寸降级：只保留封条 + 问号
+    if (mini) {
+      text('?', x + w / 2, y + h / 2 + 3, h * 0.30, bc, { align: 'center', shadow: false });
+      return;
+    }
+
+    // 档案四角金属护片（小三角）
+    const c = Math.max(6, w * 0.06), e = 3;
+    ctx.fillStyle = '#B8B8B8';
+    ctx.beginPath();
+    ctx.moveTo(x + c, y + e); ctx.lineTo(x + e, y + e); ctx.lineTo(x + e, y + c);
+    ctx.moveTo(x + w - c, y + e); ctx.lineTo(x + w - e, y + e); ctx.lineTo(x + w - e, y + c);
+    ctx.moveTo(x + c, y + h - e); ctx.lineTo(x + e, y + h - e); ctx.lineTo(x + e, y + h - c);
+    ctx.moveTo(x + w - c, y + h - e); ctx.lineTo(x + w - e, y + h - e); ctx.lineTo(x + w - e, y + h - c);
+    ctx.fill();
+
+    // 中央 ⚖ 金章（圆印）
+    const cx = x + w / 2, cy = y + h * 0.40;
+    const r = Math.min(w, h) * 0.22;
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(232,164,24,0.12)'; ctx.fill();
+    ctx.strokeStyle = '#E8A418'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(232,164,24,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+    text('⚖', cx, cy, r * 1.1, '#E8A418', { align: 'center', shadow: false });
+
+    // 主标题：真相，由证据编织
+    text('真相', cx, y + h * 0.63, Math.min(w * 0.30, h * 0.15), '#F6E9C8', { align: 'center', shadow: false });
+    text('由证据编织', cx, y + h * 0.75, Math.max(8, h * 0.065), '#9AA5B5', { align: 'center', shadow: false });
+
+    // 底部档案底注
+    const baseY = y + h - 12;
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x + 8, baseY); ctx.lineTo(x + w - 8, baseY); ctx.stroke();
+    text('机密档案', x + 8, baseY + 8, Math.max(6, h * 0.045), '#6B7686', { shadow: false });
+    text('CASE FILE', x + w - 8, baseY + 8, Math.max(5.5, h * 0.04), '#4E5866', { align: 'right', shadow: false });
   }
 
   /* ---------------- 组装：drawCard（供 drawVoterCard 薄封装调用） ---------------- */
@@ -228,30 +269,41 @@
     text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, '#4A3100', { align: 'center', shadow: false, lineW: 0 });
   }
 
-  /* ---------------- 事件牌（CONFIDENTIAL 机密卡，唯一源） ---------------- */
+  /* ---------------- 事件牌（报纸头条「号外」，唯一源） ---------------- */
   function drawEventCard(ctx, x, y, w, h, ev, o) {
     o = o || {};
     const text = E('drawPixelText'), rect = E('pxRect'), border = E('pxBorder'),
-          shadow = E('comicShadow'), wrap = E('drawWrapText'), lv = E('lvMark'),
-          PAL = E('PAL') || { events: { a: '#14213D', b: '#FFD60A' }, accent: { b: '#111111' }, paper: '#F6E9C8' };
+          shadow = E('comicShadow'), wrap = E('drawWrapText');
     if (ev.hidden) { drawCardBackAt(ctx, x, y, w, h, '#2A3A5A'); return; }
     const used = ev.used;
-    const col = used ? '#5A5A5A' : (o.col || PAL.events.a);
+    // 报纸：新闻纸米黄底（已用 → 陈旧灰）
+    const paper = used ? '#B9B2A0' : '#EDE3CC';
     shadow(x, y, w, h, 3, 3);
-    rect(x, y, w, h, col);
-    border(x, y, w, h, used ? '#333333' : '#111111', 2);
-    // 机密条
-    rect(x, y, w, 12, used ? '#444444' : '#7A0E0E');
-    text(used ? '已归档' : 'CONFIDENTIAL', x + 4, y + 6, 9, '#FFFFFF', { shadow: false });
-    text(lv(ev.lv) + ev.name, x + w / 2, y + h * 0.26, Math.max(10, h * 0.1), used ? '#BBBBBB' : PAL.events.b, { align: 'center', shadow: false });
-    const evDescLines = Math.max(1, Math.floor((h * 0.5 - 22) / Math.max(9, h * 0.09)));   // 底部标签之上截断
-    wrap(ev.desc, x + 5, y + h * 0.52, Math.max(8.5, h * 0.066), used ? '#999999' : '#FFFFFF', w - 10, Math.max(9, h * 0.09), { maxLines: evDescLines });
-    // 效果章
+    rect(x, y, w, h, paper);
+    border(x, y, w, h, used ? '#555555' : '#111111', 2);
+    // 报头条：号外（红） + 报眉：庭审公报
+    const barH = Math.max(11, h * 0.115);
+    rect(x, y, w, barH, used ? '#666666' : '#7A0E0E');
+    text(used ? '归档' : '号外', x + 4, y + barH / 2, Math.max(8.5, h * 0.07), '#FFFFFF', { shadow: false });
+    text('庭审公报 · 卷宗' + (ev.id || ''), x + w - 4, y + barH / 2, Math.max(6.5, h * 0.055), 'rgba(255,255,255,0.85)', { align: 'right', shadow: false });
+    // 头条大字：事件名（黑体）+ 红双下划线
+    const tSize = Math.max(10.5, Math.min(w * 0.082, h * 0.115));
+    text(ev.name, x + w / 2, y + h * 0.30, tSize, used ? '#666666' : '#111111', { align: 'center', shadow: false });
+    const ruleY = y + h * 0.38;
+    ctx.fillStyle = used ? '#777777' : '#7A0E0E';
+    ctx.fillRect(x + w * 0.12, ruleY, w * 0.76, 2.5);
+    ctx.fillRect(x + w * 0.20, ruleY + 4.5, w * 0.60, 1.5);
+    // 正文（报道）
+    const evDescLines = Math.max(1, Math.floor((h * 0.50 - 20) / Math.max(8.5, h * 0.085)));
+    wrap(ev.desc, x + 6, y + h * 0.55, Math.max(8, h * 0.06), used ? '#777777' : '#3A3A3A', w - 12, Math.max(8.5, h * 0.085), { maxLines: evDescLines });
+    // 效果章（报纸边栏小注，保留原语义）
     const effTxt = ev.eff ? (ev.eff.type === 'vote' ? (ev.eff.val > 0 ? '+票' : '−票') : ev.eff.type === 'money' ? (ev.eff.val > 0 ? '+⊙' : '−⊙') : ev.eff.type === 'support' ? '倾向' : '加成') : '';
     const stampCol = ev.eff && ev.eff.val < 0 ? '#E6392F' : '#0E8A5F';
     rect(x + 4, y + h - 18, 46, 14, used ? '#555555' : stampCol);
+    border(x + 4, y + h - 18, 46, 14, '#111111', 1);
     text(ev.timing === 'pre' ? '庭审前' : '庭审后', x + 27, y + h - 11, 10, '#FFFFFF', { align: 'center', shadow: false });
     rect(x + w - 50, y + h - 18, 46, 14, used ? '#555555' : '#111111');
+    border(x + w - 50, y + h - 18, 46, 14, '#111111', 1);
     text(effTxt, x + w - 27, y + h - 11, 10.5, used ? '#AAAAAA' : '#FFD60A', { align: 'center', shadow: false });
   }
 

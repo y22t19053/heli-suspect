@@ -196,6 +196,7 @@
       const PANEL_Y = opts.PANEL_Y || 56;
       const panelH = opts.panelH || 30;
       const reserveR = opts.reserveR || 0;   // 右侧按钮区让位（单机版双列按钮 212px；联机 0）
+      const actH = opts.portraitActH || 0;   // Task 5 竖屏固定操作栏高（内容区下移让位；联机未传 → 0）
       const seats = view.seats || [];
       const n = seats.length;
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -203,12 +204,13 @@
       /* 顶部紧凑信息条（每座位一条） */
       const panelRects = seats.map((s, i) => ({ seat: i, x: 10, y: PANEL_Y + i * (panelH + 6), w: W - 20, h: panelH - 4 }));
 
-      /* 中央辩论台：从信息条下方延伸到底栏上方（按钮行让位） */
+      /* 中央辩论台：从信息条下方延伸到底栏上方（按钮行让位）
+       * 单机竖屏（actH>0）：按钮在底栏内顶部 → 行区少让位；其余（含联机竖屏按钮在底栏上方）保持 btnH+8 */
       const row = view.row || [];
       const rw = clamp(Math.min(118, (W - 60) / Math.max(1, row.length) - 12), 40, 118);
       const cy = PANEL_Y + n * (panelH + 6) + (compact ? 10 : 30);
       const btnH = compact ? 38 : (isMobile ? 50 : 46);
-      const availRh = H - HAND_AREA_H - (btnH + 8) - cy;
+      const availRh = H - HAND_AREA_H - ((portraitMode && actH > 0) ? 8 : btnH + 8) - cy;
       const rh = clamp(availRh, compact ? 64 : 88, H * 0.5);
       const total = row.length * (rw + 10) - 10;
       let cx = (W - total) / 2;
@@ -237,21 +239,21 @@
         }
         return out;
       };
-      const handItems = (me.hand && me.hand.length && hh >= 64)
+      const handItems = (me.hand && me.hand.length && hh - actH >= 64)
         ? (portraitMode
-          ? _grid(me.hand.length, handY, hh, reserveR, 200).map((r, i) => Object.assign({ card: me.hand[i] }, r))
+          ? _grid(me.hand.length, handY + actH, hh - actH, reserveR, 200).map((r, i) => Object.assign({ card: me.hand[i] }, r))
           : this._flexRects(me.hand.length, handY, hh, 12, 200, reserveR, W).map((r, i) => Object.assign({ card: me.hand[i] }, r)))
         : [];
       const mk = me.market || [];
       const marketItems = mk.length
         ? (portraitMode
-          ? _grid(mk.length, H - HAND_AREA_H + 28, HAND_AREA_H - 40, reserveR, 200).map((r, i) => Object.assign({ card: mk[i] }, r))
+          ? _grid(mk.length, H - HAND_AREA_H + 28 + actH, HAND_AREA_H - 40 - actH, reserveR, 200).map((r, i) => Object.assign({ card: mk[i] }, r))
           : this._flexRects(mk.length, H - HAND_AREA_H + 28, HAND_AREA_H - 40, 12, 200, reserveR, W).map((r, i) => Object.assign({ card: mk[i] }, r)))
         : [];
       const evs = (me.events || []).slice(eventPage * 4, eventPage * 4 + 4);
       const eventItems = evs.length
         ? (portraitMode
-          ? _grid(evs.length, H - HAND_AREA_H + 34, HAND_AREA_H - 56, reserveR, 150).map((r, i) => Object.assign({ ev: evs[i] }, r))
+          ? _grid(evs.length, H - HAND_AREA_H + 34 + actH, HAND_AREA_H - 56 - actH, reserveR, 150).map((r, i) => Object.assign({ ev: evs[i] }, r))
           : this._flexRects(evs.length, H - HAND_AREA_H + 34, HAND_AREA_H - 56, 12, 150, reserveR, W).map((r, i) => Object.assign({ ev: evs[i] }, r)))
         : [];
 

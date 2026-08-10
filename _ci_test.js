@@ -19,7 +19,9 @@ const PORT = process.env.CI_PORT || (process.env.PORT || 3000);
 const BASE = [
   '_test_skill_combos.js',
   '_balance_test.js',
-  '_smoke_game.js'
+  '_smoke_game.js',
+  '_test_reconnect.js',
+  '_test_snapshot.js'
 ];
 const JUNIT = path.join(__dirname, 'junit.xml');
 
@@ -81,6 +83,8 @@ async function main() {
 
   if (!skipServer) {
     console.log('[ci] 启动 server.js (PORT=' + PORT + ') …');
+    // 干净启动：清掉上次运行残留的快照文件，避免 CI 误恢复旧房间
+    try { fs.rmSync(path.join(__dirname, 'rooms-snapshot.json'), { force: true }); } catch (e) {}
     server = spawn(process.execPath, ['server.js'], {
       cwd: __dirname,
       env: Object.assign({}, process.env, { PORT: String(PORT) }),

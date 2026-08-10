@@ -120,3 +120,36 @@ flowchart LR
     P1 -- 有任一 --> P3[broadcastState 按座位生成防作弊 view]
     P3 --> M[maybeRunAI 调度AI+管理人类计时器]
 ```
+
+## 5. 房间快照持久化（服务器重启恢复）
+
+> Task 3 交付物。基于 `shared/room-snapshot.js` + `server.js` 实际代码。
+
+### 5.1 触发点
+
+| 时机 | 动作 |
+|---|---|
+| 启动（`listen` 回调） | `restoreRooms()`：读 `rooms-snapshot.json` → `deserializeRooms`（按 30 分钟空闲阈值过滤过期房）→ 填回 `ROOMS` → 对进行中房间重跑 `maybeRunAI`（人类座位无 socket，30s 超时接管兜底） |
+| 每 10 分钟（`setInterval` 定时器，`.unref()`） | `snapshotRooms()` → `writeSnapshotFile(__dirname, ROOMS)`（tmp + rename 原子替换） |
+| 进程退出（`SIGINT`/`SIGTERM`/`exit`） | 同上落盘（Windows 强杀/断电不触发信号，靠定时落盘兜底，最多丢一个间隔内的变更） |
+
+`SNAP_INTERVAL_MS` 可用环境变量覆盖（测试/运维场景，如 `SNAP_INTERVAL_MS=1500`）。
+
+### 5.2 序列化契约（`shared/room-snapshot.js`，纯函数、require 无副作用）
+
+- **只写可 JSON 字段**：`code/mode/maxSeats/password/seed/hostSeat/started/lastActivity/seats/state/snapshots`。
+- **`seats[].connected` 强制写 `false`**：服务器重启后所有玩家处于"断线态"，同名 `joinRoom` 走重连分支（取消 AI 接管、恢复快照、`↩ 已为你恢复掉线前的手牌与市场`）。
+- **断线快照一并持久化**：`snapshots: [{seat, state, savedAt}]`，重启后掉线玩家重连仍能恢复私有资源。
+- **运行时对象不落盘**：`timers/deadlines/aiRetries/aiBusy/aiQueue` 由 `factory`（`createRoom`）重建空实例。
+- 房间号正则校验 `/^[A-Z2-9]{4}$/`（排除 0/1 防混淆）；损坏/缺失快照文件返回空数组并告警，不阻塞启动。
+
+### 5.3 恢复后行为
+
+- 恢复的房间 `started=true` 且对局未结束 → `maybeRunAI(room)`：为每个需要行动的人类座位设 30s 超时（`SEAT_TIMEOUT_MS`），期间同名重连取消接管。
+- 超过 `CLEANUP_IDLE_MS`（30 分钟）无活动的房间不恢复（与空闲清理语义一致）。
+- `ROOMS.size >= MAX_ROOMS` 时停止恢复（防止快照撑爆内存上限）。
+
+### 5.4 验证
+
+- `_test_snapshot.js`（node:test，纯函数）：serialize → write → read → deserialize 完整往返；损坏文件优雅降级。
+- `_tmp_snap_smoke.js`（临时脚本，用完即删）：建房开局 → 定时落盘 → 强杀（模拟断电）→ 重启 → `/api/rooms` 房间恢复 → 同名重连回到断线前阶段。

@@ -428,12 +428,14 @@
     if (env.renderActionButtons) env.renderActionButtons(me);
   };
 
-  /* 证物架：标题 + 槽位卡片（点牌传唤/留证） */
+  /* 证物架：标题 + 槽位卡片（点牌传唤/留证）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderMarketOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
-    const x = 10, y = y0 + 28, w = env.portraitMode ? W - 20 : W - 260, h = env.HAND_AREA_H - 40;
-    drawPixelText(env.buyMode === 'lock' ? '🔒 留证模式（点牌留证）' : '证物架 · 点牌传唤（⊙' + me.money + '）', 10, y0 + 12, 14, copy.marketTitleCol || '#FFD60A', { shadow: false });
+    const actH = env.actH || 0;
+    const x = 10, y = y0 + 28 + actH, w = env.portraitMode ? W - 20 : W - 260, h = env.HAND_AREA_H - 40 - actH;
+    drawPixelText(env.buyMode === 'lock' ? '🔒 留证模式（点牌留证）' : '证物架 · 点牌传唤（⊙' + me.money + '）', 10, y0 + 12 + actH, 14, copy.marketTitleCol || '#FFD60A', { shadow: false });
     (env.marketSlots ? env.marketSlots(me) : []).forEach(r => {
       const card = r.card;
       const locked = me.lockedUids.indexOf(card.uid) >= 0;
@@ -454,21 +456,23 @@
     });
   };
 
-  /* 事件牌区：翻页 + 事件卡（可用于目标选择） */
+  /* 事件牌区：翻页 + 事件卡（可用于目标选择）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderEventsOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
+    const actH = env.actH || 0;
     const evs = me.events || [];
     const maxPage = Math.max(0, Math.ceil(evs.length / 4) - 1);
     let ep = env.eventPage();
     if (ep > maxPage) { ep = maxPage; env.setEventPage(ep); }
-    drawPixelText('事件牌（' + evs.length + '）', 10, y0 + 14, 14, '#FFD60A', { shadow: false });
+    drawPixelText('事件牌（' + evs.length + '）', 10, y0 + 14 + actH, 14, '#FFD60A', { shadow: false });
     if (maxPage > 0) {
       if (env.navBtn) {
-        env.navBtn('evPrev', 118, y0 + 3, 40, 26, '◀', ep > 0);
-        env.navBtn('evNext', 162, y0 + 3, 40, 26, '▶', ep < maxPage);
+        env.navBtn('evPrev', 118, y0 + 3 + actH, 40, 26, '◀', ep > 0);
+        env.navBtn('evNext', 162, y0 + 3 + actH, 40, 26, '▶', ep < maxPage);
       }
-      drawPixelText((ep + 1) + '/' + (maxPage + 1), 210, y0 + 16, 11, copy.pageCol || '#C9D6EA', { shadow: false });
+      drawPixelText((ep + 1) + '/' + (maxPage + 1), 210, y0 + 16 + actH, 11, copy.pageCol || '#C9D6EA', { shadow: false });
     }
     (env.eventSlots ? env.eventSlots() : []).forEach(r => {
       const ev = r.ev;
@@ -480,15 +484,17 @@
       if (copy.eventBtn) copy.eventBtn(r.x, r.y, r.w, r.h, ev, usable);
       if (ev.used) drawPixelText('✓ 已使用', r.x + r.w / 2, r.y + r.h - 12, 11, '#5AC8FA', { align: 'center', shadow: false });
     });
-    if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60, 13, copy.emptyCol || '#7E93B0', { shadow: false });
+    if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60 + actH, 13, copy.emptyCol || '#7E93B0', { shadow: false });
   };
 
-  /* 手牌区：分页/横排 + 卡牌（选择举证/保留） */
+  /* 手牌区：分页/横排 + 卡牌（选择举证/保留）
+   * actH（Task 5 竖屏固定操作栏高）：内容区下移让位 */
   RC._renderHandOf = function (env, me, y0) {
     const ctx = env.ctx, W = env.W;
     const copy = env.copy || {};
-    const handY = y0 + 28;
-    const hh = env.HAND_AREA_H - 40;
+    const actH = env.actH || 0;
+    const handY = y0 + 28 + actH;
+    const hh = env.HAND_AREA_H - 40 - actH;
     const minH = copy.handMinH ? copy.handMinH() : 64;
     if (hh >= minH && me.hand.length) {
       if (env.portraitMode) {
@@ -500,12 +506,12 @@
         if (hs < 0) hs = 0;
         env.setHandScroll(hs);
         const from = hs * perPage, to = Math.min(rects.length, from + perPage);
-        drawPixelText(copy.handTitle ? copy.handTitle(me, from, to, rects.length) : ('手牌 ' + me.hand.length + ' 张'), 12, y0 + 13, copy.handTitleSize || 12.5, copy.handTitleCol || '#FFD60A', { shadow: false });
+        drawPixelText(copy.handTitle ? copy.handTitle(me, from, to, rects.length) : ('手牌 ' + me.hand.length + ' 张'), 12, y0 + 13 + actH, copy.handTitleSize || 12.5, copy.handTitleCol || '#FFD60A', { shadow: false });
         if (pages > 1) {
-          drawPixelText((hs + 1) + '/' + pages, W / 2, y0 + 13, 12.5, copy.pageCol || '#C9D6EA', { align: 'center', shadow: false });
+          drawPixelText((hs + 1) + '/' + pages, W / 2, y0 + 13 + actH, 12.5, copy.pageCol || '#C9D6EA', { align: 'center', shadow: false });
           if (env.navBtn) {
-            env.navBtn('handPrev', W - 92, y0 + 2, 40, 24, '◀', hs > 0);
-            env.navBtn('handNext', W - 48, y0 + 2, 40, 24, '▶', hs < pages - 1);
+            env.navBtn('handPrev', W - 92, y0 + 2 + actH, 40, 24, '◀', hs > 0);
+            env.navBtn('handNext', W - 48, y0 + 2 + actH, 40, 24, '▶', hs < pages - 1);
           }
         }
         for (let i = from; i < to; i++) {
@@ -543,7 +549,7 @@
         });
       }
     } else if (me.hand.length) {
-      drawPixelText(copy.handEmpty ? copy.handEmpty(me) : ('手牌 ' + me.hand.length + ' 张'), 10, y0 + 40, copy.handEmptySize || 14.5, copy.handEmptyCol || '#9FB3CE', { shadow: false });
+      drawPixelText(copy.handEmpty ? copy.handEmpty(me) : ('手牌 ' + me.hand.length + ' 张'), 10, y0 + 40 + actH, copy.handEmptySize || 14.5, copy.handEmptyCol || '#9FB3CE', { shadow: false });
     }
   };
 

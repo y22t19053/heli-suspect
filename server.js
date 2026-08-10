@@ -7,6 +7,7 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const Core = require('./shared/game-core.js');
+const { writeSnapshotFile, readSnapshotFile, deserializeRooms } = require('./shared/room-snapshot.js');
 
 const PORT = process.env.PORT || 3000;
 const SEAT_TIMEOUT_MS = clampInt(Number(process.env.SEAT_TIMEOUT_MS) || 30000, 5000, 120000);   // 单次操作倒计时（可配置，超级更新#69）
@@ -46,8 +47,9 @@ function sanitizePass(raw) {
   return s;
 }
 
-function createRoom({ mode, maxSeats, hostName, seed, password }) {
-  const code = genCode();
+function createRoom({ mode, maxSeats, hostName, seed, password, code: givenCode }) {
+  // 快照恢复时传入原房间号（普通建房传 null → 随机生成）
+  const code = (givenCode && /^[A-Z2-9]{4}$/.test(givenCode)) ? givenCode : genCode();
   const room = {
     code, mode,
     maxSeats: clampInt(maxSeats, 2, 4),
@@ -617,11 +619,13 @@ function afterStateChange(room) {
 /* 房间活动时间戳（空闲清理） */
 function touchRoom(room) { room.lastActivity = Date.now(); }
 
+const CLEANUP_IDLE_MS = 30 * 60 * 1000;   // 空闲清理阈值：30 分钟无操作
+
 /* 空闲清理：30 分钟无任何操作则关闭房间（避免长期驻留内存） */
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of ROOMS) {
-    if (now - room.lastActivity > 30 * 60 * 1000) {
+    if (now - room.lastActivity > CLEANUP_IDLE_MS) {
       try { io.to(code).emit('notice', '房间因长时间无活动已关闭'); } catch (e) {}
       for (const sock of io.sockets.sockets.values()) {
         const info = SOCK_TO_ROOM.get(sock.id);
@@ -842,7 +846,40 @@ server.listen(PORT, () => {
   console.log('  浏览器打开: http://localhost:' + PORT);
   console.log('  SEAT_TIMEOUT_MS=' + SEAT_TIMEOUT_MS + ' MAX_ROOMS=' + MAX_ROOMS);
   console.log('=============================================');
+  restoreRooms();
 });
+
+/* ---------------- 房间快照持久化（Task 3） ----------------
+ * 每 10 分钟把活跃房间写入 rooms-snapshot.json（原子替换），进程退出时再写一次；
+ * 启动时恢复快照中的房间（含对局状态与断线快照），玩家凭原房间号+昵称直接重连。 */
+// 落盘间隔：默认 10 分钟；可用环境变量覆盖（测试/运维场景，如 SNAP_INTERVAL_MS=1500）
+const SNAP_INTERVAL_MS = (Number(process.env.SNAP_INTERVAL_MS) > 0)
+  ? Number(process.env.SNAP_INTERVAL_MS) : 10 * 60 * 1000;
+
+function snapshotRooms() { writeSnapshotFile(__dirname, ROOMS); }
+
+function restoreRooms() {
+  const list = readSnapshotFile(__dirname);
+  if (!list.length) return;
+  const now = Date.now();
+  const restored = deserializeRooms(list, (code, opts) => createRoom(Object.assign({}, opts, { code })));
+  let n = 0;
+  for (const [code, room] of restored) {
+    if (ROOMS.size >= MAX_ROOMS) break;
+    if (now - room.lastActivity > CLEANUP_IDLE_MS) continue;   // 过期房间不恢复（与空闲清理语义一致）
+    ROOMS.set(code, room);
+    // 重新驱动 AI 调度：人类座位无 socket（connected=false），
+    // maybeRunAI 会为其设超时兜底（30s 内重连取消接管）
+    if (room.started && room.state && !room.state.gameOver) maybeRunAI(room);
+    n++;
+  }
+  if (n) console.log('[snapshot] 已恢复 ' + n + ' 个房间（from rooms-snapshot.json）');
+}
+
+setInterval(snapshotRooms, SNAP_INTERVAL_MS).unref();
+process.on('SIGINT', () => { snapshotRooms(); process.exit(0); });
+process.on('SIGTERM', () => { snapshotRooms(); process.exit(0); });
+process.on('exit', () => { try { snapshotRooms(); } catch (e) { /* 退出落盘失败不阻塞 */ } });
 
 /* ---------------- 运维：/health 健康检查 + JSON 事件日志（超级更新） ---------------- */
 const startedAt = Date.now();
