@@ -14,6 +14,8 @@
  *   RenderCore.currentActSeatOf —— 当前行动座位（原 currentActSeat，两端统一含 chooseStarter）
  *   RenderCore.keepMaxOf        —— 整理保留上限（原 keepMax，观战者恒 0）
  *   RenderCore.renderRowArea    —— 辩论台行区（原 renderRowArea，差异经 copy/注入表达）
+ *   RenderCore.drawRowCardOf    —— 行卡绘制（原两端本地 drawRowCard，以联机为基底，
+ *                                  技能闪光经 skillPulse 注入、选目标按钮经 registerTarget 注入）
  *   RenderCore.renderHudOf      —— 顶部信息条 HUD（原 renderHud，P1-7 双端合一，
  *                                  差异经 copy 注入：倒计时/观战 vs 轮次进度条/排名横幅）
  *   RenderCore.renderPanelsOf   —— 顶部座位面板（原 renderPanels，P1-7 双端合一，
@@ -103,8 +105,9 @@
   };
 
   /* 辩论台行区（统一两端 renderRowArea）
-   * 差异经 env 注入：drawRowBackdrop（联机底座+标题 / 单机无）、rowCardAnim（单机 cardIn 动画）、
-   * drawRowCard（双端各自实现）；copy 覆盖文案与配色（默认=联机版）：
+   * 差异经 env 注入：drawRowBackdrop（联机底座+标题 / 单机无）、rowCardAnim（单机 cardIn 动画）；
+   * 行卡绘制统一为 RC.drawRowCardOf(env, it)（评审五：drawRowCard 双份收口）；
+   * copy 覆盖文案与配色（默认=联机版）：
    *   rowLabel { x, dy, size?, col }    —— 「证据 · 已亮出」位置/颜色
    *   countLine { dash, txt, dy }       —— 审议半区分隔线与标记颜色
    *   rowEmpty { text, size, col }      —— 空行提示 */
@@ -116,7 +119,12 @@
     const lay = env.rowLayout();
     const cy = lay.cy, rh = lay.rh;
     const copy = env.copy || {};
-    const drawRowCard = env.drawRowCard || function () { };
+    /* Task 6 竖屏单焦点：行区折叠为可展开小面板（竖屏默认折叠——只画状态条+展开按钮；
+     * 条件含 actH>0，桌面/横屏 actH=0 零影响；折叠状态由两端 rowFolded 闭包注入） */
+    if (env.portraitMode && env.actH > 0 && env.rowFolded && env.rowFolded()) {
+      RC._rowFoldStrip(env, cy, row.length);
+      return;
+    }
     if (env.drawRowBackdrop) env.drawRowBackdrop(cy, rh);
     const lb = copy.rowLabel || { x: 20, dy: -4, col: '#9FB3CE' };
     drawPixelText('证据 · 已亮出', lb.x, cy + lb.dy, lb.size || 13, lb.col, { shadow: false });
@@ -142,12 +150,108 @@
       }
     }
     lay.items.forEach(it => {
-      if (env.rowCardAnim) env.rowCardAnim(it, () => drawRowCard(it));
-      else drawRowCard(it);
+      if (env.rowCardAnim) env.rowCardAnim(it, () => RC.drawRowCardOf(env, it));
+      else RC.drawRowCardOf(env, it);
     });
     if (!row.length) {
       const em = copy.rowEmpty || { text: '（等待暗置举证…）', size: 15, col: '#7E93B0' };
       drawPixelText(em.text, W / 2, cy + rh / 2, em.size, em.col, { align: 'center', shadow: false });
+    }
+    /* Task 6：竖屏展开态下，行区右上提供「▲ 收起」小按钮（仿 toggleLog 折叠模式；
+     * 放 W-100 处避开联机日志按钮 x=W-42 位） */
+    if (env.portraitMode && env.actH > 0 && env.navBtn) {
+      env.navBtn('toggleRow', W - 100, cy - 26, 44, 22, '▲ 收起', true);
+    }
+  };
+
+  /* Task 6 竖屏单焦点：行区折叠状态条（深色条 + 证据计数 + 「▾ 展开」按钮）
+   * 按钮经 env.navBtn 注册（单机 btn 体系 / 联机 addButton 体系，id='toggleRow'），
+   * 右侧预留日志📜按钮位（单机 x=W-38 / 联机 x=W-42），不与日志按钮重叠。 */
+  RC._rowFoldStrip = function (env, cy, n) {
+    const ctx = env.ctx, W = env.W;
+    const copy = env.copy || {};
+    const h = 26, y = cy - 4;
+    const x = 8, w = W - 16 - 64;        // 右侧预留 64px：日志按钮 + 留白
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    pxRect(x, y, w, h, '#16202E');
+    ctx.globalAlpha = 1;
+    pxBorder(x, y, w, h, '#FFD60A', 2);
+    const label = copy.rowFoldLabel || '辩论台';
+    const txt = n > 0 ? (label + ' · 已亮出 ' + n + ' 张') : (label + '（尚未举证）');
+    drawPixelText(txt, x + 12, y + h / 2, 13, '#CDD8E8', { shadow: false });
+    if (env.navBtn) env.navBtn('toggleRow', x + w - 58, y + 2, 52, h - 4, '▾ 展开', true);
+    ctx.restore();
+  };
+
+  /* 行卡绘制（统一两端本地 drawRowCard，评审五：双份收口，以联机实现为基底）
+   * 差异经 env 注入：
+   *   skillPulse(card,x,y,w,h) —— 技能闪光（计票时脉冲；两端本地 FX/ttOf 逻辑注入，
+   *                               仅访问各自 FX 数组与 SKILL_FX，不引入引擎字段）
+   *   registerTarget(it,card,kind) —— 选目标按钮注册（单机 btn 注册到 buttons；
+   *                               联机 undefined——目标点击走 hoverCards 命中→doAction）
+   * copy 覆盖配色（默认=联机版）：
+   *   removedCol —— 「✕ 档案」作废色（默认 '#FF5A4E'）
+   * 数据源统一经 env.G()（联机 view / 单机 game，revealPending/swapPending/phase 字段一致）。 */
+  RC.drawRowCardOf = function (env, it) {
+    const { card, x, y, w, h, seat } = it;
+    const revealed = it.revealed === true;
+    const removed = it.removed === true;
+    const ctx = env.ctx;
+    const g = env.G();
+    const copy = env.copy || {};
+    if (revealed && !removed) {
+      UIKit.drawCard(ctx, x, y, w, h, card, { col: seat === env.mySeat ? campSoft(seat) : '#f6e9c8', seat, noDesc: true });
+      const pt = partyOf(seat);
+      pxRect(x + w / 2 - 20, y - 9, 40, 18, env.campColor(seat));
+      pxBorder(x + w / 2 - 20, y - 9, 40, 18, '#111111', 1.5);
+      drawPixelText(pt.sym, x + w / 2, y, 11, contrast(env.campColor(seat)), { align: 'center', shadow: false });
+      if (env.skillPulse) env.skillPulse(card, x, y, w, h);
+      // 证据排除：暗红脉冲边框（不祥感）
+      if (card.skill === 'terrorist') {
+        const on = Math.sin(performance.now() / 130) > 0 ? 1 : 0.45;
+        ctx.save();
+        ctx.globalAlpha = on;
+        pxBorder(x - 5, y - 5, w + 10, h + 10, '#FF3B30', 3);
+        ctx.restore();
+      }
+    } else if (removed) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      UIKit.drawCardBackAt(ctx, x, y, w, h, '#555555');
+      ctx.restore();
+      drawPixelText('✕ 档案', x + w / 2, y + h / 2, 13, copy.removedCol || '#FF5A4E', { align: 'center' });
+    } else {
+      UIKit.drawCardBackAt(ctx, x, y, w, h, PAL.ui.b);
+      // 暗置中的证据排除：红光闪烁预示危险
+      if (card.skill === 'terrorist') {
+        const on = Math.sin(performance.now() / 120) > 0 ? 0.85 : 0.2;
+        ctx.save();
+        ctx.globalAlpha = on;
+        pxBorder(x - 3, y - 3, w + 6, h + 6, '#FF3B30', 3);
+        ctx.restore();
+      }
+      drawPixelText('暗置', x + w / 2, y + h / 2, 12, '#D9BE8B', { align: 'center', shadow: false });
+    }
+    // 证据排除选目标 / 政治操盘换位选目标
+    if (g.revealPending && g.revealPending.owner === env.mySeat && !removed && seat !== env.mySeat) {
+      pxBorder(x - 4, y - 4, w + 8, h + 8, '#FF5A4E', 4);
+      if (env.registerTarget) env.registerTarget(it, card, 'target');
+      env.hoverCards.push({ x, y, w, h, kind: 'target', data: { targetUid: card.uid } });
+    }
+    // 已亮出的行卡：悬停查看完整详情（悬浮信息卡）
+    if (revealed && !removed && !(g.revealPending && g.revealPending.owner === env.mySeat && seat !== env.mySeat)) {
+      env.hoverCards.push({ x, y, w, h, kind: 'row', card });
+    }
+    if (g.phase === 'count' && g.swapPending && g.swapPending.owner === env.mySeat && !removed
+      && g.swapPending.candidates && g.swapPending.candidates.indexOf(card.uid) >= 0) {
+      const on = Math.sin(performance.now() / 120) > 0 ? 1 : 0.4;
+      ctx.save();
+      ctx.globalAlpha = on;
+      pxBorder(x - 5, y - 5, w + 10, h + 10, '#FFD60A', 4);
+      ctx.restore();
+      if (env.registerTarget) env.registerTarget(it, card, 'swap');
+      env.hoverCards.push({ x, y, w, h, kind: 'swapTarget', data: { targetUid: card.uid } });
     }
   };
 
@@ -716,6 +820,41 @@
     env.renderLogs();
     RC.drawGoalGuide(env);
     env.renderTail();            // 双端尾部差异：联机 renderFx / 单机 renderToast+遮罩
+  };
+
+  /* env 组装单一工厂（顾问评审二/五：收口两端 renderEnv）
+   * 两端 renderEnv() 收敛为一行：return RenderCore.renderEnvOf(cfg);
+   * env 键清单在此单一来源（新增渲染字段只改这一处，两端零漂移），
+   * 差异点经 cfg 显式注入（数据源 G / 布局 HUD_H,actH / 注入 marketSlots,eventSlots,
+   * navBtn,drawRowBackdrop,rowCardAnim / copy 文案与局部逻辑）。
+   * 默认值兜底：actH=0（横屏）、HAND_AREA_H=230、copy={}。 */
+  RC.renderEnvOf = function (cfg) {
+    return {
+      ctx: cfg.ctx, W: cfg.W, H: cfg.H, PAL: cfg.PAL, screen: cfg.screen,
+      G: cfg.G,
+      mySeat: cfg.mySeat, HAND_AREA_H: cfg.HAND_AREA_H != null ? cfg.HAND_AREA_H : 230,
+      HUD_H: cfg.HUD_H,                       // 顶部信息条高（两端必须一致传递）
+      actH: cfg.actH || 0,                    // Task 5 竖屏固定操作栏高（联机桌面 0）
+      UI: cfg.UI, PHASE_STEPS: cfg.PHASE_STEPS, fontBase: cfg.fontBase,
+      selected: cfg.selected, eventPick: cfg.eventPick, buyMode: cfg.buyMode,
+      portraitMode: cfg.portraitMode, compact: cfg.compact, isMobile: cfg.isMobile,
+      eventPage: cfg.eventPage, setEventPage: cfg.setEventPage,
+      handScroll: cfg.handScroll, setHandScroll: cfg.setHandScroll,
+      vm: cfg.vm, panelRect: cfg.panelRect, panelHeight: cfg.panelHeight,
+      marketSlots: cfg.marketSlots, eventSlots: cfg.eventSlots,
+      canClickHand: cfg.canClickHand, isEventUsable: cfg.isEventUsable,
+      renderActionButtons: cfg.renderActionButtons, portraitPerPage: cfg.portraitPerPage,
+      navBtn: cfg.navBtn,
+      rowFolded: cfg.rowFolded,               // Task 6 竖屏行区折叠状态（两端注入 / 未注入则不折叠）
+      mouse: cfg.mouse, hoverAnim: cfg.hoverAnim, hoverCards: cfg.hoverCards, buttons: cfg.buttons,
+      keepMax: cfg.keepMax, campColor: cfg.campColor,
+      tooltipInfo: cfg.tooltipInfo, rowLayout: cfg.rowLayout,
+      skillPulse: cfg.skillPulse,             // 技能闪光（两端本地 FX 逻辑，评审五 drawRowCard 收口注入）
+      registerTarget: cfg.registerTarget,     // 选目标按钮注册（单机 btn / 联机 undefined 走 hoverCards）
+      drawRowBackdrop: cfg.drawRowBackdrop,   // 联机底座+标题 / 单机 undefined 不画
+      rowCardAnim: cfg.rowCardAnim,           // 单机 cardIn 入场动画 / 联机 undefined 直画
+      copy: cfg.copy || {}
+    };
   };
 
   return RC;

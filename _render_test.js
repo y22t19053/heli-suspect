@@ -421,3 +421,152 @@ test('低画质：低内存低核移动端主动降级（LOW_Q）', async (t) =>
     + ' canvas=' + st.w + 'x' + st.h + ' 内容占比 ' + st.ratio);
   await page.close();
 });
+
+/* ============================================================
+ * 顾问评审 9.3：单机 vs 联机渲染像素级一致性
+ *   —— 同种子 + 同 AI 操作序列 → 双端推进至 buy 阶段 → 稳定后区域像素对比
+ * 诊断结论（_px_probe/_s*.txt）：
+ *   ① 引擎状态两端一致（seed/round/market uid/money/marketSlots 坐标全部相同）；
+ *   ② 卡面 4.4%~5.2% 低一致率根因 = 单机 marketCardAnim 入场动画（cardIn FX，
+ *      dur 420ms 缩放淡入；联机无此动画）——等待 ≥3s 后一致率回升至 93~96%；
+ *   ③ 已知设计差异（不参与断言，仅说明）：联机 drawRowBackdrop 行卡底座（中部
+ *      y150~520 蓝灰块，单机无）、HUD 文案（单机轮次进度条 vs 联机倒计时/观战）。
+ * ============================================================ */
+
+/* 单机：点击「开庭审理」→ 自动推进（AI 走 needsAIAction/aiAct，座位0 直驱）→ 停在 buy */
+async function driveSpToBuy(page) {
+  return page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const t0 = Date.now();
+    while (Date.now() - t0 < 30000) {
+      const g = eval('game');
+      if (!g || g.gameOver) break;
+      const need = ElectionCore.needsAIAction(g);
+      if (need.length) { for (const s of need) ElectionCore.aiAct(g, s); await wait(20); continue; }
+      const me = g.seats[0];
+      if (g.phase === 'pickChar' && !me.char && g.draftCandidates[0] && g.draftCandidates[0].length) {
+        ElectionCore.apply(g, 0, { type: 'pickChar', charId: g.draftCandidates[0][0].id }); continue;
+      }
+      if (g.phase === 'chooseStarter' && g.starterPicker === 0 && !g.starterChosen) {
+        ElectionCore.apply(g, 0, { type: 'pickStarter', starterSeat: 0 }); continue;
+      }
+      if (g.phase === 'buy') break;   // 停在 buy：市场卡已布好
+      ElectionCore.advance(g);
+    }
+    const g = eval('game');
+    return g ? { phase: g.phase, round: g.round, money: g.seats[0].money,
+      market: g.seats[0].market.map(c => c.uid).join(','), row: g.row.length } : null;
+  });
+}
+
+/* 联机：大厅填入种子 → 建单人房 → 开局 → 自动推进（doAction）→ 停在 buy */
+async function driveMpToBuy(page) {
+  await page.fill('#inp-seed', 'consistency-1');
+  await page.click('#btn-solo');
+  await page.waitForSelector('#lobby:not(.hidden)', { timeout: 8000 });
+  await page.click('#btn-start');
+  await page.waitForFunction(() => window.__game && window.__game.view && window.__game.view.phase,
+    { timeout: 12000 });
+  return page.evaluate(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const t0 = Date.now();
+    while (Date.now() - t0 < 30000) {
+      const v = window.__game.view;
+      if (!v || v.gameOver) break;
+      const mySeat = window.__game.mySeat;
+      const me = v.seats[mySeat];
+      if (v.phase === 'pickChar' && !me.char && v.draftCandidates && v.draftCandidates.length) {
+        window.doAction({ type: 'pickChar', charId: v.draftCandidates[0].id }); await wait(60); continue;
+      }
+      if (v.phase === 'chooseStarter' && v.starterPicker === mySeat && !v.starterChosen) {
+        window.doAction({ type: 'pickStarter', starterSeat: mySeat }); await wait(60); continue;
+      }
+      if (v.phase === 'buy') break;
+      await wait(80);
+    }
+    const v = window.__game.view;
+    return v ? { phase: v.phase, round: v.round, money: v.seats[mySeat].money,
+      market: v.seats[mySeat].market.map(c => c.uid).join(','), row: v.row.length } : null;
+  });
+}
+
+/* 区域像素一致率（dr+dg+db < 30 判同，步进 2） */
+function regionMatch(a, b, w, x0, x1, y0, y1) {
+  let same = 0, n = 0;
+  for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) {
+    const i = (y * w + x) * 4; n++;
+    if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) < 30) same++;
+  }
+  return same / n;
+}
+
+test('评审9.3：同种子同操作序列 → 双端 buy 阶段像素级一致', async (t) => {
+  if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
+  // —— 单机 ——
+  const sp = await newPage();
+  await sp.page.addInitScript(() => {
+    try { localStorage.setItem('elec_seed', 'consistency-1'); } catch (e) { /* 忽略 */ }
+  });
+  await sp.page.goto(BASE + '/singleplayer.html');
+  await sp.page.waitForTimeout(900);
+  const r1 = await sp.page.evaluate(() => {
+    const r = document.querySelector('canvas').getBoundingClientRect();
+    return { w: r.width, h: r.height };
+  });
+  await sp.page.mouse.click(r1.w / 2, r1.h * 0.68 + 31);   // 「开庭审理」按钮
+  const spState = await driveSpToBuy(sp.page);
+  await sp.page.waitForTimeout(3200);   // 等单机 cardIn 入场动画（dur 420ms）完全结束
+  const spPix = await sp.page.evaluate(() => {
+    const cv = document.querySelector('canvas');
+    const c = cv.getContext('2d');
+    return { w: cv.width, h: cv.height, d: Array.from(c.getImageData(0, 0, cv.width, cv.height).data) };
+  });
+  assert.deepEqual(sp.errors, [], '单机一致性路径不应有 JS 错误：' + sp.errors.join(' | '));
+
+  // —— 联机 ——
+  const mp = await newPage();
+  await mp.page.goto(BASE + '/');
+  await mp.page.waitForTimeout(1200);
+  const mpState = await driveMpToBuy(mp.page);
+  await mp.page.waitForTimeout(3200);
+  const mpPix = await mp.page.evaluate(() => {
+    const cv = document.querySelector('canvas');
+    const c = cv.getContext('2d');
+    return { w: cv.width, h: cv.height, d: Array.from(c.getImageData(0, 0, cv.width, cv.height).data) };
+  });
+  assert.deepEqual(mp.errors, [], '联机一致性路径不应有 JS 错误：' + mp.errors.join(' | '));
+
+  // —— 引擎状态一致（测试前提）——
+  assert.equal(spState.phase, 'buy', '单机应停在 buy，实际 ' + JSON.stringify(spState));
+  assert.equal(mpState.phase, 'buy', '联机应停在 buy，实际 ' + JSON.stringify(mpState));
+  assert.equal(spState.market, mpState.market, '双端市场卡 uid 应一致：单机[' + spState.market + '] 联机[' + mpState.market + ']');
+  assert.equal(spState.round, mpState.round, '双端轮次应一致：' + spState.round + ' vs ' + mpState.round);
+  assert.equal(spState.money, mpState.money, '双端金钱应一致：' + spState.money + ' vs ' + mpState.money);
+  assert.equal(spPix.w, mpPix.w, '双端 canvas 宽度应一致');
+  assert.equal(spPix.h, mpPix.h, '双端 canvas 高度应一致');
+
+  // —— 区域像素对比（排除已知设计差异区：行卡底座 y150~520、HUD 文案）——
+  const w = spPix.w, a = spPix.d, b = mpPix.d;
+  const regions = [
+    // 市场卡区（y598~788：证物架卡面；联机 buy 也走 RC._renderMarketOf 单事实源）
+    { name: '市场卡区', x0: 0, x1: 860, y0: 598, y1: 788, min: 0.85 },
+    // 四张市场卡内部（避开边框/标题/按钮）
+    { name: '卡1内部', x0: 20, x1: 190, y0: 622, y1: 770, min: 0.85 },
+    { name: '卡2内部', x0: 232, x1: 402, y0: 622, y1: 770, min: 0.85 },
+    { name: '卡3内部', x0: 444, x1: 614, y0: 622, y1: 770, min: 0.85 },
+    { name: '卡4内部', x0: 656, x1: 826, y0: 622, y1: 770, min: 0.85 },
+    // 顶部中央（阶段标题/支持度轨道区域，非 HUD 文案区）
+    { name: '顶部中央', x0: 400, x1: 880, y0: 56, y1: 120, min: 0.80 },
+  ];
+  let worst = 1;
+  for (const rg of regions) {
+    const rate = regionMatch(a, b, w, rg.x0, rg.x1, rg.y0, rg.y1);
+    worst = Math.min(worst, rate);
+    console.log('[一致性] ' + rg.name + ' 一致率 ' + (rate * 100).toFixed(1) + '%' + (rate < rg.min ? ' ← 低于阈值 ' + rg.min : ''));
+    assert.ok(rate >= rg.min, '[' + rg.name + '] 一致率 ' + (rate * 100).toFixed(1) + '% 应 ≥ ' + (rg.min * 100) + '%（同种子同操作序列，画面应逐像素一致）');
+  }
+  console.log('[一致性] 引擎 单机{' + JSON.stringify(spState) + '} 联机{' + JSON.stringify(mpState) + '} canvas '
+    + w + 'x' + spPix.h + ' 最差区域一致率 ' + (worst * 100).toFixed(1) + '%');
+  await sp.page.close();
+  await mp.page.close();
+});

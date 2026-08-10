@@ -1485,7 +1485,8 @@ function renderGame() {
  * P1-7：renderHud/renderPanels/renderBottom 已并入 RenderCore（renderHudOf/
  *        renderPanelsOf/renderBottomOf），差异经下方 copy 与注入表达。 */
 function renderEnv() {
-  return {
+  // env 组装已收口至 RenderCore.renderEnvOf(cfg)（评审二/五：单一工厂+配置表）
+  return RenderCore.renderEnvOf({
     ctx, W, H, PAL, screen,
     G: () => view,
     mySeat, HAND_AREA_H, HUD_H,
@@ -1510,7 +1511,19 @@ function renderEnv() {
     campColor,
     tooltipInfo: (h) => tooltipInfo(h),
     rowLayout: () => rowLayout(),
-    drawRowCard,
+    skillPulse: (card, x, y, w, h) => {
+      // 技能闪光（计票时脉冲）：本地 FX 数组逻辑，经注入供 RC.drawRowCardOf 调用（评审五收口）
+      if (card.skill && SKILL_FX[card.skill]) {
+        const pu = FX.find(f => f.type === 'pulse' && f.uid === card.uid);
+        if (pu) {
+          ctx.save();
+          const on = Math.sin(ttOf(pu) / 90) > 0 ? 0.8 : 0.2;
+          ctx.globalAlpha = on;
+          pxRect(x - 3, y - 3, w + 6, h + 6, SKILL_FX[card.skill].col);
+          ctx.restore();
+        }
+      }
+    },
     drawRowBackdrop: (cy, rh) => {
       // 辩论台底座：深色台面 + 金色边线 + 中央微标（renderRowArea 已收敛至 RenderCore）
       pxRect(8, cy - 24, W - 16, rh + 34, PAL.bg.b);
@@ -1521,6 +1534,7 @@ function renderEnv() {
       ctx.restore();
     },
     navBtn: (id, x, y, w, h, text, enabled) => addButton(id, x, y, w, h, text, { disabled: !enabled }),
+    rowFolded: () => rowFolded,   // Task 6 竖屏行区折叠状态（renderRowArea 读取）
     copy: {
       buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张',
       // —— renderHudOf：联机差异（默认值为联机侧，显式写出与单机成对）——
@@ -1561,7 +1575,7 @@ function renderEnv() {
       // —— renderBottomOf：联机差异（默认值为联机侧）——
       handTitle: (me, from, to, total) => '手牌 ' + me.hand.length + ' 张 · ' + (from + 1) + '-' + to + ' / ' + total
     }
-  };
+  });
 }
 function myTurn() { return RenderCore.myTurnOf(renderEnv()); }
 function drawGoalGuide() { RenderCore.drawGoalGuide(renderEnv()); }
@@ -1569,72 +1583,7 @@ function updateHoverAnim() { RenderCore.updateHoverAnim(renderEnv()); }
 function hoverAlpha() { return RenderCore.hoverAlpha(renderEnv()); }
 function drawHoverTooltip() { RenderCore.drawHoverTooltip(renderEnv()); }
 function renderRowArea() { RenderCore.renderRowArea(renderEnv()); }
-function drawRowCard(it) {
-  const { card, x, y, w, h, seat } = it;
-  const revealed = it.revealed === true;
-  const removed = it.removed === true;
-  if (revealed && !removed) {
-    UIKit.drawCard(ctx, x, y, w, h, card, { col: seat === mySeat ? campSoft(seat) : '#f6e9c8', seat, noDesc: true });
-    const pt = partyOf(seat);
-    pxRect(x + w / 2 - 20, y - 9, 40, 18, campColor(seat));
-    pxBorder(x + w / 2 - 20, y - 9, 40, 18, '#111111', 1.5);
-    drawPixelText(pt.sym, x + w / 2, y, 11, contrast(campColor(seat)), { align: 'center', shadow: false });
-    // 技能闪光（计票时）
-    if (card.skill && SKILL_FX[card.skill]) {
-      const pu = FX.find(f => f.type === 'pulse' && f.uid === card.uid);
-      if (pu) {
-        ctx.save();
-        const on = Math.sin(ttOf(pu) / 90) > 0 ? 0.8 : 0.2;
-        ctx.globalAlpha = on;
-        pxRect(x - 3, y - 3, w + 6, h + 6, SKILL_FX[card.skill].col);
-        ctx.restore();
-      }
-    }
-    // 证据排除：暗红脉冲边框（不祥感）
-    if (card.skill === 'terrorist') {
-      const on = Math.sin(performance.now() / 130) > 0 ? 1 : 0.45;
-      ctx.save();
-      ctx.globalAlpha = on;
-      pxBorder(x - 5, y - 5, w + 10, h + 10, '#FF3B30', 3);
-      ctx.restore();
-    }
-  } else if (removed) {
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    UIKit.drawCardBackAt(ctx, x, y, w, h, '#555555');
-    ctx.restore();
-    drawPixelText('✕ 档案', x + w / 2, y + h / 2, 13, '#FF5A4E', { align: 'center' });
-  } else {
-    UIKit.drawCardBackAt(ctx, x, y, w, h, PAL.ui.b);
-    // 暗置中的证据排除：红光闪烁预示危险
-    if (card.skill === 'terrorist') {
-      const on = Math.sin(performance.now() / 120) > 0 ? 0.85 : 0.2;
-      ctx.save();
-      ctx.globalAlpha = on;
-      pxBorder(x - 3, y - 3, w + 6, h + 6, '#FF3B30', 3);
-      ctx.restore();
-    }
-    drawPixelText('暗置', x + w / 2, y + h / 2, 12, '#D9BE8B', { align: 'center', shadow: false });
-  }
-  // 证据排除选目标 / 政治操盘换位选目标
-  if (view.revealPending && view.revealPending.owner === mySeat && !removed && seat !== mySeat) {
-    pxBorder(x - 4, y - 4, w + 8, h + 8, '#FF5A4E', 4);
-    hoverCards.push({ x, y, w, h, kind: 'target', data: { targetUid: card.uid } });
-  }
-  // 已亮出的行卡：悬停查看完整详情（悬浮信息卡）
-  if (revealed && !removed && !(view.revealPending && view.revealPending.owner === mySeat && seat !== mySeat)) {
-    hoverCards.push({ x, y, w, h, kind: 'row', card });
-  }
-  if (view.phase === 'count' && view.swapPending && view.swapPending.owner === mySeat && !removed
-      && view.swapPending.candidates && view.swapPending.candidates.indexOf(card.uid) >= 0) {
-    const on = Math.sin(performance.now() / 120) > 0 ? 1 : 0.4;
-    ctx.save();
-    ctx.globalAlpha = on;
-    pxBorder(x - 5, y - 5, w + 10, h + 10, '#FFD60A', 4);
-    ctx.restore();
-    hoverCards.push({ x, y, w, h, kind: 'swapTarget', data: { targetUid: card.uid } });
-  }
-}
+function drawRowCard(it) { RenderCore.drawRowCardOf(renderEnv(), it); }
 /* 面板数值流与 renderPanels 已收敛至 RenderCore.renderPanelsOf（P1-7 双端合一），
  * 本地差异经 renderEnv().copy 注入（panelFlow 逻辑在 RC._panelFlowOf）。 */
 function currentActSeat() { return RenderCore.currentActSeatOf(renderEnv()); }
@@ -1866,6 +1815,7 @@ function renderActionButtons(me) {
 }
 let logExpanded = false;   // 日志📜折叠按钮状态（默认收起，点击展开右上角浮动面板）
 let logRect = null;        // 展开时日志面板区域（点击外部自动收起）
+let rowFolded = true;      // Task 6 竖屏单焦点：行区默认折叠为状态条（点击「▾ 展开」查看完整辩论台）
 function renderLogs() {
   const logs = (view && view.logs) || [];
   if (!logs.length) return;
@@ -2546,6 +2496,7 @@ function handleButton(id) {
       break;
     }
     case 'toggleLog': logExpanded = !logExpanded; sfx('click'); break;
+    case 'toggleRow': rowFolded = !rowFolded; sfx('click'); break;
     case 'playSel':
       if (selected.length > 0) {
         sfx('click');
@@ -2681,7 +2632,21 @@ let lastLogN = 0;
 let overFxDone = false;
 let lastStarterSeat = null;   // 起始玩家变化检测（轮盘 FX 触发）
 let lastHandUids = [];        // 手牌 uid 快照（仅新牌播 cardIn）
+let lastFxSig = '';           // 8.3 字段级快速签名：显示字段全未变时跳过全量扫描
 function sigOf(arr) { return (arr || []).map((x, i) => (x.card && x.card.uid != null ? x.card.uid : 'H' + x.seat + '_' + i) + (x.removed ? ':R' : '') + (x.revealed ? ':V' : '')).join(','); }
+/* 8.3 字段级 diff：覆盖 checkFxDiffs 全部触发字段（阶段/起始者/行/票/排名/财务/手牌/事件/市场/日志/结束）
+ * 一次拼接完成比较——版本号变化可能源于无显示影响的内部操作，签名未变则完全跳过全量扫描。 */
+function fxSigOf() {
+  const seats = view.seats || [];
+  let s = view.phase + '|' + view.startingSeat + '|' + view.gameOver + '|' +
+    sigOf(view.row) + '|' + (view.votes || []).join(',') + '|' + (view.roundRank || []).join(',') + '|';
+  for (let i = 0; i < seats.length; i++) {
+    const se = seats[i];
+    s += se.money + ',' + se.support + ',' + (se.hand || []).length + ',' + (se.events || []).length + ',' + (se.market || []).map(c => c.uid).join('+') + ';';
+  }
+  s += '|' + (view.logHead || 0) + ':' + (view.logs || []).length;
+  return s;
+}
 function checkFxDiffs() {
   if (!view) return;
   if (view.version === lastV) return;
@@ -2697,8 +2662,13 @@ function checkFxDiffs() {
     overFxDone = view.gameOver;
     sideRevealDone = false;   // 新对局/重连：允许重新播放抛硬币
     lastStarterSeat = view.startingSeat;   // 新对局/重连：静默对齐起始者，不触发轮盘 FX
+    lastFxSig = fxSigOf();    // 8.3：签名同步对齐，重连后首帧不触发
   }
   lastV = view.version;
+  // 8.3 字段级短路：显示字段全未变（版本变化源于无显示影响操作）→ 跳过全量扫描
+  const fxSig = fxSigOf();
+  if (fxSig === lastFxSig) return;
+  lastFxSig = fxSig;
   const n = view.seatCount;
   // 阶段变化
   if (view.phase !== lastPhase) {

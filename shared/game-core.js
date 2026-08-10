@@ -489,12 +489,17 @@
   }
 
   /* ---------------- 阶段推进 ---------------- */
-  /* 所有自动阶段在此推进；需要人类输入的阶段停在等待点 */
-  function advance(state) {
-    if (state.gameOver) { state.version = (state.version || 0) + 1; return; }
-    const n = state.seatCount;
-    switch (state.phase) {
-      case 'pickChar': {
+  /* 状态描述表（顾问评审四）：每个阶段自包含
+   *   label      —— 阶段标识
+   *   needsInput —— (state, seat) 该座位当前是否需要玩家/AI 输入（驱动 needsAIAction/humanActing）
+   *   update     —— 自动推进逻辑（调用 beginXxx 进入下一阶段；等待输入的阶段停在等待点）
+   * advance(state) 查表驱动：签名与行为与旧巨型 switch 完全一致，
+   * 服务端 pumpAutoAdvance / forceSkip / 全部单元测试直调不受影响。 */
+  const PHASES = {
+    pickChar: {
+      label: 'pickChar',
+      needsInput: (state, seat) => !state.seats[seat].char,
+      update: (state) => {
         if (state.seats.every(s => s.char)) {
           const proN = state.seats.filter(s => s.side === 'prosecutor').map(s => s.name).join('、');
           const defN = state.seats.filter(s => s.side === 'defense').map(s => s.name).join('、');
@@ -502,9 +507,12 @@
           state.logs.push('律师揭晓：' + state.seats.map(s => s.name + '【' + s.char.name + '】').join('，'));
           beginStarter(state);
         }
-        break;
       }
-      case 'chooseStarter': {
+    },
+    chooseStarter: {
+      label: 'chooseStarter',
+      needsInput: (state, seat) => state.starterPicker === seat,
+      update: (state) => {
         // 第 1 轮：随机；后续：排名最低者选择
         if (state.starterPicker < 0) {
           state.startingSeat = Math.floor(state.rng() * state.seatCount);
@@ -523,53 +531,77 @@
           state.logs.push('排名最低的【' + state.seats[state.starterPicker].name + '】选择自己开始');
           beginRound(state);
         }
-        break;
       }
-      case 'drawEvent': beginVoter(state); break;
-      case 'drawVoter': beginBuy(state); break;
-      case 'buy': {
+    },
+    drawEvent: { label: 'drawEvent', needsInput: () => false, update: (state) => beginVoter(state) },
+    drawVoter: { label: 'drawVoter', needsInput: () => false, update: (state) => beginBuy(state) },
+    buy: {
+      label: 'buy',
+      needsInput: (state, seat) => !state.seats[seat].buyDone,
+      update: (state) => {
         if (state.seats.every(s => s.buyDone)) beginPlay(state);
-        break;
       }
-      case 'play': {
+    },
+    play: {
+      label: 'play',
+      needsInput: (state, seat) => state.turn === seat && !state.seats[seat].playDone,
+      update: (state) => {
         // 轮流出牌：每回合只打 1 张，A→B→C→A→B→C 循环轮转，任何轮到的玩家都可放弃
-        if (state.seats.every(s => s.playDone || s.hand.length === 0)) { beginReveal(state); break; }
+        if (state.seats.every(s => s.playDone || s.hand.length === 0)) { beginReveal(state); return; }
         const cur = state.seats[state.turn];
         if (!cur || cur.playDone || cur.hand.length === 0) {
           if (cur && cur.hand.length === 0) cur.playDone = true;
           const next = nextPlaySeat(state);
-          if (next < 0) { beginReveal(state); break; }
+          if (next < 0) { beginReveal(state); return; }
           state.playTurn = next; state.turn = next;
           state.logs.push(state.seats[next].name + ' 请暗置提交 1 份证据（或放弃）');
         }
-        break;
       }
-      case 'reveal': {
+    },
+    reveal: {
+      label: 'reveal',
+      needsInput: (state, seat) => !!(state.revealPending && state.revealPending.owner === seat),
+      update: (state) => {
         // 逐张亮出：无待选目标时继续亮出下一张（恐怖分子按亮出顺序发动）
         if (!state.revealPending) revealNext(state);
-        break;
       }
-      case 'preEvent': {
+    },
+    preEvent: {
+      label: 'preEvent',
+      needsInput: (state, seat) => state.eventTurnSeat === seat,
+      update: (state) => {
         if (allEventsDone(state)) { doCount(state); }
-        break;
       }
-      case 'count': {
+    },
+    count: {
+      label: 'count',
+      needsInput: (state, seat) => !!(state.swapPending && state.swapPending.owner === seat),
+      update: (state) => {
         // 政治操盘（换位）等待玩家选择目标则暂停；全部换位完成后继续计票
-        if (state.swapPending) break;
+        if (state.swapPending) return;
         doCountContinue(state);
-        break;
       }
-      case 'postEvent': {
+    },
+    postEvent: {
+      label: 'postEvent',
+      needsInput: (state, seat) => state.eventTurnSeat === seat,
+      update: (state) => {
         if (allEventsDone(state)) doRank(state);
-        break;
       }
-      case 'rank': doSettle(state); break;
-      case 'settle': beginDiscard(state); break;
-      case 'discard': {
+    },
+    rank: { label: 'rank', needsInput: () => false, update: (state) => doSettle(state) },
+    settle: { label: 'settle', needsInput: () => false, update: (state) => beginDiscard(state) },
+    discard: {
+      label: 'discard',
+      needsInput: (state, seat) => state.discardSeat === seat && !state.seats[seat].keepDone,
+      update: (state) => {
         if (state.discardSeat < 0) { beginIncome(state); }
-        break;
       }
-      case 'income': {
+    },
+    income: {
+      label: 'income',
+      needsInput: () => false,
+      update: (state) => {
         // 发 ⊙ 后进入下一轮或结束
         if (state.round >= 5) {
           state.phase = 'gameover';
@@ -578,9 +610,15 @@
           state.round++;
           beginStarter(state);
         }
-        break;
       }
     }
+  };
+
+  /* 阶段推进：查表驱动。签名保持不变（服务端 pumpAutoAdvance/forceSkip 直调）。 */
+  function advance(state) {
+    if (state.gameOver) { state.version = (state.version || 0) + 1; return; }
+    const def = PHASES[state.phase];
+    if (def && def.update) def.update(state);
     state.version = (state.version || 0) + 1;
   }
 
@@ -1765,42 +1803,26 @@
   }
 
   /* ---------------- 服务端/渲染器辅助 ---------------- */
+  /* 每个阶段"谁需要输入"统一由 PHASES 表（engine/04-advance.js）判定，
+   * 本文件只按 AI/人类筛选座位，杜绝双份 switch（评审四/五：单一来源）。 */
   function needsAIAction(state) {
     if (!state || state.gameOver) return [];
     const list = [];
+    const def = PHASES[state.phase];
     state.seats.forEach((s, i) => {
       const isAI = s.isAI || !s.connected;
       if (!isAI) return;
-      switch (state.phase) {
-        case 'pickChar': if (!s.char) list.push(i); break;
-        case 'chooseStarter': if (state.starterPicker === i) list.push(i); break;
-        case 'buy': if (!s.buyDone) list.push(i); break;
-        case 'play': if (state.turn === i && !s.playDone) list.push(i); break;
-        case 'reveal': if (state.revealPending && state.revealPending.owner === i) list.push(i); break;
-        case 'count': if (state.swapPending && state.swapPending.owner === i) list.push(i); break;
-        case 'preEvent':
-        case 'postEvent': if (state.eventTurnSeat === i) list.push(i); break;
-        case 'discard': if (state.discardSeat === i && !s.keepDone) list.push(i); break;
-      }
+      if (def && def.needsInput(state, i)) list.push(i);
     });
     return list;
   }
   function humanActing(state) {
     if (!state || state.gameOver) return [];
     const list = [];
+    const def = PHASES[state.phase];
     state.seats.forEach((s, i) => {
       if (s.isAI || !s.connected) return;
-      switch (state.phase) {
-        case 'pickChar': if (!s.char) list.push(i); break;
-        case 'chooseStarter': if (state.starterPicker === i) list.push(i); break;
-        case 'buy': if (!s.buyDone) list.push(i); break;
-        case 'play': if (state.turn === i && !s.playDone) list.push(i); break;
-        case 'reveal': if (state.revealPending && state.revealPending.owner === i) list.push(i); break;
-        case 'count': if (state.swapPending && state.swapPending.owner === i) list.push(i); break;
-        case 'preEvent':
-        case 'postEvent': if (state.eventTurnSeat === i) list.push(i); break;
-        case 'discard': if (state.discardSeat === i && !s.keepDone) list.push(i); break;
-      }
+      if (def && def.needsInput(state, i)) list.push(i);
     });
     return list;
   }
@@ -1873,6 +1895,7 @@
     createGame, apply, aiAct, advance,
     needsAIAction, humanActing, phaseLabel, myClickable,
     PHASE_STEPS, PHASE_STEPS_VISIBLE,
+    PHASES,   // 状态描述表（评审四：每个阶段自包含 label/needsInput/update）
     buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES },
     mulberry32,
