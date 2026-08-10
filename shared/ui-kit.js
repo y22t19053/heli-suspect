@@ -284,19 +284,14 @@
       } else {
         text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
       }
-      // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数），small/mini 单行截断
-      //    行卡（noDesc:true）不画效果，悬停详情才展示，避免矮卡重叠
+      // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数）
+      //    痛点五：small/mini 小卡只画技能名 + 价格，隐藏效果描述（空间留给中央大图标，悬停详情查看）
       const se = lay.skillEff;
       const effTxt = effText(card, sk);
-      if (effTxt && !o.noDesc) {
-        if (lay.mini || lay.small) {
-          const fEf = fit(effTxt, se.w, se.size);
-          text(fEf.text, x + w / 2, se.y + se.size, fEf.size, '#333333', { align: 'center', shadow: false });
-        } else {
-          const lineH = Math.max(9, h * 0.075);
-          const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
-          wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
-        }
+      if (effTxt && !o.noDesc && !lay.mini && !lay.small) {
+        const lineH = Math.max(9, h * 0.075);
+        const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
+        wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
       }
     }
 

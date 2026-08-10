@@ -49,7 +49,7 @@ function applyUI() {
   const ph = screenSize();
   const s = UI;
   s.size = ph;
-  s.hudH = compact ? (ph === 'tiny' ? 34 : 40) : (ph === 'narrow' || ph === 'tiny' ? 44 : 52);
+  s.hudH = compact ? (ph === 'tiny' ? 34 : 40) : (portraitMode ? 48 : (ph === 'narrow' || ph === 'tiny' ? 44 : 52));
   s.panelY = s.hudH + 4;
   s.handH = portraitMode ? (ph === 'tiny' ? 300 : 270)
     : compact ? (ph === 'tiny' ? 118 : 140)
@@ -1546,16 +1546,21 @@ function renderEnv() {
       trackElse: (tY, tH) => { pxRect(0, tY, W * 0.5, tH, '#FF3B30'); pxRect(W * 0.5, tY, W * 0.5, tH, '#0A84FF'); },
       isSpectator: () => mySeat < 0,
       startTxt: (g) => g.startingSeat != null && g.seats[g.startingSeat] ? '起始：' + g.seats[g.startingSeat].name : '',
-      startPos: { x: W - 14, y: HUD_H / 2, size: 16 },
+      startPos: { x: W - 118, y: HUD_H / 2, size: 15 },   // 左移让位：最右留给倒计时（痛点二）
       countdown: () => {
-        // 行动倒计时（我行动时）：最后 5 秒红色呼吸脉冲 + 每秒滴答音效，≤3 秒心跳加速
+        // 行动倒计时（我行动时）：屏幕右上角最靠上边缘（HUD 内容区外），不挤占阶段标题
         if (deadline && deadline > Date.now() && myTurn()) {
           const remain = Math.max(0, Math.round((deadline - Date.now()) / 1000));
           const urgent = remain <= 5;
           const pulse = urgent ? (Math.sin(performance.now() / (remain <= 3 ? 140 : 240)) > 0 ? 1 : 0.55) : 1;
           ctx.save();
           ctx.globalAlpha = pulse;
-          drawPixelText('⏱ ' + remain + 's', W - 200, HUD_H / 2, urgent ? 22 : 16, '#FF5A4E', { align: 'right', shadow: false });
+          // 黑底金字倒计时徽章（右上角最边缘，与“起始玩家”不重叠）
+          const ctxt = '⏱ ' + remain + 's';
+          const csz = urgent ? 22 : 16;
+          pxRect(W - 66, 4, 58, HUD_H - 10, 'rgba(16,20,28,0.85)');
+          pxBorder(W - 66, 4, 58, HUD_H - 10, urgent ? '#FF5A4E' : '#3A4258', urgent ? 2 : 1.5);
+          drawPixelText(ctxt, W - 37, HUD_H / 2, csz, urgent ? '#FF5A4E' : '#FFD60A', { align: 'center', shadow: false });
           ctx.restore();
           if (urgent && remain !== lastTickSec) {
             lastTickSec = remain;
@@ -1570,11 +1575,16 @@ function renderEnv() {
         nextGuard: (sx) => sx + 12 < W
       },
       // —— renderPanelsOf：联机差异（默认值为联机侧）——
-      charBrief: (s) => (s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name,
+      // 痛点二：HUD 只写角色名（无技能简述）；技能详情悬停头像/卡牌 tooltip 查看
+      charBrief: (s) => s.char ? s.char.name : '',
+      charSize: compact ? 11.5 : 13.5,
+      charCol: '#C0392B',
       lockShow: (s, isMe, g) => UI.show.locked && s.lockedCount,
       scandalBar: (s, sc) => UI.show.scandalBar,
       // —— renderBottomOf：联机差异（默认值为联机侧）——
-      handTitle: (me, from, to, total) => '手牌 ' + me.hand.length + ' 张 · ' + (from + 1) + '-' + to + ' / ' + total
+      handTitle: (me, from, to, total) => '手牌 ' + me.hand.length + ' 张 · ' + (from + 1) + '-' + to + ' / ' + total,
+      // 痛点三：非竖屏按钮在底台上方 → 底台向上扩展同容器（btnH = compact?38:isMobile?50:46）
+      dockExt: () => portraitMode ? 0 : ((compact ? 38 : (isMobile ? 50 : 46)) + 8)
     }
   });
 }
@@ -1704,9 +1714,10 @@ function renderActionButtons(me) {
     switch (g.phase) {
       case 'buy':
         if (!me.buyDone) {
-          mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.accent.a);
-          mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.ui.a);
-          mk('结束取证', 'endBuy', true, PAL.ui.a);
+          // 痛点一：仅「结束取证」金色强调（执行按钮），换证/切模式白底次要
+          mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), '#FFFFFF');
+          mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, '#FFFFFF');
+          mk('结束取证', 'endBuy', true, PAL.accent.a);
         } else {
           hint('已结束取证', '#C9D6EA');
         }
@@ -1714,16 +1725,16 @@ function renderActionButtons(me) {
       case 'play':
         if (g.turn === mySeat && !me.playDone) {
           mk('举证（' + selected.length + '/1）', 'playSel', selected.length > 0, PAL.accent.a);
-          mk('结束举证', 'finishPlay', true, PAL.ui.a);
+          mk('结束举证', 'finishPlay', true, '#FFFFFF');
           hint('每回合举证 1 份', '#C9D6EA');
         } else if (g.playLastSeat === mySeat && !me.playDone) {
-          mk('结束举证', 'finishPlay', true, PAL.ui.a);
+          mk('结束举证', 'finishPlay', true, '#FFFFFF');
         }
         break;
       case 'preEvent': case 'postEvent':
         if (g.eventTurnSeat === mySeat) {
           mk('打出选中事件', 'playEventSel', eventPick !== null && eventPick.seat === mySeat && eventPick.target >= 0, PAL.accent.a);
-          mk('不打出', 'passEvent', true, PAL.ui.a);
+          mk('不打出', 'passEvent', true, '#FFFFFF');
           hint('最多连续 2 张 · 点事件牌', '#C9D6EA');
         }
         break;
@@ -1759,10 +1770,11 @@ function renderActionButtons(me) {
   switch (g.phase) {
     case 'buy':
       if (!me.buyDone) {
-        mk('换证 ⊙' + ElectionCore.refreshCostOf(me) + ' ［R］', 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.accent.a);
+        // 痛点一：仅「结束取证」金色强调，换证/切模式白底次要
+        mk('换证 ⊙' + ElectionCore.refreshCostOf(me) + ' ［R］', 'refresh', me.money >= ElectionCore.refreshCostOf(me), '#FFFFFF');
         if (view.leaderStreak >= 2 && view.prevFirst === mySeat) tipTxt = '👑 连胜税 +1⊙';
-        mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.ui.a);
-        mk('结束取证 ［B］', 'endBuy', true, PAL.ui.a);
+        mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, '#FFFFFF');
+        mk('结束取证 ［B］', 'endBuy', true, PAL.accent.a);
       } else {
         tipTxt = '已结束取证';
       }
@@ -1770,16 +1782,16 @@ function renderActionButtons(me) {
     case 'play':
       if (g.turn === mySeat && !me.playDone) {
         mk('举证（' + selected.length + '/1）', 'playSel', selected.length > 0, PAL.accent.a);
-        mk('结束举证 ［P］', 'finishPlay', true, PAL.ui.a);
+        mk('结束举证 ［P］', 'finishPlay', true, '#FFFFFF');
         tipTxt = '点牌选 1 张 · 回车举证';
       } else if (g.playLastSeat === mySeat && !me.playDone) {
-        mk('结束举证 ［P］', 'finishPlay', true, PAL.ui.a);
+        mk('结束举证 ［P］', 'finishPlay', true, '#FFFFFF');
       }
       break;
     case 'preEvent': case 'postEvent':
       if (g.eventTurnSeat === mySeat) {
         mk('打出选中事件', 'playEventSel', eventPick !== null && eventPick.seat === mySeat && eventPick.target >= 0, PAL.accent.a);
-        mk('不打出 ［Enter］', 'passEvent', true, PAL.ui.a);
+        mk('不打出 ［Enter］', 'passEvent', true, '#FFFFFF');
         tipTxt = '最多连续 2 张 · 点事件牌';
       }
       break;
@@ -1820,23 +1832,21 @@ let rowFolded = true;      // Task 6 竖屏单焦点：行区默认折叠为状�
 function renderLogs() {
   const logs = (view && view.logs) || [];
   if (!logs.length) return;
-  // P2：右上角可折叠半透明浮动日志面板（不再贴底栏，不挡手牌与操作按钮）
-  const panelW = Math.min(300, W - 16);
-  const btnW = 34, btnH = 26;
-  const bx = W - btnW - 8;
-  const by = PANEL_Y + view.seatCount * (panelHeight() + 6) + 6;
-  addButton('toggleLog', bx, by, btnW, btnH, logExpanded ? '✕' : '📜', {});
-  if (!logExpanded) { logRect = null; return; }
-  const nShow = Math.min(6, logs.length);
+  // 痛点四：主屏左下角常驻深色半透明日志区，文字对齐框内左上角；
+  // 折叠时 1 条、展开最多 6 条（按钮在面板右上角内侧），紧贴底台顶部之上
+  const nShow = logExpanded ? Math.min(6, logs.length) : 1;
   const show = logs.slice(-nShow);
-  const px0 = W - panelW - 8;
-  const py0 = by + btnH + 4;
-  const ph2 = nShow * 15 + 20;
+  // 非竖屏时右侧最多 3 个操作按钮（约 410px 含边距），面板宽动态收缩避免重叠
+  const panelW = Math.max(120, Math.min(280, W - (portraitMode ? 16 : 410)));
+  const ph2 = nShow * 15 + 22;
+  const btnRowH = portraitMode ? 0 : ((compact ? 38 : (isMobile ? 50 : 46)) + 8);
+  const px0 = 8;
+  const py0 = H - HAND_AREA_H - btnRowH - ph2 - 6;
   logRect = { x: px0, y: py0, w: panelW, h: ph2 };
   ctx.save();
-  ctx.globalAlpha = 0.94;
-  pxRect(px0, py0, panelW, ph2, '#101418');
-  pxBorder(px0, py0, panelW, ph2, '#3A4258', 2);
+  ctx.globalAlpha = 0.92;
+  pxRect(px0, py0, panelW, ph2, 'rgba(16,20,28,0.92)');
+  pxBorder(px0, py0, panelW, ph2, '#3A4258', 1.5);
   ctx.globalAlpha = 1;
   drawPixelText('📜 庭审记录', px0 + 10, py0 + 10, 12, '#FFD60A', { shadow: false });
   let yy = py0 + 24;
@@ -1846,6 +1856,7 @@ function renderLogs() {
     yy += 15;
   });
   ctx.restore();
+  addButton('toggleLog', px0 + panelW - 42, py0 + 4, 34, 20, logExpanded ? '✕' : '📜', {});
 }
 
 /* ---------------- 屏幕渲染：结算（gameover） ---------------- */

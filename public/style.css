@@ -174,14 +174,15 @@ select { cursor: pointer; }
 
 /* ---------- 大厅 ---------- */
 .room-code {
-  font-size: 26px; letter-spacing: 6px; color: #FFD60A; font-weight: 900;
+  font-size: 15px; letter-spacing: 2px; color: #A9B8CC; font-weight: 700;
   margin-bottom: 18px;
-  text-shadow: 0 1px 0 rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
 }
-.room-code span {
+.room-code .rc-label { font-size: 15px; letter-spacing: 2px; color: #A9B8CC; }
+.room-code span#room-code {
   font-size: 40px; font-weight: 900;
-  background: #101418; border: 2.5px solid #3A4258;
-  padding: 2px 14px; box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
+  background: #FFFFFF; color: #111111; border: 2.5px solid #111111;
+  padding: 2px 16px; box-shadow: 3px 3px 0 rgba(0,0,0,0.4);
 }
 .seat-list { text-align: left; margin-bottom: 14px; }
 .seat {

@@ -1107,19 +1107,14 @@ function drawFx(f){
       } else {
         text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
       }
-      // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数），small/mini 单行截断
-      //    行卡（noDesc:true）不画效果，悬停详情才展示，避免矮卡重叠
+      // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数）
+      //    痛点五：small/mini 小卡只画技能名 + 价格，隐藏效果描述（空间留给中央大图标，悬停详情查看）
       const se = lay.skillEff;
       const effTxt = effText(card, sk);
-      if (effTxt && !o.noDesc) {
-        if (lay.mini || lay.small) {
-          const fEf = fit(effTxt, se.w, se.size);
-          text(fEf.text, x + w / 2, se.y + se.size, fEf.size, '#333333', { align: 'center', shadow: false });
-        } else {
-          const lineH = Math.max(9, h * 0.075);
-          const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
-          wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
-        }
+      if (effTxt && !o.noDesc && !lay.mini && !lay.small) {
+        const lineH = Math.max(9, h * 0.075);
+        const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
+        wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
       }
     }
 
@@ -1825,7 +1820,9 @@ function drawFx(f){
     const copy = env.copy || {};
     const HUD_H = env.HUD_H;
     pxRect(0, 0, W, HUD_H, copy.hudBg || '#101418');
-    pxBorder(0, 0, W, HUD_H, '#FFD60A', 2.5);
+    // 痛点一：HUD 不再用粗黄描边（满屏金黄疲劳），改深色细边，仅保留金文字强调
+    pxBorder(0, 0, W, HUD_H, copy.hudBorder || '#2A3346', 1.5);
+    pxRect(0, HUD_H - 1.5, W, 1.5, copy.hudUnderline || 'rgba(255,214,10,0.28)');
     // 轮次标题
     const rp = copy.roundPos || { x: 14, y: HUD_H / 2, size: 20 };
     drawPixelText(copy.roundTxt ? copy.roundTxt(g) : ('第 ' + (g.round || 0) + ' 轮'), rp.x, rp.y, rp.size, '#FFD60A', { shadow: false });
@@ -1968,7 +1965,7 @@ function drawFx(f){
         // 行2：角色名（红）→ 数值流（大）→ 状态标签（红底白字）
         let nx2 = x + 30;
         if (s.char) {
-          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.18), 10.5);
+          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : s.char.name, Math.max(30, w * 0.2), copy.charSize || 11.5);
           drawPixelText(fCh.text, nx2, y + ph - 8, fCh.size, copy.charCol || '#C0392B', { shadow: false });
           nx2 += fCh.w + 14;
           env.hoverCards.push({ x: nx2 - fCh.w - 14, y: y + ph - 8 - 15, w: Math.min(180, w * 0.34), h: 26, kind: 'charSkill', data: { ch: s.char } });
@@ -1990,7 +1987,7 @@ function drawFx(f){
         if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 18, 12, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
         nx1 += textWidth((s.side === 'prosecutor' ? '·检方' : '·辩护方'), '700 12px ' + fontBase) + 10;
         if (s.char) {
-          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.2), 12.5);
+          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : s.char.name, Math.max(30, w * 0.22), copy.charSize || 13.5);
           drawPixelText(fCh2.text, nx1, y + 18, fCh2.size, copy.charCol || '#C0392B', { shadow: false });
           env.hoverCards.push({ x: nx1, y: y + 8, w: Math.min(180, w * 0.34), h: 24, kind: 'charSkill', data: { ch: s.char } });
         }
@@ -2081,8 +2078,23 @@ function drawFx(f){
     if (!g) return;
     const me = g.seats[env.mySeat];
     const y0 = H - env.HAND_AREA_H;
-    pxRect(6, y0 + 2, W - 12, env.HAND_AREA_H - 8, 'rgba(16,20,28,0.88)');
-    pxBorder(6, y0 + 2, W - 12, env.HAND_AREA_H - 8, '#3A4258', 2);
+    const copy = env.copy || {};
+    // 痛点三：底台容器统一包含「按钮 + 卡牌」。非竖屏且按钮在底台上方时（联机），
+    // 经 copy.dockExt() 向上扩展底台背景，按钮与卡牌同处一个容器、视觉对齐
+    const extTop = copy.dockExt ? copy.dockExt() : 0;
+    const topY = y0 + 2 - extTop;
+    const dockH = env.HAND_AREA_H - 8 + extTop;
+    pxRect(6, topY, W - 12, dockH, 'rgba(16,20,28,0.92)');
+    pxBorder(6, topY, W - 12, dockH, '#3A4258', 2);
+    // 竖屏：按钮条（actH）与卡牌网格之间画细金分隔线，明确边界
+    if (env.actH > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      pxRect(6, y0 + 2 + env.actH + 1, W - 12, 1.5, '#FFD60A');
+      ctx.restore();
+    }
+    // 单机非竖屏：按钮在底台内右侧 → 按钮区与卡牌区之间画垂直分隔线
+    if (copy.dockDivider) copy.dockDivider(y0, topY, dockH);
     if (!me) {
       drawPixelText('👁 观战中 · 不参与对局', W / 2, y0 + env.HAND_AREA_H / 2 - 12, 24, '#FFD60A', { align: 'center', shadow: false });
       drawPixelText('当前阶段：' + (g.phaseLabel || g.phase), W / 2, y0 + env.HAND_AREA_H / 2 + 18, 15, '#CDD8E8', { align: 'center', shadow: false });
@@ -2233,9 +2245,10 @@ function drawFx(f){
     var me = env.mySeat;
     if (!g.seats[me]) return;
     var ph = g.phase;
-    var handY0 = H - env.HAND_AREA_H - 40;
-    var myTurn = env.myTurn || function () { return RC.myTurnOf(env); };
     var copy = env.copy || {};
+    // 底台扩展（dockExt，按钮并入底台）后，指引条随之让位
+    var handY0 = H - env.HAND_AREA_H - (copy.dockExt ? copy.dockExt() : 0) - 40;
+    var myTurn = env.myTurn || function () { return RC.myTurnOf(env); };
     var keepMax = env.keepMax || function () { return 0; };
     var tip = '', sub = '', bx2 = 0, by2 = 0;
     if (ph === 'buy' && myTurn()) { tip = copy.buyTip || '调查取证：传唤证物架上的证据'; sub = '点击证物传唤 · 完成后点「结束取证」'; bx2 = 12; by2 = handY0 - 40; }
@@ -2249,15 +2262,16 @@ function drawFx(f){
     const bw2 = Math.min(430, W - 30);
     if (bx2 + bw2 > W - 8) bx2 = W - 8 - bw2;
     if (bx2 < 8) bx2 = 8;
-    const on = 0.5 + 0.5 * Math.sin(performance.now() / 220);
     ctx.save();
-    ctx.globalAlpha = 0.9;
+    // 痛点一/四：去掉呼吸黄粗边框，改「深色半透明底 + 左侧金色细条 + 白/金文字」的轻量引导条
+    const on = 0.55 + 0.45 * Math.sin(performance.now() / 220);   // 仅金条微呼吸，不再整框闪烁
     pxRect(bx2, by2, bw2, 42, 'rgba(16,20,28,0.92)');
-    ctx.globalAlpha = 0.45 + on * 0.55;
-    pxBorder(bx2 - 2, by2 - 2, bw2 + 4, 46, '#FFD60A', 3);
-    ctx.globalAlpha = 0.9;
-    drawPixelText('🎯 ' + tip, bx2 + 13, by2 + 14, 14.5, '#FFD60A', { shadow: false });
-    drawPixelText(sub, bx2 + 13, by2 + 32, 11.5, '#CDD8E8', { shadow: false });
+    pxBorder(bx2, by2, bw2, 42, '#3A4258', 1.5);
+    ctx.globalAlpha = on;
+    pxRect(bx2, by2 + 6, 4, 30, '#FFD60A');
+    ctx.globalAlpha = 1;
+    drawPixelText('🎯 ' + tip, bx2 + 15, by2 + 15, 14.5, '#FFD60A', { shadow: false });
+    drawPixelText(sub, bx2 + 15, by2 + 32, 11.5, '#C6D2E4', { shadow: false });
     ctx.restore();
     // 新手指引（策划意见1 轻量版）：前两轮附加指向目标区域的闪烁箭头
     if ((g.round || 0) <= 2) {
@@ -2962,18 +2976,8 @@ function renderEnv(){
       panelBg: '#efe6cd',
       panelBorder: (isAct) => (isAct ? { col: '#E6392F', w: 3 } : { col: '#111111', w: 2 }),
       screenGuard: false,
-      charBrief: (s) => {
-        const sk = s.char && s.char.skill;
-        let brief = '';
-        if (sk && sk.type === 'startMoney') brief = '起始 +⊙' + sk.v;
-        else if (sk && sk.type === 'voteBuff') brief = '本阵营 +' + sk.v + ' 票';
-        else if (sk && sk.type === 'eventBuff') brief = '增益事件 +' + sk.v;
-        else if (sk && sk.type === 'keepPlus') brief = '保留 +' + sk.v + ' 张';
-        else if (sk && sk.type === 'terrorist') brief = '可炸 1 牌';
-        else brief = sk ? (sk.type || '') : '';
-        return (s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name + ' · ' + (brief || '技能');
-      },
-      charSize: 10, charCol: '#D82E2F',
+      charBrief: (s) => (s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name,
+      charSize: 11.5, charCol: '#D82E2F',
       scandalZero: false, scandalCol: '#E6392F', actCol: '#E6392F',
       lockShow: (s, isMe, g) => (s.lockedCount && (isMe || g.phase !== 'buy')),
       lockCol: '#1E4FB5',
@@ -2987,6 +2991,15 @@ function renderEnv(){
         buttons.push(b);
       },
       // —— renderBottomOf ——
+      // 痛点三：单机非竖屏按钮已在底台内部（右侧双列），无需 dockExt 扩展；
+      // 用 dockDivider 在按钮列左侧画垂直分隔线，卡牌区与按钮区同一容器视觉对齐
+      dockExt: () => 0,
+      dockDivider: (y0, topY, dockH) => {
+        if (!portraitMode){
+          const dx = Math.max(12, W - 212) - 8;
+          pxRect(dx, topY + 2, 1.5, dockH - 4, 'rgba(255,255,255,0.16)');
+        }
+      },
       marketTitleCol: '#1B2A4A',
       marketCardAnim: (x, y, w, h, card, fn) => {
         const ci = FX.find(f => f.type === 'cardIn' && f.area === 'market' && f.uid === card.uid);
@@ -3098,9 +3111,10 @@ function renderActionButtons(me){
     switch (g.phase){
       case 'buy':
         if (!me.buyDone){
-          acts.push({ label: '换证 ⊙' + ElectionCore.refreshCostOf(me), act: 'refresh', enabled: me.money >= ElectionCore.refreshCostOf(me), col: PAL.accent.a });
+          // 痛点一：仅「结束取证」金色强调（执行按钮），换证/切模式白底次要
+          acts.push({ label: '换证 ⊙' + ElectionCore.refreshCostOf(me), act: 'refresh', enabled: me.money >= ElectionCore.refreshCostOf(me), col: PAL.ui.a });
           acts.push({ label: buyMode === 'lock' ? '切到传唤' : '切到留证', act: 'toggleBuyMode', enabled: true, col: PAL.ui.a });
-          acts.push({ label: '结束取证', act: 'endBuy', enabled: true, col: PAL.ui.a });
+          acts.push({ label: '结束取证', act: 'endBuy', enabled: true, col: PAL.accent.a });
         } else {
           hint('已结束取证', '#4A3820');
         }
@@ -3170,10 +3184,11 @@ function renderActionButtons(me){
   switch (g.phase){
     case 'buy':
       if (!me.buyDone){
-        mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.accent.a);
+        // 痛点一：仅「结束取证」金色强调，换证/切模式白底次要
+        mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.ui.a);
         if (game.leaderStreak >= 2 && game.prevFirst === mySeat) tip('👑 连胜税 +1⊙');
         mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.ui.a);
-        mk('结束取证', 'endBuy', true, PAL.ui.a);
+        mk('结束取证', 'endBuy', true, PAL.accent.a);
       } else {
         drawPixelText('已结束取证', x1, y + 12, 15, '#4A3820', { shadow: false });
       }
@@ -3223,21 +3238,33 @@ function renderActionButtons(me){
 function renderLogs(){
   const logs = game.logs || [];
   if (!logs.length) return;
-  // B3：日志📜折叠按钮 —— 默认收起到 1 条，点击展开最多 6 条
-  const btnW = 30, btnH = 24;
-  const bx = W - btnW - 8, by = H - HAND_AREA_H - 34;
-  const b = btn(bx, by, btnW, btnH, logExpanded ? '✕' : '📜', '#FFFFFF', true);
+  // 痛点四：主屏左下角深色半透明日志容器，文字对齐框内左上角；
+  // 默认 1 条，点 📜 展开最多 6 条（按钮在容器右上角内侧）；紧贴底台顶部之上
+  const nShow = logExpanded ? Math.min(6, logs.length) : 1;
+  const show = logs.slice(-nShow);
+  const panelW = Math.min(300, W - 16);
+  const ph2 = nShow * 15 + 22;
+  const px0 = 8;
+  const py0 = H - HAND_AREA_H - ph2 - 6;
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  pxRect(px0, py0, panelW, ph2, 'rgba(16,20,28,0.92)');
+  pxBorder(px0, py0, panelW, ph2, '#3A4258', 1.5);
+  ctx.globalAlpha = 1;
+  drawPixelText('📜 庭审记录', px0 + 10, py0 + 10, 12, '#FFD60A', { shadow: false });
+  let yy = py0 + 24;
+  show.forEach(ln => {
+    if (ln.length > (logExpanded ? 72 : 56)) ln = ln.slice(0, logExpanded ? 72 : 56) + '…';
+    drawPixelText('· ' + ln, px0 + 10, yy, 13, '#DCE6F5', { shadow: false });
+    yy += 15;
+  });
+  ctx.restore();
+  // 折叠/展开按钮：容器右上角内侧
+  const bx = px0 + panelW - 40, by2 = py0 + 4;
+  const b = btn(bx, by2, 32, 18, logExpanded ? '✕' : '📜', '#FFFFFF', true);
   b.act = 'toggleLog';
   buttons.push(b);
   drawBtn(b);
-  const nShow = logExpanded ? Math.min(6, logs.length) : 1;
-  const show = logs.slice(-nShow);
-  let y = H - HAND_AREA_H - 24;
-  show.forEach(ln => {
-    if (ln.length > (logExpanded ? 72 : 56)) ln = ln.slice(0, logExpanded ? 72 : 56) + '…';
-    drawPixelText('· ' + ln, 10, y, 13, '#4A4333', { shadow: false });
-    y -= 15;
-  });
 }
 function renderToast(){
   if (toast && performance.now() - toastT < 2600){

@@ -279,7 +279,9 @@
     const copy = env.copy || {};
     const HUD_H = env.HUD_H;
     pxRect(0, 0, W, HUD_H, copy.hudBg || '#101418');
-    pxBorder(0, 0, W, HUD_H, '#FFD60A', 2.5);
+    // 痛点一：HUD 不再用粗黄描边（满屏金黄疲劳），改深色细边，仅保留金文字强调
+    pxBorder(0, 0, W, HUD_H, copy.hudBorder || '#2A3346', 1.5);
+    pxRect(0, HUD_H - 1.5, W, 1.5, copy.hudUnderline || 'rgba(255,214,10,0.28)');
     // 轮次标题
     const rp = copy.roundPos || { x: 14, y: HUD_H / 2, size: 20 };
     drawPixelText(copy.roundTxt ? copy.roundTxt(g) : ('第 ' + (g.round || 0) + ' 轮'), rp.x, rp.y, rp.size, '#FFD60A', { shadow: false });
@@ -422,7 +424,7 @@
         // 行2：角色名（红）→ 数值流（大）→ 状态标签（红底白字）
         let nx2 = x + 30;
         if (s.char) {
-          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.18), 10.5);
+          const fCh = fitText(copy.charBrief ? copy.charBrief(s) : s.char.name, Math.max(30, w * 0.2), copy.charSize || 11.5);
           drawPixelText(fCh.text, nx2, y + ph - 8, fCh.size, copy.charCol || '#C0392B', { shadow: false });
           nx2 += fCh.w + 14;
           env.hoverCards.push({ x: nx2 - fCh.w - 14, y: y + ph - 8 - 15, w: Math.min(180, w * 0.34), h: 26, kind: 'charSkill', data: { ch: s.char } });
@@ -444,7 +446,7 @@
         if (s.side) drawPixelText(s.side === 'prosecutor' ? '·检方' : '·辩护方', nx1, y + 18, 12, s.side === 'prosecutor' ? '#D82E2F' : '#2F6FD8', { shadow: false });
         nx1 += textWidth((s.side === 'prosecutor' ? '·检方' : '·辩护方'), '700 12px ' + fontBase) + 10;
         if (s.char) {
-          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : ((s.side === 'prosecutor' ? '检方·' : '辩方·') + s.char.name), Math.max(30, w * 0.2), 12.5);
+          const fCh2 = fitText(copy.charBrief ? copy.charBrief(s) : s.char.name, Math.max(30, w * 0.22), copy.charSize || 13.5);
           drawPixelText(fCh2.text, nx1, y + 18, fCh2.size, copy.charCol || '#C0392B', { shadow: false });
           env.hoverCards.push({ x: nx1, y: y + 8, w: Math.min(180, w * 0.34), h: 24, kind: 'charSkill', data: { ch: s.char } });
         }
@@ -535,8 +537,23 @@
     if (!g) return;
     const me = g.seats[env.mySeat];
     const y0 = H - env.HAND_AREA_H;
-    pxRect(6, y0 + 2, W - 12, env.HAND_AREA_H - 8, 'rgba(16,20,28,0.88)');
-    pxBorder(6, y0 + 2, W - 12, env.HAND_AREA_H - 8, '#3A4258', 2);
+    const copy = env.copy || {};
+    // 痛点三：底台容器统一包含「按钮 + 卡牌」。非竖屏且按钮在底台上方时（联机），
+    // 经 copy.dockExt() 向上扩展底台背景，按钮与卡牌同处一个容器、视觉对齐
+    const extTop = copy.dockExt ? copy.dockExt() : 0;
+    const topY = y0 + 2 - extTop;
+    const dockH = env.HAND_AREA_H - 8 + extTop;
+    pxRect(6, topY, W - 12, dockH, 'rgba(16,20,28,0.92)');
+    pxBorder(6, topY, W - 12, dockH, '#3A4258', 2);
+    // 竖屏：按钮条（actH）与卡牌网格之间画细金分隔线，明确边界
+    if (env.actH > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      pxRect(6, y0 + 2 + env.actH + 1, W - 12, 1.5, '#FFD60A');
+      ctx.restore();
+    }
+    // 单机非竖屏：按钮在底台内右侧 → 按钮区与卡牌区之间画垂直分隔线
+    if (copy.dockDivider) copy.dockDivider(y0, topY, dockH);
     if (!me) {
       drawPixelText('👁 观战中 · 不参与对局', W / 2, y0 + env.HAND_AREA_H / 2 - 12, 24, '#FFD60A', { align: 'center', shadow: false });
       drawPixelText('当前阶段：' + (g.phaseLabel || g.phase), W / 2, y0 + env.HAND_AREA_H / 2 + 18, 15, '#CDD8E8', { align: 'center', shadow: false });
@@ -687,9 +704,10 @@
     var me = env.mySeat;
     if (!g.seats[me]) return;
     var ph = g.phase;
-    var handY0 = H - env.HAND_AREA_H - 40;
-    var myTurn = env.myTurn || function () { return RC.myTurnOf(env); };
     var copy = env.copy || {};
+    // 底台扩展（dockExt，按钮并入底台）后，指引条随之让位
+    var handY0 = H - env.HAND_AREA_H - (copy.dockExt ? copy.dockExt() : 0) - 40;
+    var myTurn = env.myTurn || function () { return RC.myTurnOf(env); };
     var keepMax = env.keepMax || function () { return 0; };
     var tip = '', sub = '', bx2 = 0, by2 = 0;
     if (ph === 'buy' && myTurn()) { tip = copy.buyTip || '调查取证：传唤证物架上的证据'; sub = '点击证物传唤 · 完成后点「结束取证」'; bx2 = 12; by2 = handY0 - 40; }
@@ -703,15 +721,16 @@
     const bw2 = Math.min(430, W - 30);
     if (bx2 + bw2 > W - 8) bx2 = W - 8 - bw2;
     if (bx2 < 8) bx2 = 8;
-    const on = 0.5 + 0.5 * Math.sin(performance.now() / 220);
     ctx.save();
-    ctx.globalAlpha = 0.9;
+    // 痛点一/四：去掉呼吸黄粗边框，改「深色半透明底 + 左侧金色细条 + 白/金文字」的轻量引导条
+    const on = 0.55 + 0.45 * Math.sin(performance.now() / 220);   // 仅金条微呼吸，不再整框闪烁
     pxRect(bx2, by2, bw2, 42, 'rgba(16,20,28,0.92)');
-    ctx.globalAlpha = 0.45 + on * 0.55;
-    pxBorder(bx2 - 2, by2 - 2, bw2 + 4, 46, '#FFD60A', 3);
-    ctx.globalAlpha = 0.9;
-    drawPixelText('🎯 ' + tip, bx2 + 13, by2 + 14, 14.5, '#FFD60A', { shadow: false });
-    drawPixelText(sub, bx2 + 13, by2 + 32, 11.5, '#CDD8E8', { shadow: false });
+    pxBorder(bx2, by2, bw2, 42, '#3A4258', 1.5);
+    ctx.globalAlpha = on;
+    pxRect(bx2, by2 + 6, 4, 30, '#FFD60A');
+    ctx.globalAlpha = 1;
+    drawPixelText('🎯 ' + tip, bx2 + 15, by2 + 15, 14.5, '#FFD60A', { shadow: false });
+    drawPixelText(sub, bx2 + 15, by2 + 32, 11.5, '#C6D2E4', { shadow: false });
     ctx.restore();
     // 新手指引（策划意见1 轻量版）：前两轮附加指向目标区域的闪烁箭头
     if ((g.round || 0) <= 2) {
