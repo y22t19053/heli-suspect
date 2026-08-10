@@ -210,8 +210,10 @@
       const rw = clamp(Math.min(118, (W - 60) / Math.max(1, row.length) - 12), 40, 118);
       const cy = PANEL_Y + n * (panelH + 6) + (compact ? 10 : 30);
       const btnH = compact ? 38 : (isMobile ? 50 : 46);
-      const availRh = H - HAND_AREA_H - ((portraitMode && actH > 0) ? 8 : btnH + 8) - cy;
-      const rh = clamp(availRh, compact ? 64 : 88, H * 0.5);
+      /* 行区上限 = 信息条下缘到底栏上缘的剩余空间；面板变高后空间变小，
+       * 若可用高度不足（如窄屏 4 人），宁可行卡矮一点也不溢出压住按钮/手牌区 */
+      const maxRh = H - HAND_AREA_H - ((portraitMode && actH > 0) ? 8 : btnH + 8) - cy - 4;
+      const rh = clamp(Math.min(maxRh, H * 0.5), 24, Math.max(24, maxRh));
       const total = row.length * (rw + 10) - 10;
       let cx = (W - total) / 2;
       const rowItems = row.map(r => {

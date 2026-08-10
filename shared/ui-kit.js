@@ -126,7 +126,9 @@
       voteBadge: { x: x + pad, y: y + pad, w: vbW, h: vbH },
       name: { x: x + vbW + 8, y: y + h * (mini ? 0.04 : 0.06), w: w - vbW - 14, h: nameSize * 1.4, size: nameSize },
       skillBadge: { x, y: y + h * (mini ? 0.5 : 0.34), w, h: badgeSize * 1.6, size: badgeSize },
-      skillName: { x, y: y + h * (small ? 0.52 : 0.74), w, h: Math.max(14, h * 0.08), size: Math.max(8, Math.min(h * 0.07, 13)) },
+      skillName: { x, y: y + h * (mini ? 0.36 : (small ? 0.44 : 0.62)), w, h: Math.max(mini ? 10 : 14, h * 0.08), size: Math.max(8, Math.min(h * 0.07, 13)) },
+      // 技能效果区（卡面明写技能；mini/small 1 行，normal 按可用高度折行）
+      skillEff: { x: x + 4, y: y + h * (mini ? 0.52 : (small ? 0.60 : 0.72)), w: w - 8, size: Math.max(mini ? 6 : (small ? 6.5 : 8), Math.min(h * (mini ? 0.10 : (small ? 0.085 : 0.075)), mini ? 7.5 : (small ? 9 : 10.5))) },
       cost: { x: x + w / 2 - Math.min(30, w * 0.25), y: y + h - 20, w: Math.min(60, w * 0.5), h: 16, size: Math.max(10, h * 0.082) },
       camp: { x, y: y + 1, w: 3, h: h - 2 }
     };
@@ -185,12 +187,20 @@
     text('CASE FILE', x + w - 8, baseY + 8, Math.max(5.5, h * 0.04), '#4E5866', { align: 'right', shadow: false });
   }
 
+  /* 技能效果文本：卡面 desc 优先（参数化卡牌自带），否则技能库 desc；前缀精简省字（语义不变） */
+  function effText(card, sk) {
+    let t = (card.desc != null && card.desc !== '') ? card.desc : (sk ? sk.desc : '');
+    if (!t) return '';
+    t = t.replace(/^(亮出时|审议时|结算后)：/, m => m[0] === '亮' ? '亮出：' : (m[0] === '结' ? '结算：' : '审议：'));
+    return t;
+  }
+
   /* ---------------- 组装：drawCard（供 drawVoterCard 薄封装调用） ---------------- */
   function drawCard(ctx, x, y, w, h, card, o) {
     o = o || {};
     const text = E('drawPixelText'), rect = E('pxRect'), border = E('pxBorder'),
           shadow = E('comicShadow'), fit = E('fitText'), camp = E('campColor'),
-          lv = E('lvMark'), PAL = E('PAL') || {};
+          wrap = E('drawWrapText'), lv = E('lvMark'), PAL = E('PAL') || {};
     const core = E('ElectionCore');
     const skills = (core && core.data) ? core.data.SKILLS : null;
     if (card.hidden) {
@@ -250,14 +260,29 @@
         text('⚖', sb.x + sb.w / 2, sb.y + sb.h / 2, sb.size, '#FFFFFF', { align: 'center' });
         text('铁证', sb.x + sb.w / 2, sb.y + sb.h * 0.82, Math.max(9, sb.size * 0.3), '#0E8A5F', { align: 'center', shadow: false });
       }
-      // 技能名小字（normal：徽章下方深棕；small：黑底黄字条）
-      if (sk) {
-        const sn = lay.skillName;
-        if (lay.small) {
-          rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#7A0E0E' : '#111111');
-          text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
+    }
+    // ③ 技能名 + 效果（所有档位卡面明写技能；mini 紧凑小字，normal 下方带效果说明）
+    if (sk) {
+      const sn = lay.skillName;
+      if (lay.mini) {
+        text(icon + ' ' + lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), '#4A3100', { align: 'center', shadow: false });
+      } else if (lay.small) {
+        rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#7A0E0E' : '#111111');
+        text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, Math.max(9, sn.size), '#FFD60A', { align: 'center', shadow: false });
+      } else {
+        text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
+      }
+      // ④ 技能效果说明（用户要求明写）：normal 折行（行数=到价格条可容纳数），small/mini 单行截断
+      const se = lay.skillEff;
+      const effTxt = effText(card, sk);
+      if (effTxt) {
+        if (lay.mini || lay.small) {
+          const fEf = fit(effTxt, se.w, se.size);
+          text(fEf.text, x + w / 2, se.y + se.size, fEf.size, '#333333', { align: 'center', shadow: false });
         } else {
-          text(lv(sk.lv) + sk.name, x + w / 2, sn.y + sn.h / 2, sn.size, '#4A3100', { align: 'center', shadow: false });
+          const lineH = Math.max(8.5, h * 0.085);
+          const maxLines = Math.max(1, Math.floor((lay.cost.y - se.y - 3) / lineH));
+          wrap(effTxt, x + 5, se.y, se.size, '#333333', w - 10, lineH, { maxLines });
         }
       }
     }

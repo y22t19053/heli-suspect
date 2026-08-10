@@ -54,7 +54,7 @@ function applyUI() {
   s.handH = portraitMode ? (ph === 'tiny' ? 300 : 270)
     : compact ? (ph === 'tiny' ? 118 : 140)
     : (ph === 'narrow' ? 168 : (ph === 'tiny' ? 132 : (isMobile ? 190 : 230)));
-  s.panelH = compact ? 20 : (portraitMode ? 26 : (ph === 'tiny' ? 24 : (ph === 'narrow' ? 26 : 30)));
+  s.panelH = compact ? 26 : (portraitMode ? 32 : (ph === 'tiny' ? 28 : (ph === 'narrow' ? 30 : 36)));
   s.fs.name = compact ? (ph === 'tiny' ? 10 : 11) : (ph === 'tiny' ? 11.5 : (ph === 'narrow' ? 12.5 : 14));
   s.fs.num = compact ? (ph === 'tiny' ? 9.5 : 11) : (ph === 'tiny' ? 12 : (ph === 'narrow' ? 13 : 15));
   s.fs.stat = compact ? (ph === 'tiny' ? 8.5 : 9.5) : (ph === 'tiny' ? 10.5 : (ph === 'narrow' ? 11.5 : 12.5));
