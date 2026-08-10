@@ -51,6 +51,7 @@
     // 硅谷地区：事件牌费用 ⊙2（文化地域印记）
     ev.used = true;
     s.events = s.events.filter(e => e !== ev);
+    state.grave.push(ev);   // 已打出的事件牌进档案（cardInGlobal 已查 grave，快照恢复时不会复活）
     s.eventCount++;
     s.stats.eventsPlayed++;
     const tgt = ev.target === 'enemy' ? targetSeat : (ev.target === 'self' ? s.seat : -1);

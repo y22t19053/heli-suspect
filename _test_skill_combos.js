@@ -235,5 +235,88 @@ test('组合 J：收入分发 + 逐人日志', () => {
   assert.ok(st.logs.some(l => l.indexOf('发放律师费 +3⊙') >= 0), '逐人收入日志（含末位 +3⊙）');
 });
 
+/* ============================================================
+ * 组合 K：幽灵事件牌（评审 bug）——事件牌打出后必须进档案
+ * 背景：playEvent 曾只从手牌移除、不落任何全局数组 → AI 托管期间
+ *       打掉的事件牌在断线快照恢复时经 cardInGlobal 查不到 → 幽灵复活。
+ * 修复：playEvent 将已用事件牌 push 进 state.grave（cardInGlobal 已查 grave）。
+ * 本测试在引擎级复刻 server.js 的 saveSnapshot/cardInGlobal/restoreSnapshot
+ * 关键逻辑，验证修复后事件牌不会复活（确定性，无需起服务器）。
+ * ============================================================ */
+
+/** 构造 preEvent 阶段最小状态：两个座位各持 1 张 e01（当庭陈词 lv1 pre self） */
+function makeEventState() {
+  const st = Core.createGame({
+    seatCount: 2, names: ['A', 'B'], aiMask: [false, true], seed: 20260917
+  });
+  st.phase = 'preEvent';
+  st.round = 1;
+  st.startingSeat = 0;
+  st.eventTurnSeat = 0;
+  st.turn = 0;
+  st.seats.forEach(s => { s.eventCount = 0; s.eventPassed = false; s.events = []; });
+  const tpl = Core.data.EVENT_TEMPLATES.find(t => t.id === 'e01');
+  st.seats[0].events = [Object.assign({}, tpl, { uid: 'evt-1', used: false })];
+  st.seats[1].events = [Object.assign({}, tpl, { uid: 'evt-2', used: false })];
+  return st;
+}
+
+/** 复刻 server.js cardInGlobal：行区/牌堆/档案/他人手牌市场 */
+function cardInGlobalReplica(st, seat, uid) {
+  if (Array.isArray(st.row) && st.row.some(r => r.card && r.card.uid === uid)) return true;
+  if (Array.isArray(st.used) && st.used.some(c => c.uid === uid)) return true;
+  if (Array.isArray(st.grave) && st.grave.some(c => c.uid === uid)) return true;
+  for (let i = 0; i < st.seats.length; i++) {
+    if (i === seat) continue;
+    const s2 = st.seats[i];
+    if (s2 && Array.isArray(s2.hand) && s2.hand.some(c => c.uid === uid)) return true;
+    if (s2 && Array.isArray(s2.market) && s2.market.some(c => c.uid === uid)) return true;
+  }
+  return false;
+}
+
+test('组合 K1：人类打出事件牌 → 进 grave + 快照恢复不复活', () => {
+  const st = makeEventState();
+  const snap = JSON.parse(JSON.stringify(st));   // 模拟 saveSnapshot（AI 接管前）
+
+  const r = Core.apply(st, 0, { type: 'playEvent', uid: 'evt-1', targetSeat: null });
+  assert.ok(r.ok, 'playEvent 应成功：' + (r && r.msg));
+  assert.equal(st.phase, 'preEvent', '座位 1 仍有事件可出 → preEvent 不应自动流转');
+  assert.deepEqual(st.seats[0].events, [], '打出后事件牌应从手牌移除');
+  assert.ok(st.grave.some(c => c.uid === 'evt-1'), '已打出的事件牌应进档案 grave，实际 grave=' + st.grave.map(c => c.uid));
+  assert.equal(st.seats[0].eventCount, 1, 'eventCount 应 +1（尚未进入 postEvent，不会被重置）');
+  assert.deepEqual(st.voteMod, [1, 0], 'e01 效果：本方 +1 票');
+  assert.ok(!st.grave.some(c => c.uid === 'evt-2'), '他人未打出的事件牌不应进档案');
+
+  // 模拟 restoreSnapshot：快照私有事件牌过滤掉"已在全局"的牌
+  const cur = st.seats[0];
+  const old = snap.seats[0];
+  const restored = old.events.filter(e => e && !cardInGlobalReplica(st, 0, e.uid));
+  cur.events = restored;
+  assert.deepEqual(cur.events, [], '快照恢复不应复活已打出的事件牌（幽灵牌 bug）');
+});
+
+test('组合 K2：AI 托管期间打事件牌 → 断线重连不复活（端到端语义）', () => {
+  const st = makeEventState();
+  // 场景：座位 1（AI/托管）行动前 saveSnapshot；AI 打掉事件牌；重连 restore
+  const snap = JSON.parse(JSON.stringify(st));
+  st.eventTurnSeat = 1; st.turn = 1;   // 轮到座位 1 行动
+
+  // AI（座位 1）在 preEvent 轮到自己时打出事件牌（aiAct → aiEvents → playEvent）
+  const r = Core.aiAct(st, 1);
+  assert.ok(r && r.ok !== false, 'AI 应能执行动作：' + JSON.stringify(r));
+  assert.deepEqual(st.seats[1].events, [], 'AI 打出后事件牌应被移除');
+  assert.ok(st.grave.some(c => c.uid === 'evt-2'), 'AI 打掉的事件牌也应进档案');
+
+  // 座位 1 重连：restoreSnapshot 语义（过滤掉已出现在全局的快照事件牌）
+  const old = snap.seats[1];
+  const revived = old.events.filter(e => e && !cardInGlobalReplica(st, 1, e.uid));
+  assert.deepEqual(revived, [], '重连恢复后事件牌不应复活（修复前会以 used:false 复活并可二次生效）');
+
+  // 二次验证：档案中的事件牌保留 used=true（即使被恢复也不会重复生效）
+  const evt = st.grave.find(c => c.uid === 'evt-2');
+  assert.ok(evt && evt.used === true, '档案中的事件牌应保留 used=true（防止二次生效）');
+});
+
 /* ---------------- 汇总（node:test 自动汇总，无需手动计数） ---------------- */
 
