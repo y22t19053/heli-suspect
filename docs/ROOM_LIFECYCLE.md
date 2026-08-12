@@ -85,7 +85,7 @@ flowchart TD
     A2 --> A3{执行前复查<br/>仍为AI? 未gameOver?}
     A3 -- 否(已重连) --> A9[跳过本次行动, 交还人类]
     A3 -- 是 --> A4{aiRetries ≥ 3?}
-    A4 -- 是 --> A5[forceSkip 强制跳阶段 + 日志⚠]
+    A4 -- 是 --> A5[forceSkip 强制跳阶段 + 日志]
     A4 -- 否 --> A6[Core.aiAct 决策]
     A6 --> A7{行动后仍需要AI?}
     A7 -- 是 --> A8[aiRetries+1]

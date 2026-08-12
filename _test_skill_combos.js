@@ -15,6 +15,10 @@
  * 运行：node --test _test_skill_combos.js（或 npm test）
  * 说明：直接调用 Core 导出的测试钩子，构造完整结算状态，
  *       不经过完整对局流程，聚焦计票结算的确定性。
+ *
+ * ⑦ 庭审阶段克制权重：makeCountState 固定 round=1（开庭陈述），
+ *     该轮所有 emotion 流派技能卡 +1 票（见 engine/02-numeric.js phaseArchOf）。
+ *     各期望值均已计入此阶段加成。
  * ============================================================ */
 'use strict';
 
@@ -97,28 +101,30 @@ function makeFinishState(opts) {
 
 /* ============================================================
  * 组合 A：A 有 fan（铁杆粉丝 lv1 本方 +1），B 有 troll（庭外抹黑 lv1 打最高）
- * 期望：fan 先 +1 至 2，troll 后打回 1
+ * 期望：基础 1-1；⑦R1 开庭陈述 emotion：fan +1 → A=2；
+ *       fan 技能 +1 → 3，troll 打最高敌 → 2
  * ============================================================ */
 test('组合 A：fan vs troll', () => {
   const st = runCount(['v15', 'v16'], [0, 1]);   // v15 fan / v16 troll
-  assert.deepEqual(st.votes, [1, 1], 'A=1 B=1');
+  assert.deepEqual(st.votes, [2, 1], 'A=2 B=1（⑦emotion +1 后 fan+1、troll-1）');
   assert.ok(st.seats.every(s => s.scandal === 0), '无丑闻产生，scandal=' + st.seats.map(s => s.scandal));
 });
 
 /* ============================================================
  * 组合 B：A 有 orator（雄辩陈词 lv2 本方 +1），B 有 megaScandal（致命污点 lv3 最高敌 -2 + 丑闻）
  * 基础：A=1，B=0（v21 自带 scandal 1）；
- * orator 后 A=2，megaScandal 后 A=0、A.scandal=1
+ * ⑦R1 emotion：orator +1 → A=2；orator 后 A=3，
+ * megaScandal 后 A=1、A.scandal=1
  * ============================================================ */
 test('组合 B：orator vs megaScandal', () => {
   const st = runCount(['v17', 'v21'], [0, 1]);   // v17 orator / v21 megaScandal
-  assert.deepEqual(st.votes, [0, 0], 'A=0 B=0');
+  assert.deepEqual(st.votes, [1, 0], 'A=1 B=0（⑦emotion +1，megaScandal -2）');
   assert.deepEqual(st.seats.map(s => s.scandal), [1, 0], 'A 丑闻 0→1');
 });
 
 test('组合 B2：对照 orator + tagBoost（无 megaScandal）', () => {
   const st = runCount(['v17', 'v01'], [0, 1]);   // 对照：orator + tagBoost，无 megaScandal
-  assert.deepEqual(st.votes, [2, 2], '对照：A=2 B=2');
+  assert.deepEqual(st.votes, [3, 2], '对照：A=3 B=2（⑦emotion +1、orator +1、tagBoost +1）');
 });
 
 /* ============================================================
@@ -127,8 +133,8 @@ test('组合 B2：对照 orator + tagBoost（无 megaScandal）', () => {
 test('组合 C：tagBoost/tagHate 无条件化', () => {
   // A 有 v28 tagHate（最高敌 -1）+ v17 orator（本方 +1），B 有 v01 tagBoost（本方 +1）
   const st = runCount(['v28', 'v17', 'v01'], [0, 0, 1]);
-  // 基础 A=2，B=1；①级：tagHate B-1=0、tagBoost B+1=1；②级：orator A+1=3
-  assert.deepEqual(st.votes, [3, 1], 'A=3 B=1');
+  // 基础 A=2，B=1；⑦R1 emotion：orator A+1=3；①级：tagHate B-1=0、tagBoost B+1=1；②级：orator A+1=4
+  assert.deepEqual(st.votes, [4, 1], 'A=4 B=1');
 });
 
 test('组合 C2：tagHate/tagBoost 互相抵消', () => {
@@ -158,7 +164,8 @@ test('组合 D2：合理怀疑对照（敌 2 张不触发）', () => {
 test('组合 E：确立先例（v99）', () => {
   const st = runCount(['v99', 'v15'], [0, 1]);   // v99 precedent / v15 fan
   assert.equal(st.precedentSeat, 0, 'precedentSeat = A（0）');
-  assert.deepEqual(st.votes, [2, 2], 'A=2 B=2（先例 +1，fan +1）');
+  // 基础 1-1；⑦emotion：precedent +1、fan +1 → 2-2；lv2 fan +1、lv3 precedent +1 → 3-3
+  assert.deepEqual(st.votes, [3, 3], 'A=3 B=3（⑦emotion +2，先例 +1，fan +1）');
 });
 
 /* ============================================================
@@ -216,7 +223,8 @@ test('组合 I3：左翼壁垒 v103 叠加', () => {
 test('组合 I4：抽签质证 v104', () => {
   // 抽签质证 v104：随机 1 张对方牌 -1（B 仅 1 张 → 必中）
   const st = runCount(['v104', 'v15'], [0, 1]);   // v15 fan 本方 +1
-  assert.deepEqual(st.votes, [1, 1], 'B 唯一牌被命中（fan +1 再 -1）→ A=1 B=1');
+  // 基础 1-1；⑦emotion：fan（B）B+1=2；lv1 randomHit B-1=1；lv2 fan B+1=2
+  assert.deepEqual(st.votes, [1, 2], 'B 唯一牌被命中（fan ②级 +1 再被 -1）→ A=1 B=2');
 });
 
 /* ============================================================
@@ -254,6 +262,181 @@ test('组合 J：收入分发 + 逐人日志', () => {
   assert.deepEqual(st.seats.map(s => s.money), [4, 6], 'A 榜首 -1（3→4）、B 末位 +1（3→6）');
   assert.ok(st.logs.some(l => l.indexOf('发放律师费 +1⊙') >= 0), '逐人收入日志（含保底 +1⊙），logs=' + JSON.stringify(st.logs));
   assert.ok(st.logs.some(l => l.indexOf('发放律师费 +3⊙') >= 0), '逐人收入日志（含末位 +3⊙）');
+});
+
+/* ============================================================
+ * 组合 M：纳什均衡互锁技能（阶段 C）
+ *   M1. audit 财务审计：对方金钱 ≥5 → 最高敌 -1
+ *   M2. lobby 游说金：本方金钱 ≥5 → 本方 +1
+ *   M3. endorse 名人背书：本方支持度落后 → 本方 +1
+ *   M4. crossfire 交叉火力：对方已亮 ≥3 → 最高敌 -1
+ *   M5. surge 民意浪潮：本方已亮 ≥3 → 本方 +1
+ *   M6. veto 一票否决：对方本轮打过事件 → 最高敌 -2
+ *   M7. momentum 势头：本方此前赢过轮次 → 本方 +1
+ * ============================================================ */
+test('组合 M1：audit 财务审计（对方有钱 → 查账 -1）', () => {
+  const st = makeCountState(['v109'], [0]);   // v109 = audit
+  st.seats[0].money = 2;
+  st.seats[1].money = 6;                       // 对方 ≥5 → 触发
+  Core.doCountContinue(st);
+  // A 基础 1 票；audit 使最高敌 B -1 → B 0，A 保持 1
+  assert.deepEqual(st.votes, [1, 0], '对方有钱时审计 -1：A=1 B=0');
+});
+
+test('组合 M2：lobby 游说金（本方有钱 → 买票 +1）', () => {
+  const st = makeCountState(['v110'], [0]);   // v110 = lobby
+  st.seats[0].money = 6;                       // 本方 ≥5 → 触发
+  Core.doCountContinue(st);
+  assert.deepEqual(st.votes, [2, 0], '本方有钱时游说 +1：A=2 B=0');
+});
+
+test('组合 M3：endorse 名人背书（支持度落后 → +1）', () => {
+  const st = makeCountState(['v111'], [0]);   // v111 = endorse
+  st.seats[0].support = 1;
+  st.seats[1].support = 3;                     // 本方落后 → 触发
+  Core.doCountContinue(st);
+  // 基础 1；⑦emotion +1 → 2；endorse lv2 触发 +1 → 3
+  assert.deepEqual(st.votes, [3, 0], '支持度落后时背书 +1（⑦emotion +1）：A=3 B=0');
+});
+
+test('组合 M4：crossfire 交叉火力（对方铺场 ≥3 → -1）', () => {
+  // A: fan×3（铺场 3 张）; B: crossfire + fan
+  // crossfire 看到对方（A）已亮 3 张 → 最高敌 A -1
+  // 基础 3-2；⑦emotion：A 3 fan +3=6、B fan +1=3
+  // lv1：crossfire A-1=5、3 fan A+3=8、B fan B+1=4
+  const st = runCount(['v15', 'v15', 'v15', 'v112', 'v15'], [0, 0, 0, 1, 1]);
+  assert.deepEqual(st.votes, [8, 4], '对方铺场 3 张时交叉火力 -1（⑦emotion +4）：A=8 B=4');
+});
+
+test('组合 M5：surge 民意浪潮（本方铺场 ≥3 → +1）', () => {
+  // A: surge + fan + fan = 3 张 → 本方 +1；B: fan
+  // 基础 3-1；⑦emotion：A 3 张 +3=6、B +1=2；lv1 fan×2 A+2=8、B fan+1=3；lv2 surge +1 → 9
+  const st = runCount(['v113', 'v15', 'v15', 'v15'], [0, 0, 0, 1]);
+  assert.deepEqual(st.votes, [9, 3], '本方 3 张时民意浪潮 +1（⑦emotion +4）：A=9 B=3');
+});
+
+test('组合 M6：veto 一票否决（对方本轮打过事件 → -2）', () => {
+  const st = makeCountState(['v114'], [0]);   // v114 = veto
+  st.seats[1].eventCount = 1;                  // B 本轮打过事件 → 触发
+  Core.doCountContinue(st);
+  // A 基础 1 票；veto 使最高敌 B -2 → B 0，A 保持 1
+  assert.deepEqual(st.votes, [1, 0], '对方打事件时否决 -2：A=1 B=0');
+});
+
+test('组合 M7：momentum 势头（此前赢过轮次 → +1）', () => {
+  const st = makeCountState(['v115'], [0]);   // v115 = momentum
+  st.seats[0].stats.roundsWon = 2;             // 本方赢过 → 触发
+  Core.doCountContinue(st);
+  // 基础 1；⑦emotion +1 → 2；momentum lv3 触发 +1 → 3
+  assert.deepEqual(st.votes, [3, 0], '此前赢过时势头 +1（⑦emotion +1）：A=3 B=0');
+});
+
+test('组合 M8：veto 对方未打事件不触发（对照）', () => {
+  const st = makeCountState(['v114'], [0]);
+  st.seats[1].eventCount = 0;                  // 对方未打事件 → 不触发
+  Core.doCountContinue(st);
+  assert.deepEqual(st.votes, [1, 0], '对方未打事件时否决不触发：A=1 B=0');
+});
+
+/* ============================================================
+ * 组合 N：庭审克制包（⑨：偏见揭露/最后一搏/证据链/禁言令/民意分裂/清廉档案）
+ * 全部条件触发（非白板），与⑦庭审阶段克制权重联动。
+ * R1=开庭陈述（emotion 加成）；本组攻击/物证类技能不受阶段加成，
+ * 期望值已按 ⑦ 规则核对。
+ * ============================================================ */
+test('组合 N1：bias 偏见揭露（对方铺场 ≥4 → 对方所有已亮牌各 -1）', () => {
+  // A: v117 bias；B: 4×v01 tagBoost → B 铺场 4 触发 AOE -4
+  const st = runCount(['v117', 'v01', 'v01', 'v01', 'v01'], [0, 1, 1, 1, 1]);
+  // 基础 1-4；lv1 tagBoost×4 B=8；lv3 bias B 铺场 4 → 每张 -1 → B=4
+  assert.deepEqual(st.votes, [1, 4], 'B 铺场 4 张时被 AOE -4：A=1 B=4');
+});
+
+test('组合 N1b：bias 对照（对方仅 3 张不触发）', () => {
+  const st = runCount(['v117', 'v01', 'v01', 'v01'], [0, 1, 1, 1]);
+  // 基础 1-3；lv1 tagBoost×3 B=6；bias 3<4 不触发
+  assert.deepEqual(st.votes, [1, 6], '对方 3 张不触发：A=1 B=6');
+});
+
+test('组合 N2：hailMary 最后一搏（落后 ≥2 且本方铺场 ≥3 → +3）', () => {
+  // A: v118 + fan×2（3 张，全 emotion）；B: 4×v01 tagBoost
+  const st = runCount(['v118', 'v15', 'v15', 'v01', 'v01', 'v01', 'v01'], [0, 0, 0, 1, 1, 1, 1]);
+  // 基础 3-4；⑦emotion：A 全 emotion +3 → 6；lv1 tagBoost×4 B=8、fan×2 A=8
+  // lv3 hailMary：A=8 ≤ B-2=6？否 → 不触发（但 v118 无条件 stage +1 已计入）
+  assert.deepEqual(st.votes, [8, 8], '落后不足不触发：A=8 B=8');
+  const st2 = runCount(['v118', 'v15', 'v15', 'v01', 'v01', 'v01', 'v01', 'v01'], [0, 0, 0, 1, 1, 1, 1, 1]);
+  // 基础 3-5；⑦emotion A=6；lv1 tagBoost×5 B=10、fan×2 A=8
+  // lv3 hailMary：A=8 ≤ B-2=8 ✓ 且铺场 3 ✓ → A=11
+  assert.deepEqual(st2.votes, [11, 10], '落后 ≥2 且铺场 ≥3 时 +3：A=11 B=10');
+});
+
+test('组合 N3：fullChain 证据链完整（本方物证 ≥2 → 本方所有已亮牌 +1）', () => {
+  // A: v119 fullChain + v94 timelineSnipe + v23 donor（3 张物证）；B: v15 fan
+  const st = runCount(['v119', 'v94', 'v23', 'v15'], [0, 0, 0, 1]);
+  // 基础 3-1；⑦emotion：B fan +1=2；lv1 fan B=3
+  // lv3 timelineSnipe：B 无物证不触发；fullChain：A 物证 3 ≥2 → A 全部 +3 → A=6
+  assert.deepEqual(st.votes, [6, 3], '物证 ≥2 时整链 +1：A=6 B=3');
+});
+
+test('组合 N3b：fullChain 对照（物证不足不触发）', () => {
+  const st = runCount(['v119', 'v15', 'v15'], [0, 0, 1]);
+  // 基础 2-1；⑦emotion：A fan +1=3、B fan +1=2；lv1 fan×2 A=4、B=3
+  // lv3 fullChain：A 物证仅 1（v119）<2 → 不触发
+  assert.deepEqual(st.votes, [4, 3], '物证不足不触发：A=4 B=3');
+});
+
+test('组合 N4：gagOrder 禁言令（对方本轮打过 ≥3 张 → 最高对方 -2）', () => {
+  const st = makeCountState(['v120', 'v15'], [0, 1]);   // v120 = gagOrder；B 有 fan
+  st.seats[1].played = ['x', 'y', 'z'];        // B 本轮打过 3 张 → 触发
+  Core.doCountContinue(st);
+  // 基础 1-1；⑦emotion：B fan +1=2；lv1 fan B=3；lv3 gagOrder：最高敌 B -2 → B=1
+  assert.deepEqual(st.votes, [1, 1], '对方打过 3 张时 -2：A=1 B=1');
+});
+
+test('组合 N4b：gagOrder 对照（对方仅打过 2 张不触发）', () => {
+  const st = makeCountState(['v120', 'v15'], [0, 1]);
+  st.seats[1].played = ['x', 'y'];
+  Core.doCountContinue(st);
+  // 基础 1-1；⑦emotion：B fan +1=2；lv1 fan B=3；gagOrder 2<3 不触发
+  assert.deepEqual(st.votes, [1, 3], '对方 2 张不触发：A=1 B=3');
+});
+
+test('组合 N5：split 民意分裂（双方已亮牌数相等 → 双方最高票各 -1）', () => {
+  // A: v121 + fan；B: fan×2 → 双方各 2 张相等
+  const st = runCount(['v121', 'v15', 'v15', 'v15'], [0, 0, 1, 1]);
+  // 基础 2-2；⑦emotion：A fan +1=3、B fan×2 +2=4；lv1 fan×2 A=4、B=6
+  // lv2 split：2=2 ✓ → A-1=3、最高敌 B-1=5
+  assert.deepEqual(st.votes, [3, 5], '牌数相等两败俱伤：A=3 B=5');
+});
+
+test('组合 N5b：split 对照（牌数不等不触发）', () => {
+  const st = runCount(['v121', 'v15', 'v15'], [0, 0, 1]);
+  // 基础 2-1；⑦emotion：A fan +1=3、B fan +1=2；lv1 fan×2 A=4、B=3
+  // lv2 split：2≠1 不触发
+  assert.deepEqual(st.votes, [4, 3], '牌数不等不触发：A=4 B=3');
+});
+
+test('组合 N6：integrity 清廉档案（本方无丑闻且对方有丑闻 → +1⊙）', () => {
+  // v122 integrity 为 post 技能，经 doSettle 结算（rank.update → advance）
+  const st = makeCountState(['v122', 'v01'], [0, 1]);
+  st.votes = [2, 1];
+  st.roundRank = [0, 1];                     // A 第一（供 doSettle 使用）
+  st.seats[1].scandal = 1;                   // B 有丑闻、A 无丑闻 → 触发
+  const money0 = st.seats[0].money;
+  const money1 = st.seats[1].money;
+  st.phase = 'rank';
+  Core.advance(st);                          // rank.update → doSettle → integrity
+  assert.equal(st.seats[0].money, money0 + 1, 'A 清白且对方有丑闻 → +1⊙');
+  assert.equal(st.seats[1].money, money1, 'B 的 ⊙ 不变');
+});
+
+test('组合 N6b：integrity 对照（双方均无丑闻不触发）', () => {
+  const st = makeCountState(['v122', 'v01'], [0, 1]);
+  st.votes = [2, 1];
+  st.roundRank = [0, 1];
+  const money0 = st.seats[0].money;
+  st.phase = 'rank';
+  Core.advance(st);
+  assert.equal(st.seats[0].money, money0, '双方无丑闻 → 不触发');
 });
 
 /* ============================================================

@@ -1,79 +1,84 @@
 /* ===== engine/12-income.js（game-core.js 行 1412-1494）===== */
-  /* ---------------- 分发每轮 ⊙ ---------------- */
-  function beginIncome(state) {
-    state.phase = 'income';
-    const prevRank = state.rankInfo;
-    const hasPrev = prevRank && prevRank.length > 0;
-    const first = hasPrev ? prevRank[0].seat : -1;
-    const last = hasPrev ? prevRank[prevRank.length - 1].seat : -1;
-    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1
-    const base = incomeOf(state.round);                        // 固定 2
-    state.seats.forEach((s, i) => {
-      const pbonus = (s.personality && s.personality.bonus && s.personality.bonus.money) || 0;
-      let amt = base + pbonus;
-      if (!hasPrev) amt += 2;       // 第 1 轮无排名：全体 +4 启动资金
-      else {
-        if (i === first) amt -= 1;  // 领先税：榜首 -1⊙（政治资本消耗）
-        if (i === last) amt += 1;   // 保底酬金：末位 +1⊙（胜诉基金）
-      }
-      // 收入保底：每轮至少 +1⊙（榜首 -1 时也不会白板回合）
-      const pay = Math.max(1, amt);
-      s.money += pay;
-      state.logs.push('💰 【' + s.name + '】发放律师费 +' + pay + '⊙（累计 ' + s.money + '⊙）');
-    });
-    state.logs.push(hasPrev
-      ? '第 ' + state.round + ' 轮结束，发放律师费（榜首 -1⊙ / 末位 +1⊙）' + (tax ? '，连任榜首更换证物架成本 +1' : '')
-      : '第 ' + state.round + ' 轮结束，发放启动酬金 +4⊙');
-    // 轮末：市场未买牌洗回，锁定牌留作下轮
-    state.seats.forEach((s, i) => {
-      s.lastLockedUids = s.lockedUids.slice();
-      const kept = s.market.filter(c => s.lockedUids.indexOf(c.uid) >= 0);
-      const rest = s.market.filter(c => s.lockedUids.indexOf(c.uid) < 0);
-      state.used.push(...rest);
-      s.market = kept.slice();
-      s.lockedUids = [];
-      // 重置每轮状态
-      s.buyDone = false; s.playDone = false; s.eventCount = 0; s.eventPassed = false; s.buyUsed = false;
-      s.refreshUsed = false;
-      s.refreshCost = (tax && i === first) ? 2 : 1;   // 连任恐惧税：榜首下轮刷新起点 +1
-    });
-    state.voteMod = new Array(state.seatCount).fill(0);
-    state.supportBuff = new Array(state.seatCount).fill(0);
+          case 'hailMary': {
+            // 最后一搏：落后 ≥2 且本方铺场 ≥3 → +3（绝境+铺场双条件翻盘）
+            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
+            const ownN = state.row.filter(x => !x.removed && !x._nullified && x.seat === owner).length;
+            if (votes[owner] <= maxOther - 2 && ownN >= 3) votes[owner] += 3;
+            break;
+          }
+          case 'fullChain': {
+            // 证据链完整：本方已亮物证 ≥2 → 本方所有已亮牌 +1（与⑦证据开示轮联动）
+            const eviN = state.row.filter(x => !x.removed && !x._nullified && x.seat === owner
+              && ARCH[x.card.skill] === 'evidence').length;
+            if (eviN >= 2) {
+              state.row.forEach(x => { if (!x.removed && !x._nullified && x.seat === owner) votes[x.seat] += 1; });
+            }
+            break;
+          }
+          case 'gagOrder': {
+            // 禁言令：对方本轮打过 ≥3 张牌 → 最高对方 -2（克制"每轮打 2 张"的激进铺场）
+            const foeMany = state.seats.some((x, j) => j !== owner && x.played && x.played.length >= 3);
+            if (foeMany) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
+            break;
+          }
+          case 'split': {
+            // 民意分裂：双方已亮牌数相等 → 双方最高票玩家各 -1（两败俱伤）
+            const ownN = state.row.filter(x => !x.removed && !x._nullified && x.seat === owner).length;
+            const foeN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
+            if (ownN === foeN) {
+              votes[owner] -= 1;
+              votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            }
+            break;
+          }
+        }
+        state.logs.push('【' + state.seats[owner].name + '】的【' + r.card.name + '】发动技能【' + sk.name + '】');
+        // 账本：本技能对每座造成的票数净变化（逐条记录，供逐票动画）
+        for (let j = 0; j < n; j++) {
+          if (votes[j] !== before[j]) {
+            ledger.push({ kind: 'skill', seat: j, delta: votes[j] - before[j], cardUid: r.card.uid, desc: '【' + r.card.name + '】' + sk.name });
+          }
+        }
+      });
+    }
+    for (let i = 0; i < n; i++) votes[i] = Math.max(0, votes[i]);
+    state.votes = votes;
+    state.countLedger = ledger;   // 前端「逐票结算动画 + 复盘」数据源
+    state.logs.push('审议结果：' + state.seats.map((s, i) => s.name + ' ' + votes[i] + ' 票').join('，'));
+    // 陪审团否决胜利判定：任一玩家获得 3 名陪审员支持 → 立即胜诉（跳出常规轮次）
+    if (state.juryTokens && Math.max(...state.juryTokens) >= 3) {
+      const winner = state.juryTokens.indexOf(Math.max(...state.juryTokens));
+      state.logs.push('陪审团否决！【' + state.seats[winner].name + '】说服 3 名陪审员拒绝适用现有法律——立即宣告胜诉');
+      finishGame(state, { juryNull: true });
+      return;
+    }
+    beginPostEvent(state);
   }
-  function finishGame(state, opts) {
-    opts = opts || {};
-    const n = state.seatCount;
-    state.gameOver = true;
-    // 胜利路径 1：陪审团否决（立即胜诉，已由 doCountContinue 直接触发）
-    if (opts.juryNull) {
-      const winner = (state.juryTokens || []).indexOf(Math.max(...(state.juryTokens || [])));
-      state.winner = winner >= 0 ? winner : 0;
-      state.winType = 'juryNull';
-      state.logs.push('🕊️ 陪审团否决裁定生效：人民拒绝适用恶法');
-      state.logs.push('🏆 ' + state.seats[state.winner].name + ' 胜诉！（陪审团否决）');
-      return;
+  /* 丑闻曝光（舆情事件）：目标玩家声誉腐蚀 +1（上限 5），此后每轮票数 -1 */
+  function applyScandalEffects(state, targetSeat) {
+    if (targetSeat < 0 || targetSeat >= state.seatCount) return;
+    const s = state.seats[targetSeat];
+    s.scandal = Math.min(5, (s.scandal || 0) + 1);
+    state.logs.push('丑闻曝光！【' + s.name + '】声誉受损，丑闻指数 ' + s.scandal + '/5');
+  }
+  /* 票数最高的对方（平票时随机抽签，避免同一目标被连续针对或可预测）
+   * #13 修复：随机源必须用 state.rng（同种子可复现），不能用 Math.random */
+  function highestEnemy(votes, owner, n, rng) {
+    let bv = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (i === owner) continue;
+      if (votes[i] > bv) bv = votes[i];
     }
-    // 胜利路径 2：先例胜利——触发"确立先例"的一方即使票数落后也直接获胜
-    if (state.precedentSeat !== undefined && state.precedentSeat >= 0) {
-      state.winner = state.precedentSeat;
-      state.winType = 'precedent';
-      state.logs.push('⚖️ 先例胜利：虽然票数落后，但【' + state.seats[state.winner].name + '】的辩护已确立判例，后世将以此为准');
-      state.logs.push('🏆 ' + state.seats[state.winner].name + ' 胜诉！（先例胜利）');
-      return;
+    if (bv === -Infinity) return owner;
+    const ties = [];
+    for (let i = 0; i < n; i++) {
+      if (i !== owner && votes[i] === bv) ties.push(i);
     }
-    // 胜利路径 3（默认）：无特殊情况第五轮结算后按照倾向判定胜者
-    // 平衡修复（#48 千局测试发现）：平局不再按座位号偏袒（原 a.seat-b.seat 让座位 0 吃掉 91.9% 平局），
-    // 改用种子 RNG 随机抽签——确定可复现且对所有座位公平。
-    const maxSupport = Math.max(...state.seats.map(s => s.support));
-    const tied = state.seats.filter(s => s.support === maxSupport);
-    if (tied.length > 1) {
-      const pick = tied[Math.floor(state.rng() * tied.length)];
-      state.winner = pick.seat;
-    } else {
-      state.winner = state.seats.find(s => s.support === maxSupport).seat;
-    }
-    state.winType = 'support';
-    state.logs.push('最终陪审团倾向：' + state.seats.map((s, i) => s.name + ' ' + s.support).join('，'));
-    state.logs.push('🏆 ' + state.seats[state.winner].name + ' 胜诉！');
+    return ties.length === 1 ? ties[0] : ties[Math.floor((rng || Math.random)() * ties.length)];
   }
 
+  /* ---------------- 本轮排名 ---------------- */
+  function doRank(state) {
+    state.phase = 'rank';
+    const n = state.seatCount;
+    const info = state.seats.map((s, i) => {

@@ -1,56 +1,69 @@
 /* ===== engine/05-phases.js（game-core.js 行 587-654）===== */
-  /* 起始玩家选择（第 1 轮随机，后续由上轮排名最低者选择） */
-  function beginStarter(state) {
-    if (state.round === 0) {
-      state.round = 1;
-      state.starterPicker = -1;            // 第 1 轮自动随机
-      state.starterChosen = false;
-    } else {
-      const last = state.roundRank[state.roundRank.length - 1];
-      state.starterPicker = (last === undefined) ? -1 : last;
-      state.starterChosen = false;
-      if (state.starterPicker >= 0) {
-        state.logs.push('上轮排名最低的【' + state.seats[state.starterPicker].name + '】选择本轮起始玩家');
+    drawEvent: { label: 'drawEvent', needsInput: () => false, update: (state) => beginVoter(state) },
+    drawVoter: { label: 'drawVoter', needsInput: () => false, update: (state) => beginBuy(state) },
+    buy: {
+      label: 'buy',
+      needsInput: (state, seat) => !state.seats[seat].buyDone,
+      update: (state) => {
+        if (state.seats.every(s => s.buyDone)) beginPlay(state);
       }
-    }
-    state.phase = 'chooseStarter';
-  }
-  function beginRound(state) {
-    state.phase = 'drawEvent';
-    state.turn = state.startingSeat;
-    state.voteMod = new Array(state.seatCount).fill(0);
-    state.supportBuff = new Array(state.seatCount).fill(0);
-    // 抽事件牌：从起始角色开始每人 1 张（状态机照常推进）
-    for (let k = 0; k < state.seatCount; k++) {
-      const s = state.seats[(state.startingSeat + k) % state.seatCount];
-      if (!state.eventDeck.length) state.eventDeck = buildEventDeck(state.rng);
-      s.events.push(state.eventDeck.pop());
-    }
-    state.logs.push('—— 第 ' + state.round + ' 轮 ——');
-  }
-  /* 抽证据（证物架）：保留上轮留证牌，补抽至证物架槽位 */
-  function beginVoter(state) {
-    state.phase = 'drawVoter';
-    state.seats.forEach((s) => {
-      // 上轮锁定的牌保留在市场
-      const kept = s.market.filter(c => s.lastLockedUids.indexOf(c.uid) >= 0);
-      const rest = s.market.filter(c => s.lastLockedUids.indexOf(c.uid) < 0);
-      state.used.push(...rest);
-      s.market = kept.slice();
-      s.lockedUids = [];
-      s.refreshCost = 1; s.refreshUsed = false; s.buyUsed = false;
-      const need = marketSize(s) - s.market.length;
-      for (let i = 0; i < need; i++) {
-        if (!state.deck.length) reshuffle(state);
-        if (!state.deck.length) break;
-        s.market.push(state.deck.pop());
+    },
+    play: {
+      label: 'play',
+      needsInput: (state, seat) => state.turn === seat && !state.seats[seat].playDone,
+      update: (state) => {
+        // 轮流出牌：每回合可打 1-2 张，A→B→C→A→B→C 循环轮转；每轮必须出牌（仅最后一位律师可放弃）
+        if (state.seats.every(s => s.playDone || s.hand.length === 0)) { beginReveal(state); return; }
+        const cur = state.seats[state.turn];
+        if (!cur || cur.playDone || cur.hand.length === 0) {
+          if (cur && cur.hand.length === 0) cur.playDone = true;
+          const next = nextPlaySeat(state);
+          if (next < 0) { beginReveal(state); return; }
+          state.playTurn = next; state.turn = next;
+          state.logs.push(state.seats[next].name + ' 请暗置提交 1-2 份证据（每轮至少 1 张）');
+        }
       }
-    });
-  }
-  function beginBuy(state) {
-    state.phase = 'buy';
-    state.turn = state.startingSeat;
-    state.seats.forEach(s => { s.buyDone = false; });
-  }
-
-  /* ---------------- 购买阶段 ---------------- */
+    },
+    reveal: {
+      label: 'reveal',
+      needsInput: (state, seat) => !!(state.revealPending && state.revealPending.owner === seat),
+      update: (state) => {
+        // 逐张亮出：无待选目标时继续亮出下一张（恐怖分子按亮出顺序发动）
+        if (!state.revealPending) revealNext(state);
+      }
+    },
+    preEvent: {
+      label: 'preEvent',
+      needsInput: (state, seat) => state.eventTurnSeat === seat,
+      update: (state) => {
+        if (allEventsDone(state)) { doCount(state); }
+      }
+    },
+    count: {
+      label: 'count',
+      needsInput: (state, seat) => !!(state.swapPending && state.swapPending.owner === seat),
+      update: (state) => {
+        // 政治操盘（换位）等待玩家选择目标则暂停；全部换位完成后继续计票
+        if (state.swapPending) return;
+        doCountContinue(state);
+      }
+    },
+    postEvent: {
+      label: 'postEvent',
+      needsInput: (state, seat) => state.eventTurnSeat === seat,
+      update: (state) => {
+        if (allEventsDone(state)) doRank(state);
+      }
+    },
+    rank: { label: 'rank', needsInput: () => false, update: (state) => doSettle(state) },
+    settle: { label: 'settle', needsInput: () => false, update: (state) => beginDiscard(state) },
+    discard: {
+      label: 'discard',
+      needsInput: (state, seat) => state.discardSeat === seat && !state.seats[seat].keepDone,
+      update: (state) => {
+        if (state.discardSeat < 0) { beginIncome(state); }
+      }
+    },
+    income: {
+      label: 'income',
+      needsInput: () => false,

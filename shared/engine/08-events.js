@@ -1,4 +1,83 @@
 /* ===== engine/08-events.js（game-core.js 行 865-998）===== */
+        return; // 等待玩家选择目标
+      }
+      state.logs.push('【' + state.seats[r.seat].name + '】的恐怖分子无目标可炸');
+    }
+    state.revealIndex++;
+  }
+  /* 证据排除选择目标（被移除的牌进档案，不洗入牌堆） */
+  function resolveTerrorist(state, targetUid) {
+    const p = state.revealPending;
+    if (!p) return { ok: false, msg: '没有待发动的恐怖分子' };
+    const target = state.row.find(r => r.card.uid === targetUid);
+    if (!target || target.removed || !target.revealed) return { ok: false, msg: '目标不存在或未亮出' };
+    if (target.seat === p.owner) return { ok: false, msg: '不能炸自己的牌' };
+    target.removed = true;
+    state.grave.push(target.card);
+    state.logs.push('【' + state.seats[p.owner].name + '】的证据排除作废了【' + state.seats[target.seat].name + '】的【' + target.card.name + '】（进档案）');
+    state.revealPending = null;
+    state.revealIndex++; // 跳过恐怖分子这张，由 advance('reveal') 继续亮下一张
+    return { ok: true };
+  }
+
+  /* ---------------- 环形桌邻位（行首尾相邻：第 0 张的左边 = 最后一张） ---------------- */
+  function rowNeighbor(state, idx, dir) {
+    const n = state.row.length;
+    if (n <= 1) return null;
+    return state.row[(idx + dir + n) % n];
+  }
+  function swapRow(state, a, b) {
+    const t = state.row[a];
+    state.row[a] = state.row[b];
+    state.row[b] = t;
+  }
+  /* 换位技能结算（计票前）：shift 自动换位（每张牌只换一次）；swap 需要玩家选择目标（swapPending） */
+  function applyMoves(state) {
+    // 1. 自动换位：合纵左移 / 连横右移（从左到右，与相邻牌互换；每张只执行一次防死循环）
+    for (let i = 0; i < state.row.length; i++) {
+      const r = state.row[i];
+      if (r.removed || r._nullified || r._moved) continue;
+      if (r.card.skill === 'shiftLeft' || r.card.skill === 'shiftRight') {
+        const dir = r.card.skill === 'shiftLeft' ? -1 : 1;
+        const nb = rowNeighbor(state, i, dir);
+        if (nb && !nb.removed && nb.card.uid !== r.card.uid && !nb._moved) {
+          const j = state.row.indexOf(nb);
+          swapRow(state, i, j);
+          r._moved = true;
+          state.logs.push('【' + state.seats[r.seat].name + '】的【' + r.card.name + '】与【' + nb.card.name + '】互换位置');
+          i = -1; // 重扫（位置已变化）
+        }
+      }
+    }
+    // 2. 政治操盘：需玩家选择目标（每张只处理一次）
+    for (let i = 0; i < state.row.length; i++) {
+      const r = state.row[i];
+      if (r.removed || r._nullified || r._moved || r.card.skill !== 'swap') continue;
+      const candidates = state.row.filter(x => !x.removed && x.card.uid !== r.card.uid);
+      if (!candidates.length) continue;
+      state.swapPending = { owner: r.seat, cardUid: r.card.uid, candidates: candidates.map(x => x.card.uid) };
+      state.logs.push('【' + state.seats[r.seat].name + '】的【程序动议】发动：请选择 1 张其他证据互换位置');
+      return false; // 暂停计票，等待选择
+    }
+    return true;
+  }
+  function resolveSwap(state, targetUid) {
+    const p = state.swapPending;
+    if (!p) return { ok: false, msg: '没有待处理的换位' };
+    const t = state.row.find(x => x.card.uid === targetUid);
+    if (!t || t.removed) return { ok: false, msg: '目标不存在' };
+    if (t.card.uid === p.cardUid) return { ok: false, msg: '不能和自己互换' };
+    const a = state.row.findIndex(x => x.card.uid === p.cardUid);
+    const b = state.row.indexOf(t);
+    swapRow(state, a, b);
+    state.row[b]._moved = true; // 这张政治操盘已发动，不再重复
+    state.logs.push('【' + state.seats[p.owner].name + '】的【程序动议】将【' + state.row[b].card.name + '】与【' + t.card.name + '】互换位置');
+    state.swapPending = null;
+    // 若还有下一张政治操盘则继续等待，否则由 advance('count') 继续计票
+    if (!applyMoves(state)) return { ok: true, msg: '继续选择下一个换位目标' };
+    return { ok: true };
+  }
+
   /* ---------------- 事件牌阶段（计票前 / 计票后） ---------------- */
   function beginPreEvent(state) {
     state.phase = 'preEvent';
@@ -54,55 +133,3 @@
     state.grave.push(ev);   // 已打出的事件牌进档案（cardInGlobal 已查 grave，快照恢复时不会复活）
     s.eventCount++;
     s.stats.eventsPlayed++;
-    const tgt = ev.target === 'enemy' ? targetSeat : (ev.target === 'self' ? s.seat : -1);
-    if (ev.target === 'enemy') {
-      state.logs.push(s.name + ' 打出事件【' + ev.name + '】→ ' + state.seats[tgt].name);
-    } else {
-      state.logs.push(s.name + ' 打出事件【' + ev.name + '】');
-    }
-    applyEventEff(state, s, ev, tgt);
-    // 推进到下一个可行动者（多轮循环，直至所有角色都选择不继续）
-    const next = nextEventSeat(state);
-    if (next >= 0) { state.eventTurnSeat = next; state.turn = next; state.logs.push('轮到 ' + state.seats[next].name + ' 选择是否打出事件牌'); }
-    return { ok: true };
-  }
-  function applyEventEff(state, s, ev, tgt) {
-    const e = ev.eff;
-    const buff = (s.char && s.char.skill.type === 'eventBuff' && e.val > 0) ? s.char.skill.v : 0;
-    if (state.phase === 'preEvent') {
-      // 庭审前：修改票数修正 / 全局公共议题
-      if (e.type === 'vote') {
-        if (e.val > 0) state.voteMod[s.seat] += e.val + buff;
-        else {
-          state.voteMod[tgt] += e.val;
-          // 丑闻类事件（舆论风波/惊天丑闻）直接腐蚀对手声誉
-          if (ev.id === 'e04' || ev.id === 'e06') applyScandalEffects(state, tgt);
-        }
-      } else if (e.type === 'scandalAll') {
-        // 全局丑闻：所有玩家丑闻值 +val
-        for (let i = 0; i < state.seatCount; i++) applyScandalEffects(state, i);
-        state.logs.push('😱 公共议题【' + ev.name + '】：所有玩家丑闻值 +' + (e.val || 1));
-      }
-    } else {
-      // 计票后
-      if (e.type === 'money') {
-        if (e.val > 0) s.money += e.val + buff;
-        else state.seats[tgt].money = Math.max(0, state.seats[tgt].money + e.val);
-      } else if (e.type === 'rewardBuff') {
-        state.supportBuff[s.seat] += e.val + buff;
-      } else if (e.type === 'support') {
-        state.seats[tgt].support = Math.max(0, state.seats[tgt].support + e.val);
-      } else if (e.type === 'scandalAll') {
-        for (let i = 0; i < state.seatCount; i++) applyScandalEffects(state, i);
-        state.logs.push('😱 公共议题【' + ev.name + '】：所有玩家丑闻值 +' + (e.val || 1));
-      }
-    }
-  }
-  function passEvent(state, s) {
-    s.eventPassed = true;
-    state.logs.push(s.name + ' 选择不打出事件牌');
-    const next = nextEventSeat(state);
-    if (next >= 0) { state.eventTurnSeat = next; state.turn = next; state.logs.push('轮到 ' + state.seats[next].name + ' 选择是否打出事件牌'); }
-    return { ok: true };
-  }
-

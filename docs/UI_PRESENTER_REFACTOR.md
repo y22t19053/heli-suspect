@@ -97,7 +97,7 @@ const idx = vm.hud.phaseIdx;
 const next = vm.hud.nextStep;           // {0:阶段id, 1:中文名} 或 null
 ```
 同理替换：`renderPanels` → `vm.seats[]`（含 `acting/leading/scandal` 已算好）、
-`renderMarket` → `vm.market`、`renderLogs` → `vm.meta`、连任 👑 徽章 → `vm.hud.leader === i`、
+`renderMarket` → `vm.market`、`renderLogs` → `vm.meta`、连任 徽章 → `vm.hud.leader === i`、
 支持度轨道 → `vm.hud.supportBar`、任务指引 → `vm.myTurn`。
 每替换一个函数，跑一次静态检查 + 用户手动对局验证，再继续下一个。
 
@@ -140,20 +140,20 @@ const next = vm.hud.nextStep;           // {0:阶段id, 1:中文名} 或 null
 
 | 函数 | 原两端实现 | 收敛后 | 状态 |
 |---|---|---|---|
-| `RenderCore.renderScene(env)` | renderGame 主流程（清屏+背景+六段+尾部） | 统一调度骨架 | ✅ |
-| `RenderCore.drawGoalGuide(env)` | drawGoalGuide（逐字同构） | 单一事实源 | ✅ |
-| `RenderCore.updateHoverAnim(env)` | updateHoverAnim（逐字同构） | 单一事实源 | ✅ |
-| `RenderCore.hoverAlpha(env)` | hoverAlpha（逐字同构） | 单一事实源 | ✅ |
-| `RenderCore.drawHoverTooltip(env)` | drawHoverTooltip（逐字同构） | 单一事实源 | ✅ |
-| `RenderCore.myTurnOf(env)` | myTurn / myTurnSP（逐字同构） | 单一事实源 | ✅ |
-| `RenderCore.currentActSeatOf(env)` | currentActSeat（逐字同构） | 单一事实源（统一含 chooseStarter） | ✅ |
-| `RenderCore.keepMaxOf(env)` | keepMax（逐字同构） | 单一事实源（观战者恒 0） | ✅ |
-| `RenderCore.renderRowArea(env)` | renderRowArea（同构骨架+少量差异） | 单一事实源（差异经 copy/注入表达） | ✅ |
-| `RenderCore.renderHudOf(env)` | renderHud（倒计时/观战 vs 轮次进度条/排名横幅） | 单一事实源（差异经 copy 注入） | ✅ |
-| `RenderCore.renderPanelsOf(env)` | renderPanels（panelFlow vs 静态坐标） | 单一事实源（以联机流式 panelFlow 为基底，差异经 copy/注入） | ✅ |
-| `RenderCore._panelFlowOf(env,…)` | panelFlow（流式排布私有子块） | 单一事实源 | ✅ |
-| `RenderCore.renderBottomOf(env)` | renderBottom（按钮机制/手牌抽屉） | 单一事实源（骨架合一，子块/按钮体系经 env 注入） | ✅ |
-| `RenderCore._renderMarketOf/_renderEventsOf/_renderHandOf(env,…)` | renderMarket/renderEvents/renderHand 子块 | 单一事实源 | ✅ |
+| `RenderCore.renderScene(env)` | renderGame 主流程（清屏+背景+六段+尾部） | 统一调度骨架 | ✔ |
+| `RenderCore.drawGoalGuide(env)` | drawGoalGuide（逐字同构） | 单一事实源 | ✔ |
+| `RenderCore.updateHoverAnim(env)` | updateHoverAnim（逐字同构） | 单一事实源 | ✔ |
+| `RenderCore.hoverAlpha(env)` | hoverAlpha（逐字同构） | 单一事实源 | ✔ |
+| `RenderCore.drawHoverTooltip(env)` | drawHoverTooltip（逐字同构） | 单一事实源 | ✔ |
+| `RenderCore.myTurnOf(env)` | myTurn / myTurnSP（逐字同构） | 单一事实源 | ✔ |
+| `RenderCore.currentActSeatOf(env)` | currentActSeat（逐字同构） | 单一事实源（统一含 chooseStarter） | ✔ |
+| `RenderCore.keepMaxOf(env)` | keepMax（逐字同构） | 单一事实源（观战者恒 0） | ✔ |
+| `RenderCore.renderRowArea(env)` | renderRowArea（同构骨架+少量差异） | 单一事实源（差异经 copy/注入表达） | ✔ |
+| `RenderCore.renderHudOf(env)` | renderHud（倒计时/观战 vs 轮次进度条/排名横幅） | 单一事实源（差异经 copy 注入） | ✔ |
+| `RenderCore.renderPanelsOf(env)` | renderPanels（panelFlow vs 静态坐标） | 单一事实源（以联机流式 panelFlow 为基底，差异经 copy/注入） | ✔ |
+| `RenderCore._panelFlowOf(env,…)` | panelFlow（流式排布私有子块） | 单一事实源 | ✔ |
+| `RenderCore.renderBottomOf(env)` | renderBottom（按钮机制/手牌抽屉） | 单一事实源（骨架合一，子块/按钮体系经 env 注入） | ✔ |
+| `RenderCore._renderMarketOf/_renderEventsOf/_renderHandOf(env,…)` | renderMarket/renderEvents/renderHand 子块 | 单一事实源 | ✔ |
 
 **按设计保留双端本地实现**（差异大，经 renderScene 的 env 注入调用，属设计收口非未完成项）：
 `renderLogs`（右上角浮动面板 vs 贴底栏）、`renderActionButtons`（按钮体系差异大）、

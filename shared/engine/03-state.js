@@ -1,4 +1,56 @@
 /* ===== engine/03-state.js（game-core.js 行 364-490）===== */
+    { id: 'e38', name: '桃色丑闻案',    lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
+    { id: 'e40', name: '计票争议案',    lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
+    { id: 'e41', name: '水门案',        lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
+    /* ============ 纳什均衡事件包（e42+：反制领先/普惠/经济） ============ */
+    { id: 'e42', name: '庭审直播',      lv: 2, timing: 'post', target: 'auto', eff: { type: 'leadSupport', val: 1 },            desc: '庭审后：本轮票数最高的玩家倾向 -1（树大招风）' },
+    { id: 'e43', name: '休庭补助',      lv: 1, timing: 'post', target: 'auto', eff: { type: 'moneyAll', val: 1 },               desc: '庭审后：所有玩家 +1⊙（普惠福利）' },
+    { id: 'e44', name: '舆论转向',      lv: 2, timing: 'post', target: 'auto', eff: { type: 'richTax', val: 1 },                desc: '庭审后：金钱最多的玩家 -1⊙（首富被征税）' },
+    { id: 'e45', name: '证人保护',      lv: 1, timing: 'post', target: 'self',  eff: { type: 'poorAid', val: 1 },               desc: '庭审后：若本方金钱最少，+1⊙（扶弱济困）' }
+  ];
+
+  /* 事件牌按轮次解锁：轮1→①；轮2~3→①②；轮4+→①②③ */
+  function eventLvMax(round) { return round <= 1 ? 1 : (round <= 3 ? 2 : 3); }
+  /* ⑦ 庭审阶段克制权重：5 轮庭审节奏映射到克制三角
+   * 第 1 轮开庭陈述 → 情感型 +1；第 2~3 轮证据开示 → 物证型 +1；
+   * 第 4 轮交叉询问 → 攻击型 +1；第 5 轮起结案陈词 → 情感型 +1 */
+  function phaseArchOf(round) {
+    if (round <= 1) return { arch: 'emotion', label: '开庭陈述', tip: '情感型证据 +1 票' };
+    if (round <= 3) return { arch: 'evidence', label: '证据开示', tip: '物证型证据 +1 票' };
+    if (round <= 4) return { arch: 'attack', label: '交叉询问', tip: '攻击型证据 +1 票' };
+    return { arch: 'emotion', label: '结案陈词', tip: '情感型证据 +1 票' };
+  }
+  /* 每轮结束发放的 ⊙（卡牌降价后同步加钱，保证买得起更多牌）
+   * 阶段 C 改造：收入随轮次递增——第 1~3 轮 2⊙（前期克制），第 4 轮起 3⊙（后期资金加速，弱势方有翻盘机会） */
+  function incomeOf(round) { return round >= 4 ? 3 : 2; }
+  /* 支持度奖励 */
+  function rewardOf(round) { return round <= 3 ? 2 : (round === 4 ? 3 : 4); }
+  /* 市场槽位数（初始 4，组织能手 +1） */
+  function marketSize(s) { return 4 + ((s.char && s.char.skill.type === 'drawPlus') ? s.char.skill.v : 0); }
+  /* 购买价（全局 -1 降价；铁腕大状再 -1）
+   * 阶段 C 改造——供需定价：
+   *   ① 市场内同技能卡 ≥2 张 → 该技能卡 +1⊙（供不应求溢价，反制"只买同一种技能"的垄断套路）
+   *   ② 第 4 轮起市场清仓 -1⊙（后期甩卖，加速资金流转，给落后方抄底机会） */
+  function buyCostOf(s, card) {
+    let cost = Math.max(1, card.cost - 1 - ((s.char && s.char.skill.type === 'buyDiscount') ? s.char.skill.v : 0));
+    if (card.skill && s.market) {
+      const same = s.market.filter(c => c.skill === card.skill && c.uid !== card.uid).length;
+      if (same >= 1) cost += 1;             // 同技能已有 1 张 → +1⊙（稀缺溢价）
+    }
+    if (s.round && s.round >= 4) cost = Math.max(1, cost - 1);   // 后期清仓 -1⊙
+    return cost;
+  }
+  /* 刷新成本（幕后金主 -1；外交官每轮首次免费）
+   * 阶段 C 改造：刷新成本封顶 3⊙——1→2→3→3（不再无限递增，避免滚雪球到买不起） */
+  function refreshCostOf(s) {
+    let c = Math.min(3, s.refreshCost);
+    if (s.char && s.char.skill.type === 'refreshDiscount') c = Math.max(0, c - s.char.skill.v);
+    if (s.char && s.char.skill.type === 'firstRefreshFree' && !s.refreshUsed && !s.buyUsed) c = 0;
+    return c;
+  }
+  /* 锁定上限（务实派 2 张） */
+  function lockMax(s) { return 1 + ((s.char && s.char.skill.type === 'lockPlus') ? s.char.skill.v : 0); }
+
   /* ---------------- 状态构建 ---------------- */
   function makeSeat(i, name, isAI, rng) {
     return {
@@ -7,6 +59,7 @@
       side: null,              // 庭审角色：'prosecutor' 检方 / 'defense' 辩护方（开局分配）
       personality: null,       // AI 人格（人类为 null；AI 从 AI_PERSONALITIES 分配）
       money: 4, support: 0,          // 起始 ⊙ = 4（卡价压缩后 4⊙ 起步；倾向累计）
+      round: 1,                      // 当前轮次（阶段 C：供需定价按轮次折扣需要）
       scandal: 0,                    // 丑闻指数（声誉腐蚀，0~5）
       hand: [], market: [], events: [], played: [],   // 手牌 / 市场 / 事件手牌 / 本轮已亮出牌
       lockedUids: [], lastLockedUids: [],             // 本轮锁定（下轮保留）/ 上轮锁定
@@ -73,53 +126,3 @@
       seats.forEach((s, i) => { s.side = shuffled[i]; });
     }
     const state = {
-      version: 1, seatCount,
-      seed,                             // 种子码（可复现；分享战绩用，超级更新#13）
-      seedRaw,                          // 用户输入的原始种子码字符串（无则 null；显示/分享用 #13 修复）
-      rng,                              // 随机源（抽签质证等随机技能用；测试可注入种子）
-      phase: 'pickChar',
-      round: 0,                // 当前轮次（1 起）
-      startingSeat: 0,         // 本轮起始角色
-      turn: 0,                 // 当前行动座位
-      seats,
-      draftCandidates: [],     // 每人 3 张候选角色
-      deck: buildDeck(rng),
-      eventDeck: buildEventDeck(rng),
-      used: [],                // 洗回池（行牌/整理/未买证物架牌）
-      grave: [],               // 档案（【移除】的牌，不洗入牌堆）
-      row: [],                 // 中央亮出行 [{seat, card, revealed}]
-      votes: [],               // 本轮计票结果（含事件修正）
-      voteMod: [],             // 计票前事件修正
-      roundRank: [],           // 本轮排名（高→低）
-      rankInfo: [],            // [{seat, votes, power}]
-      supportReward: 0,
-      supportBuff: [],         // 计票后事件：若第一额外奖励
-      starterPicker: -1,       // 需要选择起始玩家的座位（-1 = 第 1 轮自动随机）
-      starterChosen: false,    // 起始玩家是否已被选定（防止随机覆盖）
-      leaderStreak: 0,         // 连续排名第一的轮数（恐惧税用）
-      prevFirst: -1,           // 上轮第一名座位（用于连任判断）
-      revealIndex: 0,          // 逐张亮出进度（当前亮出到 row 第几张）
-      revealPending: null,     // {seat, cardUid} 等待恐怖分子选目标
-      swapPending: null,       // {owner, cardUid, candidates} 等待选换位目标（政治操盘）
-      eventTurnSeat: -1,       // 事件阶段当前轮到
-      eventTargetPending: null,// {seat, eventUid} 等待选事件目标
-      discardSeat: -1,         // 整理阶段当前轮到
-      precedentSeat: -1,       // 触发"确立先例"的座位（终局先例胜利判定）
-      juryTokens: new Array(seatCount).fill(0),  // 各玩家陪审员支持（集满 3 立即胜诉）
-      winType: 'support',      // 胜利类型：support / precedent / juryNull
-      winner: null, gameOver: false,
-      logs: []
-    };
-    // 每人 3 张候选角色（同时亮出）
-    const pool = shuffle(CHARACTERS.slice(), rng);
-    for (let i = 0; i < seatCount; i++) {
-      const cand = shuffle(CHARACTERS.slice(), rng);
-      state.draftCandidates.push(cand.slice(0, 3));
-    }
-    void pool;
-    state.votes = new Array(seatCount).fill(0);
-    state.voteMod = new Array(seatCount).fill(0);
-    state.supportBuff = new Array(seatCount).fill(0);
-    return state;
-  }
-

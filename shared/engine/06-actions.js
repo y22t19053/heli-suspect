@@ -1,4 +1,83 @@
 /* ===== engine/06-actions.js（game-core.js 行 655-761）===== */
+      update: (state) => {
+        // 发 ⊙ 后进入下一轮或结束（P1-4 快速模式：roundsLimit 可覆盖默认 5 轮）
+        const limit = (state && state.roundsLimit) || 5;
+        if (state.round >= limit) {
+          state.phase = 'gameover';
+          finishGame(state);
+        } else {
+          state.round++;
+          beginStarter(state);
+        }
+      }
+    }
+  };
+
+  /* 阶段推进：查表驱动。签名保持不变（服务端 pumpAutoAdvance/forceSkip 直调）。 */
+  function advance(state) {
+    if (state.gameOver) { state.version = (state.version || 0) + 1; return; }
+    const def = PHASES[state.phase];
+    if (def && def.update) def.update(state);
+    state.version = (state.version || 0) + 1;
+  }
+
+  /* 起始玩家选择（第 1 轮随机，后续由上轮排名最低者选择） */
+  function beginStarter(state) {
+    if (state.round === 0) {
+      state.round = 1;
+      state.starterPicker = -1;            // 第 1 轮自动随机
+      state.starterChosen = false;
+    } else {
+      const last = state.roundRank[state.roundRank.length - 1];
+      state.starterPicker = (last === undefined) ? -1 : last;
+      state.starterChosen = false;
+      if (state.starterPicker >= 0) {
+        state.logs.push('上轮排名最低的【' + state.seats[state.starterPicker].name + '】选择本轮起始玩家');
+      }
+    }
+    state.phase = 'chooseStarter';
+  }
+  function beginRound(state) {
+    state.phase = 'drawEvent';
+    state.turn = state.startingSeat;
+    state.voteMod = new Array(state.seatCount).fill(0);
+    state.supportBuff = new Array(state.seatCount).fill(0);
+    // 阶段 C：同步轮次到每个座位（供需定价按轮次折扣）
+    state.seats.forEach(s => { s.round = state.round; });
+    // 抽事件牌：从起始角色开始每人 1 张（状态机照常推进）
+    for (let k = 0; k < state.seatCount; k++) {
+      const s = state.seats[(state.startingSeat + k) % state.seatCount];
+      if (!state.eventDeck.length) state.eventDeck = buildEventDeck(state.rng);
+      s.events.push(state.eventDeck.pop());
+    }
+    state.logs.push('—— 第 ' + state.round + ' 轮 · 【' + phaseArchOf(state.round).label + '】：' + phaseArchOf(state.round).tip + ' ——');
+  }
+  /* 抽证据（证物架）：保留上轮留证牌，补抽至证物架槽位 */
+  function beginVoter(state) {
+    state.phase = 'drawVoter';
+    state.seats.forEach((s) => {
+      // 上轮锁定的牌保留在市场
+      const kept = s.market.filter(c => s.lastLockedUids.indexOf(c.uid) >= 0);
+      const rest = s.market.filter(c => s.lastLockedUids.indexOf(c.uid) < 0);
+      state.used.push(...rest);
+      s.market = kept.slice();
+      s.lockedUids = [];
+      s.refreshCost = 1; s.refreshUsed = false; s.buyUsed = false;
+      const need = marketSize(s) - s.market.length;
+      for (let i = 0; i < need; i++) {
+        if (!state.deck.length) reshuffle(state);
+        if (!state.deck.length) break;
+        s.market.push(state.deck.pop());
+      }
+    });
+  }
+  function beginBuy(state) {
+    state.phase = 'buy';
+    state.turn = state.startingSeat;
+    state.seats.forEach(s => { s.buyDone = false; });
+  }
+
+  /* ---------------- 购买阶段 ---------------- */
   function buyCard(state, s, uid) {
     const card = s.market.find(c => c.uid === uid);
     if (!card) return { ok: false, msg: '该牌不在市场中' };
@@ -27,69 +106,3 @@
     const cost = refreshCostOf(s);
     if (s.money < cost) return { ok: false, msg: '⊙ 不足（换证需 ' + cost + '⊙）' };
     s.money -= cost; s.refreshUsed = true;
-    s.refreshCost++;
-    const kept = s.market.filter(c => s.lockedUids.indexOf(c.uid) >= 0);
-    const rest = s.market.filter(c => s.lockedUids.indexOf(c.uid) < 0);
-    state.used.push(...rest);
-    s.market = kept.slice();
-    while (s.market.length < marketSize(s)) {
-      if (!state.deck.length) reshuffle(state);
-      s.market.push(state.deck.pop());
-    }
-    return { ok: true, msg: s.name + ' 更换证物架（-' + cost + '⊙，下次 ' + s.refreshCost + '⊙）' };
-  }
-  function reshuffle(state) {
-    if (state.used.length) { state.deck = shuffle(state.used, state.rng); state.used = []; }
-  }
-
-  /* ---------------- 出牌阶段（轮流 1 张：A→B→C→A→B→C 循环，行首尾相邻成环桌） ---------------- */
-  function beginPlay(state) {
-    state.phase = 'play';
-    state.seats.forEach(s => { s.playDone = false; });
-    state.playTurn = state.startingSeat;
-    state.playLastSeat = -1;
-    state.row = [];
-    state.turn = state.playTurn;
-    state.logs.push('举证阶段：' + state.seats[state.playTurn].name + ' 请暗置提交 1 份证据（或放弃）');
-  }
-  /* 下一个可行动座位（从当前座位之后按座位顺序循环，跳过已放弃/无牌者） */
-  function nextPlaySeat(state) {
-    const n = state.seatCount;
-    for (let k = 1; k <= n; k++) {
-      const seat = (state.playTurn + k) % n;
-      const s = state.seats[seat];
-      if (!s.playDone && s.hand.length > 0) return seat;
-    }
-    return -1;
-  }
-  /* 每回合只能暗置打出 1 张；打出后轮转到下一个可行动者（自己还有牌则下次轮到自己） */
-  function playCards(state, s, uids) {
-    if (state.phase !== 'play') return { ok: false, msg: '当前不是举证阶段' };
-    if (state.turn !== s.seat) return { ok: false, msg: '还没轮到你' };
-    if (s.playDone) return { ok: false, msg: '已放弃举证' };
-    if (!uids || uids.length !== 1) return { ok: false, msg: '每回合只能暗置提交 1 份证据' };
-    const card = s.hand.find(c => c.uid === uids[0]);
-    if (!card) return { ok: false, msg: '手牌不存在' };
-    s.hand = s.hand.filter(x => x !== card);
-    state.row.push({ seat: s.seat, card: card, revealed: false });
-    s.played.push(card);
-    s.stats.playedCards++;
-    state.logs.push(s.name + ' 暗置提交 1 份证据');
-    // 轮转：还有手牌则轮到下一个可行动者（若只剩自己则继续轮到自己）
-    if (s.hand.length > 0) {
-      const next = nextPlaySeat(state);
-      state.playTurn = next; state.turn = next;
-      if (next === s.seat) state.logs.push('轮到 ' + s.name + ' 继续举证（或放弃）');
-      else state.logs.push('轮到 ' + state.seats[next].name + ' 举证');
-    }
-    return { ok: true };
-  }
-  /* 任何轮到的玩家都可放弃出牌（不再要求"最后一名"） */
-  function finishPlay(state, s) {
-    if (state.phase !== 'play' || state.turn !== s.seat || s.playDone) return { ok: false, msg: '当前不能放弃举证' };
-    s.playDone = true;
-    state.logs.push(s.name + ' 放弃举证');
-    return { ok: true };
-  }
-
-  /* ---------------- 亮出阶段（从左到右逐张亮出，恐怖分子按亮出顺序发动） ---------------- */

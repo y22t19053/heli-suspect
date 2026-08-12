@@ -82,7 +82,8 @@ function keepMaxOf(seatView) {
   return 2 + ((sk && sk.type === 'keepPlus') ? sk.v : 0);
 }
 /* 从当前状态一路推进到 discard（或 gameover）：沿途处理人类 0 号的所有可选行动——
- * play 轮转轮到 0 → finishPlay；reveal 恐怖分子选目标；preEvent/postEvent → passEvent；
+ * play 轮转轮到 0 → 出 1 张牌（⑩ 每轮必须出牌，非最后一位律师不可 finishPlay；
+ *   无手牌则由 advance 自动置 playDone）；reveal 恐怖分子选目标；preEvent/postEvent → passEvent；
  * count 政治操盘选目标。AI 座位由服务器自动处理，无需测试干预。
  * 原因：每轮每人发 1 张事件牌，seat 0 可能拿到可用的 pre/post 事件而必须行动；
  * 若不做任何操作会等满 SEAT_TIMEOUT_MS(30s) 才被 AI 接管，测试等 discard 会超时。 */
@@ -90,7 +91,22 @@ async function driveToDiscard(A, v, max = 40) {
   let g = 0;
   while (!['discard', 'gameover'].includes(v.phase) && g++ < max) {
     if (v.phase === 'play' && v.turn === 0 && !v.seats[0].playDone) {
-      v = await myAction(A, v, { type: 'finishPlay' });
+      const hand = v.seats[0].hand || [];
+      if (!hand.length) {
+        v = await waitState(A, vv => vv.version > v.version, 15000);
+        continue;
+      }
+      // ⑩ 每轮必须出牌：非最后一位有手牌者必须出 1 张；最后一位可 finishPlay（保留手牌）
+      // 注意：服务器隐藏非我方手牌（hand=null），因此用 playDone 判断（AI 手牌空时 advance 会置 playDone）
+      const isLast = !v.seats.some(x => x.seat !== 0 && !x.playDone);
+      if (isLast) {
+        v = await myAction(A, v, { type: 'finishPlay' });
+      } else {
+        v = await myAction(A, v, { type: 'playCards', uids: [hand[0].uid] });
+      }
+    } else if (v.phase === 'chooseStarter' && v.starterPicker === 0 && !v.starterChosen) {
+      // 第 2 轮起：排名最低者（可能轮到自己）选择起始玩家 → 直接选自己
+      v = await myAction(A, v, { type: 'pickStarter', starterSeat: 0 });
     } else if (v.phase === 'reveal' && v.revealPending && v.revealPending.owner === 0) {
       const tgt = (v.row || []).find(r => r.revealed && r.seat !== 0 && !r.removed);
       v = await myAction(A, v, { type: 'terroristTarget', targetUid: tgt ? tgt.card.uid : v.revealPending.cardUid });
@@ -123,29 +139,45 @@ test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，�
   v = await myAction(A, v, { type: 'pickChar', charId: v.draftCandidates[0].id });
   v = await waitState(A, vv => vv.phase === 'buy');
   // buy 初始手牌为 0（beginBuy 不发牌，手牌靠买证/技能/事件获得）：
-  // 买一张可负担的证，确保有手牌可验证「断线恢复不丢牌」
-  {
+  // 最大化手牌（买最便宜，买不动再刷新，目标 3 张）——保证 discard 阶段手牌 > keepMax
+  // 触发人类弃牌（否则手牌 ≤ keepMax 时 discard 自动过，driveToDiscard 会一路冲到下一轮）
+  let guard = 0;
+  while (guard++ < 12) {
     const seat = v.seats[0];
-    const cand = (seat.market || []).find(c => Core.buyCostOf(seat, c) <= seat.money);
-    if (cand) v = await myAction(A, v, { type: 'buyCard', uid: cand.uid });
+    const afford = (seat.market || []).filter(c => Core.buyCostOf(seat, c) <= seat.money)
+      .sort((a, b) => Core.buyCostOf(seat, a) - Core.buyCostOf(seat, b));
+    if (afford.length) { v = await myAction(A, v, { type: 'buyCard', uid: afford[0].uid }); continue; }
+    if (guard < 10 && seat.money >= 1 && Core.refreshCostOf(seat) <= seat.money) {
+      const rp = waitStateP(A, vv => vv.version > v.version);
+      const rc = await emitAck(A, 'action', { type: 'refreshMarket' });
+      if (!rc.ok) break;
+      v = await rp;
+      continue;
+    }
+    break;
   }
-  // 记录断线时私有资源
-  const h0 = (v.seats[0].hand || []).map(c => c.uid);
+  // 记录断线时私有资源（市场/金钱 buy 后与掉线时一致，直接记录；手牌需等 driveToDiscard 后再记）
   const m0 = (v.seats[0].market || []).map(c => c.uid);
   const money0 = v.seats[0].money;
-  assert.ok(h0.length >= 1, '买证后应有手牌，实际 ' + h0.length);
   assert.ok(m0.length >= 1, 'buy 阶段应有市场，实际 ' + m0.length);
+  const keepMax0 = keepMaxOf(v.seats[0]);
 
   // 保守托管基准：不买不锁不刷新，直接 endBuy
   v = await myAction(A, v, { type: 'endBuy' });
-  // 一路推进到 discard：沿途处理人类 0 号在 play/reveal/事件/换位阶段的可选行动
+  // 一路推进到 discard：沿途处理人类 0 号在 chooseStarter/play/reveal/事件/换位阶段的可选行动
   v = await driveToDiscard(A, v);
   // driveToDiscard 返回时已消费 discard state（v.phase === 'discard'）。
+  // 注意：driveToDiscard 的 play 分支会按⑩规则出掉 0 号的手牌（非最后一位必须出 1 张），
+  // 因此掉线时的真实手牌 = driveToDiscard 之后的手牌，需在此重新记录（h0 断言基准）
+  const hDiscard = (v.seats[0].hand || []).map(c => c.uid);
+  assert.ok(hDiscard.length >= 1, '掉线前（discard）应有手牌，实际 ' + hDiscard.length);
+  const h0 = hDiscard;
+  const n0 = Math.min(keepMax0, h0.length);
   // 注意不能再 waitState(discard)：discard state 已被消费，下一个版本要等人类弃牌
   // （SEAT_TIMEOUT 30s 或 AI 接管）→ 会超时。直接掉线，让 AI 接管处理弃牌。
   assert.equal(v.phase, 'discard', '应推进到 discard，实际 ' + v.phase);
   A.disconnect();
-  await sleep(2500);   // AI 托管推进（ghostAct）
+  await sleep(2500);   // AI 托管推进（ghostAct：discard 保留前 keepMax 张 + 继续后续轮次）
 
   // 同名重连（先注册 state 监听器，避免 joinRoom ack 前的 state 广播丢帧）
   B = await connect();
@@ -158,9 +190,13 @@ test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，�
   const s2 = v2.seats[0];
   assert.equal(s2.isAI, false, '重连后应取消 AI 接管');
   const h1 = (s2.hand || []).map(c => c.uid);
-  // 断线时手牌全部保留（可含跨轮新发牌，但断线时牌不丢不复制）
-  for (const uid of h0) assert.ok(h1.includes(uid), '断线手牌丢失: ' + uid);
+  // 快照恢复 + ghostAct discard：重连后手牌前 n0 张 = 断线时前 n0 张（顺序保持），
+  // 被 AI 托管归档的（n0 之后）不复活（冲突检测防复制）；跨轮新发牌只允许附加在尾部
+  assert.deepEqual(h1.slice(0, n0), h0.slice(0, n0), '保留牌顺序应保持（前 ' + n0 + ' 张）');
   assert.equal(new Set(h1).size, h1.length, '手牌不应有重复 uid（快照恢复防复制）');
+  if (h0.length > n0) {
+    for (const uid of h0.slice(n0)) assert.ok(!h1.includes(uid), '被弃牌不应恢复回手牌: ' + uid);
+  }
   assert.ok(s2.money >= money0, '保守托管不应消耗金钱: ' + money0 + ' → ' + s2.money);
   // 行动权回归：发一个当前阶段允许的探测行动，不得再被「AI 接管」拒绝
   let probe = null;
@@ -168,7 +204,7 @@ test('掉线重连：AI 托管期间私有资源恢复，金钱不被消耗，�
     case 'pickChar': probe = { type: 'pickChar', charId: v2.draftCandidates[0].id }; break;
     case 'chooseStarter': probe = v2.starterPicker === 0 ? { type: 'pickStarter', starterSeat: 0 } : null; break;
     case 'buy': probe = s2.buyDone ? null : { type: 'endBuy' }; break;
-    case 'play': probe = (v2.turn === 0 && !s2.playDone) ? { type: 'finishPlay' } : null; break;
+    case 'play': probe = (v2.turn === 0 && !s2.playDone && (s2.hand || []).length) ? { type: 'playCards', uids: [s2.hand[0].uid] } : null; break;
     case 'discard': probe = (v2.discardSeat === 0 && !s2.keepDone && h1.length) ? { type: 'keepCard', uid: h1[0] } : null; break;
     default: probe = null;
   }
@@ -201,14 +237,15 @@ test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活
   // 第 1 轮起始玩家自动随机，chooseStarter 阶段不广播 → 直接等 buy
   v = await waitState(A, vv => vv.phase === 'buy');
 
-  // 最大化手牌：买到买不动 → 刷新 → 再买（尽量让手牌 > keepMax，触发弃牌）
+  // 最大化手牌：先买最便宜的（cost-1 卡 1⊙），买不动再刷新（尽量让手牌 > keepMax，触发弃牌）
   let guard = 0;
-  while (guard++ < 10) {
+  while (guard++ < 12) {
     const seat = v.seats[0];
-    const cand = (seat.market || []).find(c => Core.buyCostOf(seat, c) <= seat.money);
-    if (cand) { v = await myAction(A, v, { type: 'buyCard', uid: cand.uid }); continue; }
-    // 买不动：若刷新成本 < 剩余钱且还有余量则刷新（1⊙ 换新市场）
-    if (guard < 8 && seat.money >= 2) {
+    const afford = (seat.market || []).filter(c => Core.buyCostOf(seat, c) <= seat.money)
+      .sort((a, b) => Core.buyCostOf(seat, a) - Core.buyCostOf(seat, b));
+    if (afford.length) { v = await myAction(A, v, { type: 'buyCard', uid: afford[0].uid }); continue; }
+    // 买不动：刷新成本 < 剩余钱则刷新（1⊙ 换新市场）
+    if (guard < 10 && seat.money >= 1 && Core.refreshCostOf(seat) <= seat.money) {
       const rp = waitStateP(A, vv => vv.version > v.version);   // 先注册，防 ack 前广播丢帧
       const rc = await emitAck(A, 'action', { type: 'refreshMarket' });
       if (!rc.ok) break;
@@ -228,7 +265,6 @@ test('ghostAct discard 多手牌：只保留前 keepMax 张，被弃牌不复活
   const keepMax = keepMaxOf(v.seats[0]);
   const n = Math.min(keepMax, h0.length);
   assert.ok(h0.length >= 2, '断线时手牌应 >= 2，实际 ' + h0.length);
-  console.log('  [discard] 断线时手牌=' + h0.length + ' keepMax=' + keepMax + (h0.length > keepMax ? '（触发弃牌）' : '（未超限，全保留）'));
 
   A.disconnect();
   await sleep(6000);   // AI 托管推进：ghostAct 处理 A 的 discard 并继续

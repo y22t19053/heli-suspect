@@ -1,177 +1,177 @@
 /* ===== engine/14-ai.js（game-core.js 行 1592-1767）===== */
-  function aiAct(state, seat) {
+    if (state.phase !== 'discard' || state.discardSeat !== s.seat) return { ok: false, msg: '还没轮到你整理' };
+    const card = s.hand.find(c => c.uid === uid);
+    if (!card) return { ok: false, msg: '手牌不存在' };
+    const keepMax = keepMaxOf(s);
+    if (s.keepUids && s.keepUids.length >= keepMax) return { ok: false, msg: '最多保留 ' + keepMax + ' 张' };
+    s.keepUids = s.keepUids || [];
+    if (s.keepUids.indexOf(uid) >= 0) { s.keepUids = s.keepUids.filter(x => x !== uid); return { ok: true }; }
+    s.keepUids.push(uid);
+    return { ok: true };
+  }
+  function finishKeep(state, s) {
+    if (state.phase !== 'discard' || state.discardSeat !== s.seat) return { ok: false, msg: '还没轮到你' };
+    const keepMax = keepMaxOf(s);
+    const kept = s.keepUids || [];
+    if (kept.length < Math.min(keepMax, s.hand.length)) return { ok: false, msg: '请先选择要保留的证据' };
+    // 未保留的手牌洗入牌堆
+    const rest = s.hand.filter(c => kept.indexOf(c.uid) < 0);
+    state.used.push(...rest);
+    s.hand = s.hand.filter(c => kept.indexOf(c.uid) >= 0);
+    s.keepDone = true;
+    s.keepUids = [];
+    state.logs.push(s.name + ' 保留了 ' + kept.length + ' 份证据');
+    const next = nextKeepSeat(state);
+    state.discardSeat = next;
+    state.turn = next;
+    if (next >= 0) state.logs.push('整理阶段：' + state.seats[next].name + ' 请保留最多 ' + keepMaxOf(state.seats[next]) + ' 份证据');
+    return { ok: true };
+  }
+
+  /* ---------------- 分发每轮 ⊙ ---------------- */
+  function beginIncome(state) {
+    state.phase = 'income';
+    const prevRank = state.rankInfo;
+    const hasPrev = prevRank && prevRank.length > 0;
+    const first = hasPrev ? prevRank[0].seat : -1;
+    const last = hasPrev ? prevRank[prevRank.length - 1].seat : -1;
+    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1
+    const base = incomeOf(state.round);                        // 固定 2
+    state.seats.forEach((s, i) => {
+      const pbonus = (s.personality && s.personality.bonus && s.personality.bonus.money) || 0;
+      let amt = base + pbonus;
+      if (!hasPrev) amt += 2;       // 第 1 轮无排名：全体 +4 启动资金
+      else {
+        if (i === first) amt -= 1;  // 领先税：榜首 -1⊙（政治资本消耗）
+        if (i === last) amt += 1;   // 保底酬金：末位 +1⊙（胜诉基金）
+      }
+      // 收入保底：每轮至少 +1⊙（榜首 -1 时也不会白板回合）
+      const pay = Math.max(1, amt);
+      s.money += pay;
+      state.logs.push('【' + s.name + '】发放律师费 +' + pay + '⊙（累计 ' + s.money + '⊙）');
+    });
+    state.logs.push(hasPrev
+      ? '第 ' + state.round + ' 轮结束，发放律师费（榜首 -1⊙ / 末位 +1⊙）' + (tax ? '，连任榜首更换证物架成本 +1' : '')
+      : '第 ' + state.round + ' 轮结束，发放启动酬金 +4⊙');
+    // 轮末：市场未买牌洗回，锁定牌留作下轮
+    state.seats.forEach((s, i) => {
+      s.lastLockedUids = s.lockedUids.slice();
+      const kept = s.market.filter(c => s.lockedUids.indexOf(c.uid) >= 0);
+      const rest = s.market.filter(c => s.lockedUids.indexOf(c.uid) < 0);
+      state.used.push(...rest);
+      s.market = kept.slice();
+      s.lockedUids = [];
+      // 重置每轮状态
+      s.buyDone = false; s.playDone = false; s.eventCount = 0; s.eventPassed = false; s.buyUsed = false;
+      s.refreshUsed = false;
+      s.refreshCost = (tax && i === first) ? 2 : 1;   // 连任恐惧税：榜首下轮刷新起点 +1
+    });
+    state.voteMod = new Array(state.seatCount).fill(0);
+    state.supportBuff = new Array(state.seatCount).fill(0);
+  }
+  function finishGame(state, opts) {
+    opts = opts || {};
+    const n = state.seatCount;
+    state.gameOver = true;
+    // 胜利路径 1：陪审团否决（立即胜诉，已由 doCountContinue 直接触发）
+    if (opts.juryNull) {
+      const winner = (state.juryTokens || []).indexOf(Math.max(...(state.juryTokens || [])));
+      state.winner = winner >= 0 ? winner : 0;
+      state.winType = 'juryNull';
+      state.logs.push('陪审团否决裁定生效：人民拒绝适用恶法');
+      state.logs.push(state.seats[state.winner].name + ' 胜诉！（陪审团否决）');
+      return;
+    }
+    // 胜利路径 2：先例胜利——触发"确立先例"的一方即使票数落后也直接获胜
+    if (state.precedentSeat !== undefined && state.precedentSeat >= 0) {
+      state.winner = state.precedentSeat;
+      state.winType = 'precedent';
+      state.logs.push('先例胜利：虽然票数落后，但【' + state.seats[state.winner].name + '】的辩护已确立判例，后世将以此为准');
+      state.logs.push(state.seats[state.winner].name + ' 胜诉！（先例胜利）');
+      return;
+    }
+    // 胜利路径 3（默认）：无特殊情况第五轮结算后按照倾向判定胜者
+    // 平衡修复（#48 千局测试发现）：平局不再按座位号偏袒（原 a.seat-b.seat 让座位 0 吃掉 91.9% 平局），
+    // 改用种子 RNG 随机抽签——确定可复现且对所有座位公平。
+    const maxSupport = Math.max(...state.seats.map(s => s.support));
+    const tied = state.seats.filter(s => s.support === maxSupport);
+    if (tied.length > 1) {
+      const pick = tied[Math.floor(state.rng() * tied.length)];
+      state.winner = pick.seat;
+    } else {
+      state.winner = state.seats.find(s => s.support === maxSupport).seat;
+    }
+    state.winType = 'support';
+    state.logs.push('最终陪审团倾向：' + state.seats.map((s, i) => s.name + ' ' + s.support).join('，'));
+    state.logs.push(state.seats[state.winner].name + ' 胜诉！');
+  }
+
+  /* ---------------- 玩家动作 ---------------- */
+  function apply(state, seat, action) {
+    if (seat < 0 || seat >= state.seats.length) return { ok: false, msg: '非法座位' };
     const s = state.seats[seat];
-    if (!s || state.gameOver) return { ok: false, msg: '游戏已结束' };
+    if (!action || !action.type) return { ok: false, msg: '未知操作' };
     const msgs = [];
-    switch (state.phase) {
+    let res = { ok: true };
+    switch (action.type) {
       case 'pickChar': {
-        if (!s.char) {
-          const cands = state.draftCandidates[seat] || [];
-          if (cands.length) {
-            const v = c => ({ startMoney: 2, buyDiscount: 1.5, refreshDiscount: 1, drawPlus: 1.5, votePlus: 1.5, lockPlus: 0.8, eventBuff: 1.2, postMoney: 1, keepPlus: 0.8, roundMoney: 1.5, firstRefreshFree: 1 }[c.skill.type] || 0);
-            cands.sort((a, b) => v(b) - v(a));
-            s.char = cands[0];
-            s.camp = s.char.camp;
-            if (s.char.skill.type === 'startMoney') s.money += s.char.skill.v;
-          }
-        }
+        if (state.phase !== 'pickChar' || s.char) return { ok: false, msg: '当前不能选择角色' };
+        const cand = (state.draftCandidates[seat] || []).find(c => c.id === action.charId);
+        if (!cand) return { ok: false, msg: '非法角色' };
+        s.char = cand;
+        s.camp = cand.camp;
+        if (cand.skill.type === 'startMoney') s.money += cand.skill.v;
+        msgs.push(s.name + ' 选择了【' + cand.name + '】');
         break;
       }
-      case 'chooseStarter': {
-        if (state.starterPicker === seat) {
-          state.startingSeat = seat;
-          state.starterChosen = true;
-          state.logs.push('排名最低的【' + s.name + '】选择自己开始');
-        }
+      case 'pickStarter': {
+        if (state.phase !== 'chooseStarter') return { ok: false, msg: '当前不是选择起始玩家阶段' };
+        if (state.starterChosen) return { ok: false, msg: '起始玩家已选定，不能重复指定' };
+        if (state.starterPicker !== seat) return { ok: false, msg: '不由你选择起始玩家' };
+        if (action.starterSeat === undefined || action.starterSeat < 0 || action.starterSeat >= state.seatCount) return { ok: false, msg: '非法选择' };
+        state.startingSeat = action.starterSeat;
+        state.starterChosen = true;
+        msgs.push(s.name + ' 指定【' + state.seats[action.starterSeat].name + '】开始本轮');
         break;
       }
-      case 'buy': {
-        if (!s.buyDone) {
-          aiBuy(state, s);
-          s.buyDone = true;
-        }
+      case 'buyCard': {
+        res = buyCard(state, s, action.uid);
         break;
       }
-      case 'play': {
-        if (state.turn === seat && !s.playDone) aiPlay(state, s);
+      case 'lockCard': {
+        res = lockCard(state, s, action.uid);
         break;
       }
-      case 'reveal': {
-        if (state.revealPending && state.revealPending.owner === seat) {
-          const targets = state.row.filter(r => r.revealed && r.seat !== seat && !r.removed);
-          if (targets.length) {
-            // 选对手最"重"的牌（cost 最高）炸
-            targets.sort((a, b) => b.card.cost - a.card.cost || b.card.votes - a.card.votes);
-            resolveTerrorist(state, targets[0].card.uid);
-          } else {
-            state.revealPending = null;
-          }
-        }
+      case 'refreshMarket': {
+        res = refreshMarket(state, s);
         break;
       }
-      case 'count': {
-        // 政治操盘：选对手票数最高的牌换到自己这张牌旁（改变邻位博弈）
-        if (state.swapPending && state.swapPending.owner === seat) {
-          const cands = state.row.filter(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0 && x.seat !== seat);
-          cands.sort((a, b) => (b.card.votes || 1) - (a.card.votes || 1) || b.card.cost - a.card.cost);
-          let t = cands[0];
-          if (!t) t = state.row.find(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0);
-          if (t) resolveSwap(state, t.card.uid);
-          else state.swapPending = null;
-        }
+      case 'endBuy': {
+        if (state.phase !== 'buy' || s.buyDone) return { ok: false, msg: '当前不能结束取证' };
+        s.buyDone = true;
+        msgs.push(s.name + ' 完成取证');
         break;
       }
-      case 'preEvent':
-      case 'postEvent': {
-        if (state.eventTurnSeat === seat) aiEvents(state, s);
+      case 'playCards': {
+        res = playCards(state, s, action.uids || []);
         break;
       }
-      case 'discard': {
-        if (state.discardSeat === seat && !s.keepDone) {
-          s.keepUids = [];
-          if (s.hand.length) {
-            // 保留契合当前选区文化 + 人格偏好的强牌（最多 keepMax 张）
-            const sorted = s.hand.slice().sort((a, b) => aiCardScore(state, b, s.seat) - aiCardScore(state, a, s.seat));
-            s.keepUids = sorted.slice(0, Math.min(keepMaxOf(s), s.hand.length)).map(c => c.uid);
-          }
-          finishKeep(state, s);
-        }
+      case 'finishPlay': {
+        res = finishPlay(state, s);
         break;
       }
-    }
-    advance(state);
-    return { ok: true, msgs };
-  }
-
-  /* AI 卡牌评分：数值 + 技能（SK_VAL 表）+ 丑闻减分 */
-  function aiCardScore(state, c, seat) {
-    return (c.votes || 1) + skillVal(c.skill) - (c.scandal || 0) * 0.8;
-  }
-
-  /* AI 购买：买高价值牌，市场差则刷新，好牌买不起则锁定 */
-  function aiBuy(state, s) {
-    const val = c => (c.votes || 1) * 1.5 + skillVal(c.skill)
-      - (c.scandal || 0) * 0.6 - buyCostOf(s, c) * 0.4;
-    for (let guard = 0; guard < 8; guard++) {
-      if (s.money < 1) break;
-      const buyable = s.market.filter(c => buyCostOf(s, c) <= s.money);
-      if (!buyable.length) break;
-      buyable.sort((a, b) => val(b) - val(a));
-      const best = buyable[0];
-      if (val(best) < 0.8 && s.hand.length >= 4) break;
-      if (buyCard(state, s, best.uid).ok) continue;
-      break;
-    }
-    // 锁定：市场有高价值牌但暂时买不起（或刷新后保留）
-    if (s.lockedUids.length < lockMax(s) && s.market.some(c => s.lastLockedUids.indexOf(c.uid) < 0 && (c.votes || 1) >= 2)) {
-      const good = s.market.filter(c => s.lastLockedUids.indexOf(c.uid) < 0 && (c.votes || 1) >= 2).sort((a, b) => b.votes - a.votes)[0];
-      if (good && (good.cost > s.money || s.hand.length < 3)) lockCard(state, s, good.uid);
-    }
-    // 刷新：手牌少且市场差（经济型人格更愿刷新；弱卡 = 单票 + 低价值技能 + 不便宜）
-    if (s.hand.length < 2 && s.market.length) {
-      const weak = s.market.every(c => (c.votes || 1) === 1 && skillVal(c.skill) <= 1.6 && (c.cost || 1) >= 2);
-      // 经济型人格更愿刷新（per 即 s.personality；此处修复历史未定义引用）
-      const threshold = (s.personality && s.personality.economy >= 0.7) ? 3 : 2;
-      if (weak && s.hand.length < threshold && refreshCostOf(s) <= s.money) refreshMarket(state, s);
-    }
-  }
-
-  /* AI 出牌：新规则每回合只打 1 张（评分最高）；温和人格更可能保留战略，激进人格打完 */
-  function aiPlay(state, s) {
-    if (s.playDone) return;
-    const hand = s.hand.slice().sort((a, b) => aiCardScore(state, b, s.seat) - aiCardScore(state, a, s.seat));
-    if (!hand.length) { s.playDone = true; return; }
-    const agg = (s.personality && s.personality.aggression !== undefined) ? s.personality.aggression : 0.5;
-    const keepChance = (1 - agg) * 0.3; // 温和人格保留战略
-    if (state.rng() < keepChance && hand.length > 1) { s.playDone = true; return; }
-    playCards(state, s, [hand[0].uid]);
-  }
-
-  /* 全局事件（scandalAll）对 AI 的价值评估：>0 则对己方有利 */
-  function aiAutoValue(state, s, ev) {
-    const e = ev.eff;
-    if (e.type === 'scandalAll') {
-      let maxOther = 0;
-      state.seats.forEach((x, i) => { if (i !== s.seat) maxOther = Math.max(maxOther, x.scandal); });
-      return maxOther - s.scandal;
-    }
-    return 0;
-  }
-
-  /* AI 事件：依据人格 aggression 选择攻击/增益事件；全局 auto 事件经价值评估后才打 */
-  function aiEvents(state, s) {
-    const agg = (s.personality && s.personality.aggression !== undefined) ? s.personality.aggression : 0.5;
-    for (let i = 0; i < 2; i++) {
-      const usable = usableEvents(state, s);
-      if (!usable.length) break;
-      const selfEv = usable.find(e => e.target === 'self');
-      const enemyEv = usable.find(e => e.target === 'enemy');
-      const autoCands = usable.filter(e => e.target === 'auto' && aiAutoValue(state, s, e) > 0)
-        .sort((a, b) => aiAutoValue(state, s, b) - aiAutoValue(state, s, a));
-      const goodAuto = autoCands[0];
-      let ev;
-      if (agg >= 0.7) {
-        // 激进人格（MAGA/茶党）：优先攻击对手
-        ev = enemyEv || goodAuto || selfEv;
-      } else if (agg >= 0.5) {
-        // 平衡人格：先打正价值全局事件，再考虑增益/攻击
-        ev = goodAuto || selfEv || enemyEv;
-      } else {
-        // 温和人格（自由意志/永不特朗普）：优先增益自己，auto 次之，攻击仅偶尔
-        ev = selfEv || goodAuto || (enemyEv && state.rng() < 0.3 ? enemyEv : null);
+      case 'terroristTarget': {
+        if (state.phase !== 'reveal') return { ok: false, msg: '当前没有待选的恐怖分子目标' };
+        if (state.revealPending && state.revealPending.owner !== seat) return { ok: false, msg: '不由你选择目标' };
+        res = resolveTerrorist(state, action.targetUid);
+        break;
       }
-      if (!ev) break;
-      let tgt;
-      if (ev.target === 'enemy') {
-        // 选当前最高票/最高倾向的对手
-        const scores = state.seats.map((x, i) => (state.votes && state.votes[i]) || x.support);
-        tgt = highestEnemy(scores, s.seat, state.seatCount, state.rng);
+      case 'swapTarget': {
+        if (state.phase !== 'count') return { ok: false, msg: '当前没有待选的换位目标' };
+        if (state.swapPending && state.swapPending.owner !== seat) return { ok: false, msg: '不由你选择换位目标' };
+        res = resolveSwap(state, action.targetUid);
+        break;
       }
-      if (!playEvent(state, s, ev.uid, tgt).ok) break;
-      // playEvent 已推进 eventTurnSeat
-      if (state.eventTurnSeat !== s.seat) return;
-    }
-    if (state.eventTurnSeat === s.seat) passEvent(state, s);
-  }
-
-  /* ---------------- 服务端/渲染器辅助 ---------------- */
+      case 'playEvent': {
+        res = playEvent(state, s, action.uid, action.targetSeat);
+        break;

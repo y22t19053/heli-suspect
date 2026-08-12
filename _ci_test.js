@@ -82,6 +82,15 @@ async function main() {
   const skipServer = process.argv.includes('--skip-server');
   let server = null;
 
+  /* 布局探针硬门禁：卡面/面板坐标重叠即中止（用户强制要求，任何一次提交/CI 都先过探针） */
+  try {
+    execFileSync(process.execPath, [path.join(__dirname, '_layout_probe.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 });
+    console.log('[ci] _layout_probe.js → 布局坐标无重叠');
+  } catch (e) {
+    console.error('[ci] _layout_probe.js 布局重叠检测失败：\n' + ((e.stdout || '').toString().trim() || e.message));
+    process.exit(1);
+  }
+
   if (!skipServer) {
     console.log('[ci] 启动 server.js (PORT=' + PORT + ') …');
     // 干净启动：清掉上次运行残留的快照文件，避免 CI 误恢复旧房间

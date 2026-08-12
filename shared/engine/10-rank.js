@@ -1,63 +1,63 @@
 /* ===== engine/10-rank.js（game-core.js 行 1295-1356）===== */
-  /* ---------------- 本轮排名 ---------------- */
-  function doRank(state) {
-    state.phase = 'rank';
-    const n = state.seatCount;
-    const info = state.seats.map((s, i) => {
-      const power = state.row.filter(r => !r.removed && r.seat === i).reduce((sum, r) => sum + r.card.cost, 0);
-      return { seat: i, votes: state.votes[i], power };
-    });
-    // 票数 desc → ⊙ 总和 desc → 亮出顺序（座位靠前）高
-    info.sort((a, b) => b.votes - a.votes || b.power - a.power || a.seat - b.seat);
-    state.rankInfo = info;
-    state.roundRank = info.map(x => x.seat);
-    state.logs.push('本轮排名：' + state.roundRank.map((s, i) => (i + 1) + '.' + state.seats[s].name).join(' '));
-    doSettle(state);
-  }
-  function doSettle(state) {
-    state.phase = 'settle';
-    const first = state.roundRank[0];
-    const reward = rewardOf(state.round);
-    // 差额计分（防滚雪球）：第一名 +reward，之后每名 -1（最低 +1）→ 落后方不白卷
-    state.rankInfo.forEach((info, idx) => {
-      const s = state.seats[info.seat];
-      let r = Math.max(1, reward - idx);
-      if (idx === 0 && state.supportBuff[first]) r += state.supportBuff[first];
-      s.support += r;
-      if (idx === 0) s.stats.roundsWon++;
-      state.logs.push('【' + s.name + '】排名第 ' + (idx + 1) + '，陪审团倾向 +' + r + '（累计 ' + s.support + '）');
-    });
-    state.supportReward = reward + (state.supportBuff[first] || 0);
-    // 连任计数（恐惧税：连续 2 轮第一，下轮刷新成本 +1）
-    if (state.prevFirst === first) state.leaderStreak = (state.leaderStreak || 0) + 1;
-    else state.leaderStreak = 1;
-    state.prevFirst = first;
-    // 结算后技能（some voters' skills trigger here）
-    state.row.forEach(r => {
-      if (r.removed || !r.card.skill) return;
-      const sk = SKILLS[r.card.skill];
-      if (sk.when !== 'post') return;
-      const owner = r.seat;
-      if (r.card.skill === 'donor') {
-        state.seats[owner].money += 1;
-        state.logs.push('【' + state.seats[owner].name + '】的【胜诉酬金】+1⊙');
-      } else if (r.card.skill === 'buyback') {
-        const t = highestEnemy(state.votes, owner, state.seatCount, state.rng);
-        state.seats[t].money = Math.max(0, state.seats[t].money - 1);
-        state.logs.push('【' + state.seats[owner].name + '】的【收买证词】使【' + state.seats[t].name + '】-1⊙');
-      } else if (r.card.skill === 'whistleblower') {
-        // 内部吹哨人：丑闻最高的对方 -1⊙ 且丑闻 +1（瑟皮科扳倒系统）
-        const t = highestEnemy(state.votes, owner, state.seatCount, state.rng);
-        state.seats[t].money = Math.max(0, state.seats[t].money - 1);
-        applyScandalEffects(state, t);
-        state.logs.push('📢 内部吹哨人：【' + state.seats[owner].name + '】的线人曝光【' + state.seats[t].name + '】内部腐败（-1⊙ +丑闻）');
-      }
-    });
-    // 角色被动：小镇市长每轮结束 +1⊙
-    state.seats.forEach(s => {
-      if (s.char && s.char.skill.type === 'roundMoney') { s.money += s.char.skill.v; }
-    });
-    beginDiscard(state);
-  }
-
-  /* ---------------- 整理（保留本阵营 2 张，其余洗入牌堆） ---------------- */
+            act.forEach((x, i) => {
+              if (x.seat === owner && i * 2 < act.length) votes[owner] += 1;
+            });
+            break;
+          }
+          case 'randomHit': {
+            // 抽签质证：随机 1 张对方牌 -1（赌运气）
+            const act = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner);
+            if (act.length) {
+              const rng = state.rng || Math.random;
+              const hit = act[Math.floor(rng() * act.length)];
+              votes[hit.seat] -= (r.card.v || 1);
+            }
+            break;
+          }
+          case 'shame': {
+            if (state.row.some(x => !x.removed && !x._nullified && (x.card.scandal || 0) > 0)) votes[owner] += 1;
+            break;
+          }
+          case 'threat': {
+            const hasLv3 = state.row.some(x => !x.removed && !x._nullified && x.seat !== owner
+              && x.card.skill && SKILLS[x.card.skill] && SKILLS[x.card.skill].lv >= 3);
+            if (hasLv3) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            break;
+          }
+          /* —— 封神技（真实传奇律师招牌战术） —— */
+          case 'crossExam': {
+            // 交叉询问：相邻敌方证人 -1；若该证人带丑闻，额外 -1
+            const nbL = rowNeighbor(state, idx, -1);
+            const nbR = rowNeighbor(state, idx, 1);
+            [nbL, nbR].forEach(nb => {
+              if (nb && !nb.removed && !nb._nullified && nb.seat !== owner) {
+                let dmg = 1;
+                if ((nb.card.scandal || 0) > 0) dmg += 1;
+                votes[nb.seat] -= dmg;
+              }
+            });
+            break;
+          }
+          case 'objection': {
+            // 反对!：对方本场亮出 ②/③ 级技能牌 → 最高对方 -1
+            const hasHigh = state.row.some(x => !x.removed && !x._nullified && x.seat !== owner
+              && x.card.skill && SKILLS[x.card.skill] && SKILLS[x.card.skill].lv >= 2);
+            if (hasHigh) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            break;
+          }
+          case 'reasonableDoubt': {
+            // 合理怀疑：对方场上证据 ≥3 → 最高对方 -2（"戴不上，就无罪"）
+            const enemyN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
+            if (enemyN >= 3) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
+            break;
+          }
+          case 'timelineSnipe': {
+            // 时间线狙击：对方带技能证据 ≥2 → 最高对方 -1（收据时间戳）
+            const skN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner
+              && x.card.skill && SKILLS[x.card.skill]).length;
+            if (skN >= 2) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            break;
+          }
+          case 'flipNarrative': {
+            // 翻转叙事：本方落后 ≥2 → 本方 +2（把事实之争翻成原则之争）
+            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));

@@ -1,89 +1,105 @@
 /* ===== engine/15-meta.js（game-core.js 行 1768-1871）===== */
-  /* 每个阶段"谁需要输入"统一由 PHASES 表（engine/04-advance.js）判定，
-   * 本文件只按 AI/人类筛选座位，杜绝双份 switch（评审四/五：单一来源）。 */
-  function needsAIAction(state) {
-    if (!state || state.gameOver) return [];
-    const list = [];
-    const def = PHASES[state.phase];
-    state.seats.forEach((s, i) => {
-      const isAI = s.isAI || !s.connected;
-      if (!isAI) return;
-      if (def && def.needsInput(state, i)) list.push(i);
-    });
-    return list;
-  }
-  function humanActing(state) {
-    if (!state || state.gameOver) return [];
-    const list = [];
-    const def = PHASES[state.phase];
-    state.seats.forEach((s, i) => {
-      if (s.isAI || !s.connected) return;
-      if (def && def.needsInput(state, i)) list.push(i);
-    });
-    return list;
-  }
-  /* 阶段流转唯一源（超级更新#2）：全部 15 个 phase 按真实流转顺序。
-   * 两端进度条 / UIPresenter.phaseIndex 一律引用本常量，禁止另写副本。 */
-  const PHASE_STEPS = [
-    ['pickChar', '抽取角色'],
-    ['chooseStarter', '起始'],
-    ['drawEvent', '抽事件'],
-    ['drawVoter', '发选民'],
-    ['buy', '取证'],
-    ['play', '举证'],
-    ['reveal', '亮出'],
-    ['preEvent', '前庭审'],
-    ['count', '审议'],
-    ['postEvent', '后庭审'],
-    ['rank', '排名'],
-    ['settle', '结算'],
-    ['discard', '整理'],
-    ['income', '酬金'],
-    ['gameover', '终局']
-  ];
-  /* 进度条显示用：过滤瞬时自动阶段（无玩家操作），与历史 10 步展示一致 */
-  const PHASE_STEPS_VISIBLE = PHASE_STEPS.filter(s => !['pickChar', 'drawEvent', 'drawVoter', 'settle', 'income'].includes(s[0]));
-  function phaseLabel(state) {
-    const map = {
-      pickChar: '抽取角色', chooseStarter: '决定起始玩家', drawEvent: '抽取事件牌', drawVoter: '抽取证据',
-      buy: '调查取证', play: '暗置举证', reveal: '亮出证据', preEvent: '庭审前·事件', count: '审议中',
-      postEvent: '庭审后·事件', rank: '本轮排名', settle: '本轮结算', discard: '整理', income: '发放酬金', gameover: '游戏结束'
-    };
-    return map[state.phase] || state.phase;
-  }
-  /* 可点击卡牌（供渲染器高亮） */
-  function myClickable(state, seat) {
-    const s = state.seats[seat];
-    const out = { market: [], hand: [], events: [], targets: [], chars: [] };
-    if (!s) return out;
-    switch (state.phase) {
-      case 'pickChar':
-        out.chars = (state.draftCandidates[seat] || []).map(c => c.id);
+      }
+      case 'passEvent': {
+        if (state.phase !== 'preEvent' && state.phase !== 'postEvent') return { ok: false, msg: '当前不是事件阶段' };
+        if (state.eventTurnSeat !== seat) return { ok: false, msg: '还没轮到你' };
+        res = passEvent(state, s);
         break;
-      case 'buy':
-        if (!s.buyDone) { out.market = s.market.map(c => c.uid); }
+      }
+      case 'keepCard': {
+        res = keepCard(state, s, action.uid);
         break;
-      case 'play':
-        if (state.turn === seat && !s.playDone) { out.hand = s.hand.map(c => c.uid); }
+      }
+      case 'finishKeep': {
+        res = finishKeep(state, s);
         break;
-      case 'reveal':
-        if (state.revealPending && state.revealPending.owner === seat) {
-          out.targets = state.row.filter(r => r.revealed && r.seat !== seat && !r.removed).map(r => r.card.uid);
-        }
+      }
+      case 'continue': {
+        // 结算屏/结束屏继续
         break;
-      case 'count':
-        if (state.swapPending && state.swapPending.owner === seat) {
-          out.targets = state.swapPending.candidates.slice();
-        }
-        break;
-      case 'preEvent':
-      case 'postEvent':
-        if (state.eventTurnSeat === seat) { out.events = usableEvents(state, s).map(e => e.uid); }
-        break;
-      case 'discard':
-        if (state.discardSeat === seat && !s.keepDone) { out.hand = s.hand.map(c => c.uid); }
-        break;
+      }
+      default: return { ok: false, msg: '未知操作' };
     }
-    return out;
+    if (!res.ok) return res;
+    if (msgs.length) state.logs.push(...msgs);
+    advance(state);
+    return { ok: true, msgs, combo: res.combo === true };
   }
 
+  /* ---------------- AI 决策 ---------------- */
+  function aiAct(state, seat) {
+    const s = state.seats[seat];
+    if (!s || state.gameOver) return { ok: false, msg: '游戏已结束' };
+    const msgs = [];
+    switch (state.phase) {
+      case 'pickChar': {
+        if (!s.char) {
+          const cands = state.draftCandidates[seat] || [];
+          if (cands.length) {
+            const v = c => ({ startMoney: 2, buyDiscount: 1.5, refreshDiscount: 1, drawPlus: 1.5, votePlus: 1.5, lockPlus: 0.8, eventBuff: 1.2, postMoney: 1, keepPlus: 0.8, roundMoney: 1.5, firstRefreshFree: 1 }[c.skill.type] || 0);
+            cands.sort((a, b) => v(b) - v(a));
+            s.char = cands[0];
+            s.camp = s.char.camp;
+            if (s.char.skill.type === 'startMoney') s.money += s.char.skill.v;
+          }
+        }
+        break;
+      }
+      case 'chooseStarter': {
+        if (state.starterPicker === seat) {
+          state.startingSeat = seat;
+          state.starterChosen = true;
+          state.logs.push('排名最低的【' + s.name + '】选择自己开始');
+        }
+        break;
+      }
+      case 'buy': {
+        if (!s.buyDone) {
+          aiBuy(state, s);
+          s.buyDone = true;
+        }
+        break;
+      }
+      case 'play': {
+        if (state.turn === seat && !s.playDone) aiPlay(state, s);
+        break;
+      }
+      case 'reveal': {
+        if (state.revealPending && state.revealPending.owner === seat) {
+          const targets = state.row.filter(r => r.revealed && r.seat !== seat && !r.removed);
+          if (targets.length) {
+            // 选对手最"重"的牌（cost 最高）炸
+            targets.sort((a, b) => b.card.cost - a.card.cost || b.card.votes - a.card.votes);
+            resolveTerrorist(state, targets[0].card.uid);
+          } else {
+            state.revealPending = null;
+          }
+        }
+        break;
+      }
+      case 'count': {
+        // 政治操盘：选对手票数最高的牌换到自己这张牌旁（改变邻位博弈）
+        if (state.swapPending && state.swapPending.owner === seat) {
+          const cands = state.row.filter(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0 && x.seat !== seat);
+          cands.sort((a, b) => (b.card.votes || 1) - (a.card.votes || 1) || b.card.cost - a.card.cost);
+          let t = cands[0];
+          if (!t) t = state.row.find(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0);
+          if (t) resolveSwap(state, t.card.uid);
+          else state.swapPending = null;
+        }
+        break;
+      }
+      case 'preEvent':
+      case 'postEvent': {
+        if (state.eventTurnSeat === seat) aiEvents(state, s);
+        break;
+      }
+      case 'discard': {
+        if (state.discardSeat === seat && !s.keepDone) {
+          s.keepUids = [];
+          if (s.hand.length) {
+            // 保留契合当前选区文化 + 人格偏好的强牌（最多 keepMax 张）
+            const sorted = s.hand.slice().sort((a, b) => aiCardScore(state, b, s.seat) - aiCardScore(state, a, s.seat));
+            s.keepUids = sorted.slice(0, Math.min(keepMaxOf(s), s.hand.length)).map(c => c.uid);
+          }
+          finishKeep(state, s);

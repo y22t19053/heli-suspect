@@ -19,7 +19,9 @@
     { id: 'tycoon',     name: '律所金主',   camp: 'gold',  desc: '换证成本 -1',        skill: { type: 'refreshDiscount', v: 1 } },
     { id: 'orator',     name: '金牌大状',   camp: 'red',   desc: '证物架多抽 1 张',    skill: { type: 'drawPlus', v: 1 } },
     { id: 'organizer',  name: '首席助理',   camp: 'green', desc: '审议时本方 +1 票',   skill: { type: 'votePlus', v: 1 } },
-    { id: 'pragmatist', name: '务实派律师', camp: 'blue',  desc: '可保留 2 份证词',    skill: { type: 'lockPlus', v: 1 } }
+    { id: 'pragmatist', name: '务实派律师', camp: 'blue',  desc: '可保留 2 份证词',    skill: { type: 'lockPlus', v: 1 } },
+    { id: 'analyst',    name: '数据分析师', camp: 'green', desc: '每轮结束 +1⊙',      skill: { type: 'roundMoney', v: 1 } },
+    { id: 'counsel',    name: '首席顾问',   camp: 'gold',  desc: '事件牌效果 +1',      skill: { type: 'eventBuff', v: 1 } }
   ];
 
   /* 证词技能词典（① ② ③ 分级；证据排除在亮出阶段发动）
@@ -47,6 +49,10 @@
     pivot:       { name: '险中取胜', lv: 3, when: 'count',  desc: '审议时：若左右都是敌方牌，本方 +2 票（换位可破）', src: '四面楚歌时的孤注一掷：重罪法庭的最后一搏' },
     donor:       { name: '胜诉酬金', lv: 0, when: 'post',   desc: '结算后：本方 +1⊙', src: '风险代理（Contingency Fee）：不赢不收费的诉讼融资' },
     buyback:     { name: '收买证词', lv: 0, when: 'post',   desc: '结算后：票数最高的对方 -1⊙', src: '证人收买丑闻：历史上反复出现的伪证交易' },
+    /* —— 纳什均衡系（互锁：每个技能都有对手可回应的条件） —— */
+    audit:       { name: '财务审计', lv: 1, when: 'count',  desc: '审议时：若对方金钱 ≥5⊙，票数最高的对方 -1 票', src: '反垄断审计：资本越厚，账目越经不起查——藏富者的软肋' },
+    lobby:       { name: '游说金',   lv: 1, when: 'count',  desc: '审议时：若本方金钱 ≥5⊙，本方 +1 票', src: '政治献金游说：钱能买来听证席上的声量，也能买来选票' },
+    endorse:     { name: '名人背书', lv: 2, when: 'count',  desc: '审议时：若本方支持度落后对方，本方 +1 票', src: '明星站台效应：公众人物一句话胜过百份证词' },
     /* —— 议题/站位系（条件发动，全部卡牌特有，参数在牌面上） —— */
     tagBoost:    { name: '议题共鸣', lv: 1, when: 'count',  desc: '审议时：本方 +1 票', src: '罗伊诉韦德案式议题动员：社会议题把法庭变成战场' },
     tagHate:     { name: '舆论压制', lv: 1, when: 'count',  desc: '审议时：票数最高的对方 -1 票', src: '麦卡锡式贴标签：先定义敌人再消灭敌人' },
@@ -59,6 +65,12 @@
     minority:    { name: '逆境反扑', lv: 1, when: 'count',  desc: '审议时：若本方当前票数落后，本方 +1 票', src: '孤证翻盘史：单个勇敢的持异议陪审员改变判决' },
     shame:       { name: '借题发挥', lv: 2, when: 'count',  desc: '审议时：若场上有丑闻牌，本方 +1 票', src: '丑闻放大效应：一旦有污点，舆论自动扩散' },
     threat:      { name: '王牌对垒', lv: 2, when: 'count',  desc: '审议时：若对方有 ③ 级技能牌，票数最高的对方 -1 票', src: '王牌证人对王牌证人：世纪审判的宿命对决' },
+    /* —— 铺场/事件互锁系（对方铺得越多/越爱打事件，越被反制） —— */
+    crossfire:   { name: '交叉火力', lv: 2, when: 'count',  desc: '审议时：若对方已亮出 ≥3 张牌，票数最高的对方 -1 票', src: '多线质证战术：对方证词堆得越多，漏洞交叉越多' },
+    surge:       { name: '民意浪潮', lv: 2, when: 'count',  desc: '审议时：若本方已亮出 ≥3 张牌，本方 +1 票', src: '舆论造势滚雪球：声势浩大时，摇摆陪审员随波逐流' },
+    veto:        { name: '一票否决', lv: 3, when: 'count',  desc: '审议时：若对方本轮打出过事件牌，票数最高的对方 -2 票', src: '程序否决权：滥用动议者终被程序反噬——规则即武器' },
+    momentum:    { name: '势头',     lv: 3, when: 'count',  desc: '审议时：若本方此前赢得过轮次，本方 +1 票', src: '连胜气势：赢家全拿的法庭心理学，气势压垮理性' },
+    grant:       { name: '法律援助', lv: 0, when: 'post',   desc: '结算后：若本方金钱最少，+1⊙', src: '公益法律援助：为弱势者发声，本身就是一种胜利' },
     /* —— 封神技（真实传奇律师招牌战术，全部卡牌特有） —— */
     crossExam:     { name: '交叉询问', lv: 2, when: 'count', desc: '审议时：相邻敌方证人 -1 票；若其带丑闻，额外 -1 票', src: '佩里·梅森式质证：问题早已知道答案，只等证人自投罗网' },
     objection:     { name: '反对!', lv: 1, when: 'count', desc: '审议时：若对方本场亮出 ②/③ 级技能牌，票数最高的对方 -1 票', src: '法庭反对程序：程序正义的日常武器' },
@@ -74,7 +86,41 @@
     firstSeat:   { name: '首座质证', lv: 2, when: 'count', desc: '审议时：若行首（最左一张）是对方牌，该牌 -1 票', src: '证人席首位效应：谁坐在第一个位置，谁先被盘问' },
     lastSeat:    { name: '末席质证', lv: 2, when: 'count', desc: '审议时：若行尾（最右一张）是对方牌，该牌 -1 票', src: '末位记忆效应：陪审团对最后一个证人的印象最深' },
     leftWall:    { name: '左翼壁垒', lv: 3, when: 'count', desc: '审议时：本方所有位于行左半区的牌各 +1 票', src: '阵地战术：把整条证据链铺在陪审团视线左侧形成压迫' },
-    randomHit:   { name: '抽签质证', lv: 2, when: 'count', desc: '审议时：随机 1 张对方牌 -1 票（赌运气）', src: '庭上掷骰：没有明确目标时，抽中谁算谁' }
+    randomHit:   { name: '抽签质证', lv: 2, when: 'count', desc: '审议时：随机 1 张对方牌 -1 票（赌运气）', src: '庭上掷骰：没有明确目标时，抽中谁算谁' },
+    /* —— 庭审克制包（⑨ 精选：与阶段权重/新出牌规则联动） —— */
+    bias:        { name: '偏见揭露', lv: 3, when: 'count', desc: '审议时：对方已亮 ≥4 张牌时，对方所有已亮牌各 -1 票', src: '偏见定势：预设立场一旦形成，全部证词都会被过滤成支持它的样子' },
+    hailMary:    { name: '最后一搏', lv: 3, when: 'count', desc: '审议时：本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票', src: '法庭绝境：把全部筹码押上辩论席的最后一次呐喊' },
+    fullChain:   { name: '证据链完整', lv: 3, when: 'count', desc: '审议时：本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票', src: '物证闭环：每一环都扣得上时，整条证据链就是铁证' },
+    gagOrder:    { name: '禁言令', lv: 3, when: 'count', desc: '审议时：对方本轮打过 ≥3 张牌时，票数最高的对方 -2 票', src: '法官禁令：话说得太多，反而把辩词压进死胡同' },
+    split:       { name: '民意分裂', lv: 2, when: 'count', desc: '审议时：双方已亮牌数相等时，双方最高票玩家各 -1 票', src: '势均力敌的法庭：民意在两极间拉扯，谁也占不到便宜' },
+    integrity:   { name: '清廉档案', lv: 0, when: 'post', desc: '结算后：本方无丑闻且对方有人有丑闻时，本方 +1⊙', src: '清白本身就是武器：在丑闻时代，干净的档案千金难买' }
+  };
+  /* 庭审流派（⑦ 阶段克制权重）：每项技能归属一大流派
+   * attack 攻击（质证/揭短） | procedure 程序（动议/排除） | emotion 情感（演说/舆论）
+   * evidence 物证（实锤/证据链） | logic 逻辑（站位/博弈） | witness 人证（议题/共鸣）
+   * 克制三角：attack 克 evidence，evidence 克 emotion，emotion 克 attack */
+  const ARCH = {
+    // 攻击系（质证/揭短/压制）
+    troll: 'attack', tagHate: 'attack', leftFoe: 'attack', rightFoe: 'attack',
+    scandal: 'attack', megaScandal: 'attack', flank: 'attack', poach: 'attack',
+    crossfire: 'attack', veto: 'attack', crossExam: 'attack', credCollapse: 'attack',
+    firstSeat: 'attack', lastSeat: 'attack', randomHit: 'attack', threat: 'attack',
+    audit: 'attack', buyback: 'attack', whistleblower: 'attack',
+    reasonableDoubt: 'attack', bias: 'attack', gagOrder: 'attack', split: 'attack',
+    // 程序系（动议/排除/反对）
+    terrorist: 'procedure', swap: 'procedure', shiftLeft: 'procedure', shiftRight: 'procedure', objection: 'procedure',
+    // 情感系（演说/舆论/士气）
+    fan: 'emotion', orator: 'emotion', wave: 'emotion', idol: 'emotion', comeback: 'emotion',
+    endorse: 'emotion', rally: 'emotion', surge: 'emotion', momentum: 'emotion',
+    flipNarrative: 'emotion', careerGamble: 'emotion', precedent: 'emotion', juryNull: 'emotion',
+    shame: 'emotion', hailMary: 'emotion',
+    // 物证系（实锤/时间戳/证据链）
+    timelineSnipe: 'evidence', donor: 'evidence', fullChain: 'evidence',
+    // 逻辑/站位系（端点/半区/左右博弈）
+    edge: 'logic', rowL: 'logic', rowR: 'logic', majority: 'logic', minority: 'logic',
+    leftWall: 'logic', chain: 'logic', pivot: 'logic', counsel: 'logic',
+    // 人证/议题系（默认）
+    tagBoost: 'witness'
   };
   /* 技能价值表（AI 选牌/买卖用；非列表内技能回退 2）—— 数值已按 ±1 化微调 */
   const SK_VAL = {
@@ -85,7 +131,12 @@
     shame: 2.2, threat: 2.4,
     crossExam: 3, objection: 2, reasonableDoubt: 3.8, timelineSnipe: 3.4, flipNarrative: 3.2,
     careerGamble: 3.2, credCollapse: 2.8, whistleblower: 2.4, precedent: 3.8, juryNull: 3.6,
-    firstSeat: 2.2, lastSeat: 2.2, leftWall: 3.0, randomHit: 2.4
+    firstSeat: 2.2, lastSeat: 2.2, leftWall: 3.0, randomHit: 2.4,
+    audit: 2.2, lobby: 2.2, endorse: 2.4, crossfire: 2.4, surge: 2.4, veto: 3.4, momentum: 2.6, grant: 2.2,
+    /* ⑨ 庭审克制包（条件触发，绝不白板）：数值按触发难度定 */
+    bias: 3.6, hailMary: 3.2, fullChain: 3.4, gagOrder: 3.6, split: 2.8, integrity: 2.2,
+    /* 数值审查：纯数值白板卡降权（AI 少买无脑强卡，鼓励条件牌） */
+    tagBoost: 1.8
   };
   function skillVal(s) { return SK_VAL[s] !== undefined ? SK_VAL[s] : (s ? 2 : 0); }
 
@@ -215,7 +266,23 @@
     { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
     { id: 'v106', name: '左席旗手',      cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '位于亮出行左半区时，本方 +1 票' },
     { id: 'v107', name: '右席旗手',      cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '位于亮出行右半区时，本方 +1 票' },
-    { id: 'v108', name: '对调策划',      cost: 4, votes: 1, skill: 'swap', v: 1, desc: '与场上任意一张其他牌互换位置' }
+    { id: 'v108', name: '对调策划',      cost: 4, votes: 1, skill: 'swap', v: 1, desc: '与场上任意一张其他牌互换位置' },
+    /* ============ 纳什均衡扩充包（v109+：互锁技能） ============ */
+    { id: 'v109', name: '审计员证词',    cost: 2, votes: 1, skill: 'audit', desc: '对方金钱 ≥5⊙ 时，票数最高的对方 -1 票' },
+    { id: 'v110', name: '游说账单',      cost: 3, votes: 1, skill: 'lobby', desc: '本方金钱 ≥5⊙ 时，本方 +1 票' },
+    { id: 'v111', name: '名人站台函',    cost: 3, votes: 1, skill: 'endorse', desc: '本方支持度落后对方时，本方 +1 票' },
+    { id: 'v112', name: '多线质证卷宗',  cost: 3, votes: 1, skill: 'crossfire', desc: '对方已亮 ≥3 张时，票数最高的对方 -1 票' },
+    { id: 'v113', name: '造势集会报告',  cost: 3, votes: 1, skill: 'surge', desc: '本方已亮 ≥3 张时，本方 +1 票' },
+    { id: 'v114', name: '否决动议书',    cost: 4, votes: 1, skill: 'veto', desc: '对方本轮打出过事件牌时，票数最高的对方 -2 票' },
+    { id: 'v115', name: '连胜战报',      cost: 4, votes: 1, skill: 'momentum', desc: '本方此前赢得过轮次时，本方 +1 票' },
+    { id: 'v116', name: '法援申请书',    cost: 2, votes: 1, skill: 'grant', desc: '结算后：本方金钱最少时，+1⊙' },
+    /* ============ 庭审克制包（v117+：偏见揭露/最后一搏/证据链/禁言令/民意分裂/清廉档案） ============ */
+    { id: 'v117', name: '揭底档案',      cost: 4, votes: 1, skill: 'bias', desc: '对方已亮 ≥4 张时，对方所有已亮牌各 -1 票' },
+    { id: 'v118', name: '绝境陈词',      cost: 4, votes: 1, skill: 'hailMary', desc: '本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票' },
+    { id: 'v119', name: '链条卷宗',      cost: 4, votes: 1, skill: 'fullChain', desc: '本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票' },
+    { id: 'v120', name: '禁言动议',      cost: 4, votes: 1, skill: 'gagOrder', desc: '对方本轮打过 ≥3 张时，票数最高的对方 -2 票' },
+    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' },
+    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' }
   ];
 
   /* AI 人格（从美式法律/政治文化提取）：
@@ -223,41 +290,13 @@
    * economy 0~1：经济牌偏好（影响购买/刷新决策）
    * bonus：人格被动加成（vote=审议+票 / money=每轮+⊙）——让 AI 更像"有性格的对手" */
   const AI_PERSONALITIES = [
-    { id: 'libertarian',    name: '自由派律师',     icon: '🗽', aggression: 0.35, economy: 0.8, bonus: { money: 1 } },
-    { id: 'teaParty',       name: '民粹律师',       icon: '🍵', aggression: 0.7,  economy: 0.45, bonus: { vote: 1 } },
-    { id: 'demSoc',         name: '平权律师',       icon: '✊', aggression: 0.55, economy: 0.6 },
-    { id: 'maga',           name: '鹰派律师',       icon: '🦅', aggression: 0.9,  economy: 0.35, bonus: { vote: 1 } },
-    { id: 'greenNewDeal',   name: '环保律师',       icon: '🌱', aggression: 0.6,  economy: 0.55, bonus: { money: 1 } },
-    { id: 'establishment',  name: '建制派律师',     icon: '🏛️', aggression: 0.5,  economy: 0.65, bonus: { money: 1 } },
-    { id: 'nevertrump',     name: '温和保守律师',   icon: '🕊️', aggression: 0.3,  economy: 0.6 },
-    { id: 'hollywood',      name: '名人律师',       icon: '🎬', aggression: 0.65, economy: 0.5, bonus: { vote: 1 } },
+    { id: 'libertarian',    name: '自由派律师',     aggression: 0.35, economy: 0.8, bonus: { money: 1 } },
+    { id: 'teaParty',       name: '民粹律师',       aggression: 0.7,  economy: 0.45, bonus: { vote: 1 } },
+    { id: 'demSoc',         name: '平权律师',       aggression: 0.55, economy: 0.6 },
+    { id: 'maga',           name: '鹰派律师',       aggression: 0.9,  economy: 0.35, bonus: { vote: 1 } },
+    { id: 'greenNewDeal',   name: '环保律师',       aggression: 0.6,  economy: 0.55, bonus: { money: 1 } },
+    { id: 'establishment',  name: '建制派律师',     aggression: 0.5,  economy: 0.65, bonus: { money: 1 } },
+    { id: 'nevertrump',     name: '温和保守律师',   aggression: 0.3,  economy: 0.6 },
+    { id: 'hollywood',      name: '名人律师',       aggression: 0.65, economy: 0.5, bonus: { vote: 1 } },
     /* ============ 更多人格扩充包（+4） ============ */
-    { id: 'populist',       name: '民粹大状',       icon: '📣', aggression: 0.85, economy: 0.3,  bonus: { vote: 1 } },
-    { id: 'silicon',        name: '硅谷律师',       icon: '💻', aggression: 0.4,  economy: 0.75, bonus: { money: 1 } },
-    { id: 'military',       name: '军法律师',       icon: '🎖️', aggression: 0.9,  economy: 0.4,  bonus: { vote: 1 } },
-    { id: 'moderate',       name: '中立律师',       icon: '⚖️', aggression: 0.3,  economy: 0.6,  bonus: { money: 1 } }
-  ];
-
-  /* 事件牌模板（lv：① ② ③ 分级；target：self 自己 / enemy 需选对方 / auto 自动） */
-  const EVENT_TEMPLATES = [
-    { id: 'e01', name: '当庭陈词',   lv: 1, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 1 },     desc: '庭审前：本方 +1 票' },
-    { id: 'e02', name: '质疑证词',   lv: 1, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -1 },    desc: '庭审前：指定对方 -1 票' },
-    { id: 'e03', name: '追加陈词',   lv: 2, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 1 },     desc: '庭审前：本方 +1 票' },
-    { id: 'e04', name: '揭发前科',   lv: 2, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -1 },    desc: '庭审前：指定对方 -1 票' },
-    { id: 'e05', name: '关键陈词',   lv: 3, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 2 },     desc: '庭审前：本方 +2 票' },
-    { id: 'e06', name: '致命污点',   lv: 3, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -2 },    desc: '庭审前：指定对方 -2 票' },
-    { id: 'e07', name: '胜诉酬金',   lv: 1, timing: 'post', target: 'self',  eff: { type: 'money', val: 1 },    desc: '庭审后：本方 +1⊙' },
-    { id: 'e08', name: '冻结资产',   lv: 1, timing: 'post', target: 'enemy', eff: { type: 'money', val: -1 },   desc: '庭审后：指定对方 -1⊙' },
-    { id: 'e09', name: '舆论施压',   lv: 2, timing: 'post', target: 'auto',  eff: { type: 'rewardBuff', val: 1 }, desc: '庭审后：若本方本轮第一，倾向奖励 +1' },
-    { id: 'e10', name: '抹黑对手',   lv: 2, timing: 'post', target: 'enemy', eff: { type: 'support', val: -1 }, desc: '庭审后：指定对方倾向 -1' },
-    { id: 'e11', name: '终局陈词',   lv: 3, timing: 'post', target: 'auto',  eff: { type: 'rewardBuff', val: 2 }, desc: '庭审后：若本方本轮第一，倾向奖励 +2' },
-    { id: 'e12', name: '庭外交易',   lv: 3, timing: 'post', target: 'enemy', eff: { type: 'support', val: -2 }, desc: '庭审后：指定对方倾向 -2' },
-    { id: 'e21', name: '环境污染案',    lv: 2, timing: 'pre',  target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审前：所有玩家丑闻值 +1' },
-    { id: 'e34', name: '禁酒令案',      lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e36', name: '反恐案',        lv: 2, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e37', name: '军售丑闻案',    lv: 2, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e38', name: '桃色丑闻案',    lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e40', name: '计票争议案',    lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
-    { id: 'e41', name: '水门案',        lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' }
-  ];
-
+    { id: 'populist',       name: '民粹大状',       aggression: 0.85, economy: 0.3,  bonus: { vote: 1 } },

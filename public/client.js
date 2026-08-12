@@ -16,6 +16,7 @@ const DEBUG = false;       // 调试面板开关：发布时 false（右上角�
 const mouse = { x: 0, y: 0 };
 let hoverTickOn = false, hoverTickT = 0;   // 悬停音效节流：进入可点区域瞬间极短滴答
 let buttons = [];          // 本帧按钮命中区
+let confirmAsk = null;     // P1-3 确认撤销：{ act, title, body } —— 危险操作二次确认弹层
 let btnFlash = {};         // 按钮点击闪光（id → alpha，主循环衰减）
 let hoverCards = [];       // 本帧卡牌命中区（悬停显示详情）
 let termHits = [];         // 本帧术语链接命中区（点击打开术语弹窗）
@@ -31,6 +32,11 @@ let portraitMode = false; // 竖屏触屏：底栏纵向手牌抽屉（超级更
 let handScroll = 0;       // 竖屏抽屉当前页（0 起）
 let HUD_H = 52, PANEL_Y = 56;
 let HAND_AREA_H = isMobile ? 190 : 230;
+// HUD 左右面板宽（与 shared/render-core.js renderHudOf 同公式；供 stepBar 起止点计算）
+function hudPanelW(side){
+  return side === 'L' ? clamp(Math.min(254, W * 0.42), 116, 254)
+    : clamp(Math.min(262, W * 0.42), 116, 262);
+}
 const PORTRAIT_ACT_H = 48;   // Task 5 竖屏固定操作栏高度（含上下留白）
 /* 四档屏幕断点：wide(>1280) / normal(≥800) / narrow(≥600) / tiny(<600)
  * 每档独立调整 HUD/面板/底栏高度与字号，信息条字段按档位级联隐藏 */
@@ -135,35 +141,6 @@ function flexRects(n, y, h, gap, maxW, reserveR) {
   for (let i = 0; i < n; i++) out.push({ x: 10 + i * (cw + gap), y, w: cw, h });
   return out;
 }
-/* ============ 讽刺卡通调色板：大胆鲜艳 + 粗黑描边 ============ */
-function c2(c) {
-  const M = {
-    '#f6f1e3': '#fdf0c9', '#efe8d5': '#f7e6a8', '#fffdf6': '#ffffff',
-    'rgba(255,253,246,0.94)': 'rgba(255,255,255,0.95)',
-    '#3a342a': '#111111', '#2f2b26': '#111111', '#2b2b2b': '#111111',
-    /* 红系 → 鲜红 */
-    '#ff4757': '#FF3B30', '#d64545': '#FF3B30', '#c0392b': '#FF3B30', '#b33a3a': '#FF3B30', '#e74c3c': '#FF3B30', '#e04343': '#FF3B30', '#D82E2F': '#FF3B30', '#E6392F': '#FF3B30',
-    /* 蓝系 → 亮蓝 */
-    '#3f6fb5': '#0A84FF', '#4a6fa5': '#0A84FF', '#3a63c8': '#0A84FF', '#1E4FB5': '#0A84FF', '#2f6fd8': '#0A84FF', '#3f8f8f': '#2FBF5F',
-    /* 绿系 → 鲜绿 */
-    '#4d9e5a': '#2FBF5F', '#5daa4f': '#2FBF5F', '#2ecc71': '#2FBF5F', '#2ed573': '#2FBF5F', '#0E8A5F': '#2FBF5F', '#2f9e62': '#2FBF5F', '#2e9e63': '#2FBF5F',
-    /* 金系 → 亮金 */
-    '#f0b429': '#FFC61A', '#d9a52e': '#FFC61A', '#c98a1b': '#FFB020', '#8a6a1a': '#B8860B', '#ffa502': '#FF9F0A', '#E8A418': '#FFB020', '#FFD400': '#FFD60A', '#B8860B': '#E8A418',
-    '#2a2620': '#1A1410', '#5a5345': '#3A342A', '#7a7262': '#6B6355',
-    '#8a816e': '#7d7564', '#a89e85': '#94886C', '#b8ae92': '#C4B894',
-    '#c9bfa5': '#E8DDB8', '#d8d0b8': '#F0E8C8', '#e5ddc8': '#F5ECD0', '#e8dfc8': '#F0E8C8',
-    '#8f8f98': '#9a917e', '#7a6fa0': '#7a6fa8', '#c06a2a': '#FF9F0A',
-    '#553a20': '#4a2a10', '#3a3a3a': '#111111', '#6b4a2a': '#5a3a1a',
-    '#2a2a2a': '#101418', '#20222c': '#0F1B2D', '#4a3520': '#3a2a12', '#8a6a3a': '#E8A418',
-    /* 面板 / 背景旧色 → 演播室 */
-    '#EDE4C8': '#0F1B2D', '#DCCFA8': '#1A2C44', '#F7F0DC': '#FFFFFF', '#efe6cd': '#F2E9D2',
-    '#FDF6E3': '#F6E9C8', '#f6e9c8': '#F6E9C8', '#f0e8c8': '#F4ECD8', '#fffdf6': '#FFFFFF',
-    '#DDD5BC': '#39425A', '#F3EBD6': '#F2E9D2',
-    '#2A3A5A': '#1B2C4A', '#7A0E0E': '#A31B1B', '#8A7350': '#8A6A3F', '#e8e0c8': '#EAE2C8',
-    'rgba(20,25,40,0.92)': 'rgba(10,16,28,0.94)', 'rgba(255,255,255,0.08)': 'rgba(255,255,255,0.10)'
-  };
-  return M[c] || c;
-}
 
 /* 美漫锯齿矩形路径（miter 折线 + 手绘纸边锯齿） */
 function jaggedRectPath(x, y, w, h, j) {
@@ -187,7 +164,7 @@ function jaggedRectPath(x, y, w, h, j) {
 /** 平涂纯色色块（无圆角、无渐变） */
 function pxRect(x, y, w, h, col) {
   ctx.save();
-  ctx.fillStyle = c2(col);
+  ctx.fillStyle = col;
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
   ctx.restore();
 }
@@ -195,7 +172,7 @@ function pxRect(x, y, w, h, col) {
 function pxBorder(x, y, w, h, col, t) {
   t = clamp(Math.max(1.5, t || 2), 1.5, 6);
   ctx.save();
-  ctx.strokeStyle = c2(col);
+  ctx.strokeStyle = col;
   ctx.lineWidth = t;
   ctx.lineJoin = 'miter';
   ctx.lineCap = 'butt';
@@ -209,7 +186,7 @@ function pxBorder(x, y, w, h, col, t) {
   ctx.restore();
 }
 
-const _FONT_BASE = '"Microsoft YaHei","PingFang SC","Impact","Arial Black",sans-serif';
+const _FONT_BASE = '"Noto Sans SC","Microsoft YaHei","PingFang SC","Impact","Arial Black",sans-serif';
 const _twCache = new Map();
 /** 精确测量文本宽度（带缓存：字体+文本 作为 key，避免每帧重复 measureText） */
 function textWidth(text, font) {
@@ -260,10 +237,10 @@ function drawPixelText(text, x, y, size, color, o) {
   if (!small && o.shadow !== false) {
     ctx.lineWidth = o.lineW !== undefined ? o.lineW : Math.max(0.8, size / 12);
     ctx.lineJoin = 'miter';
-    ctx.strokeStyle = o.outline || '#111111';
+    ctx.strokeStyle = o.outline || PAL.black;
     ctx.strokeText(text, x, y);
   }
-  ctx.fillStyle = c2(color);
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
   ctx.restore();
   return { w: Math.round(textWidth(text, bold + size + 'px ' + _FONT_BASE)), h: Math.round(size * 1.4) };
@@ -323,7 +300,7 @@ function drawSpeedLine(cx, cy, R0, R1, n, col, wdt) {
 /** 美漫背景：做旧报纸底 + 45° 平行墨线 */
 function hatchBg() {
   ctx.save();
-  ctx.fillStyle = '#f0e8c8';
+  ctx.fillStyle = '#F4ECD8';
   ctx.fillRect(0, 0, W, H);
   ctx.strokeStyle = 'rgba(20,20,20,0.16)';
   ctx.lineWidth = 1.5;
@@ -359,12 +336,13 @@ function sfx(name) {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
     if (AC.state === 'suspended') AC.resume();
     const t = AC.currentTime;
+    const vscale = (settings && settings.sfx != null ? settings.sfx : 80) / 100;   // P1-5 音效音量
     const osc = (type, f0, f1, dur, vol, delay) => {
       const o = AC.createOscillator(), g = AC.createGain();
       o.type = type; o.frequency.setValueAtTime(f0, t + (delay || 0));
       if (f1 !== undefined) o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + (delay || 0) + dur);
       g.gain.setValueAtTime(0.0001, t + (delay || 0));
-      g.gain.exponentialRampToValueAtTime(vol, t + (delay || 0) + 0.015);
+      g.gain.exponentialRampToValueAtTime(vol * vscale, t + (delay || 0) + 0.015);
       g.gain.exponentialRampToValueAtTime(0.0001, t + (delay || 0) + dur);
       o.connect(g); g.connect(AC.destination);
       o.start(t + (delay || 0)); o.stop(t + (delay || 0) + dur + 0.05);
@@ -375,7 +353,7 @@ function sfx(name) {
       const d = buf.getChannelData(0);
       for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
       const src = AC.createBufferSource(), g = AC.createGain();
-      src.buffer = buf; g.gain.value = vol;
+      src.buffer = buf; g.gain.value = vol * vscale;
       src.connect(g); g.connect(AC.destination);
       src.start(t + (delay || 0));
     };
@@ -447,6 +425,7 @@ function updateFx(dt) {
 function ttOf(f) { return Math.max(0, f.t - (f.delay || 0)); }
 function easeOutBack(p) { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); }
 function easeOutCubic(p) { return 1 - Math.pow(1 - p, 3); }
+function easeOutQuart(p) { return 1 - Math.pow(1 - p, 4); }
 function easeInOut(p) { return p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; }
 function renderFx() { for (const f of FX) drawFx(f); }
 function drawFx(f) {
@@ -481,7 +460,7 @@ function drawFx(f) {
             ctx.closePath();
             ctx.fill();
             ctx.globalAlpha = sa * 0.9;
-            ctx.strokeStyle = '#FFFFFF';
+            ctx.strokeStyle = PAL.white;
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(0, -it.h * 0.85);
@@ -494,118 +473,14 @@ function drawFx(f) {
       });
       break;
     }
-    case 'boom': {
-      const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
-      const R = f.w * 0.9 * easeOutCubic(p);
-      const a = p < 0.65 ? 1 : 1 - (p - 0.65) / 0.35;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, a);
-      // 中心白闪
-      if (p < 0.25) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.globalAlpha = (0.25 - p) / 0.25 * 0.85;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 0.5 * (1 - p), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = Math.max(0, a);
-      ctx.fillStyle = p < 0.4 ? '#FFD60A' : '#FF3B30';
-      ctx.beginPath();
-      const seg = 12;
-      for (let i = 0; i <= seg; i++) {
-        const ang = i / seg * Math.PI * 2;
-        const r = R * (0.72 + 0.28 * Math.abs(Math.sin(i * 2.7 + f.t * 0.02)));
-        const x = cx + Math.cos(ang) * r, y = cy + Math.sin(ang) * r;
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      }
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.stroke();
-      if (p > 0.15 && p < 0.7) {
-        const s2 = 1 + 0.6 * Math.sin(p * 9);
-        drawPixelText('BOOM!', cx, cy, 40 * s2 * (p < 0.3 ? p / 0.3 : 1), '#FFD60A', { align: 'center' });
-      }
-      // 飞溅碎片（fxLowQ 减半，保帧率）
-      if (p > 0.2) {
-        const rnd = f.seed || 11;
-        ctx.globalAlpha = Math.max(0, 1 - p * 1.2);
-        for (let i = 0; i < (fxLowQ ? 5 : 10); i++) {
-          const ang = ((rnd * (i + 1) * 1.7) % 6.28);
-          const dist = (p - 0.2) / 0.8 * (R * 1.4) * (0.4 + ((rnd * i) % 10) / 14);
-          const px = cx + Math.cos(ang) * dist, py = cy + Math.sin(ang) * dist;
-          ctx.save();
-          ctx.translate(px, py); ctx.rotate(ang + p * 4);
-          ctx.fillStyle = ['#FF3B30', '#FFD60A', '#FF9F0A', '#FFFFFF'][(rnd + i) % 4];
-          ctx.fillRect(-4, -4, 8, 8);
-          ctx.restore();
-        }
-      }
-      ctx.restore();
-      break;
-    }
-    case 'news': {
-      const inP = clamp(tt / 220, 0, 1);
-      const outP = clamp((tt - (f.dur - 200)) / 200, 0, 1);
-      const slide = inP * (1 - outP);
-      ctx.save();
-      // 红蓝全屏脉冲（新闻冲击感）
-      if (p < 0.12) { ctx.save(); ctx.globalAlpha = (0.12 - p) / 0.12 * 0.4; pxRect(0, 0, W, H, '#FFFFFF'); ctx.restore(); }
-      else if (p > 0.45 && p < 0.6) { ctx.save(); ctx.globalAlpha = (0.6 - p) / 0.15 * 0.16; pxRect(0, 0, W, H, '#FF3B30'); ctx.restore(); }
-      else if (p > 0.68 && p < 0.83) { ctx.save(); ctx.globalAlpha = (0.83 - p) / 0.15 * 0.16; pxRect(0, 0, W, H, '#0A84FF'); ctx.restore(); }
-      const bw = W * 1.2, bh = 64, by = -50 + slide * 12;
-      ctx.translate(-(1 - slide) * 60, 0);
-      pxRect(-20, by, bw, bh, '#FFD60A');
-      ctx.save();
-      ctx.beginPath(); ctx.rect(-20, by, bw, bh); ctx.clip();
-      for (let i = -2; i < 20; i += 2) {
-        ctx.fillStyle = '#1A1A1A'; ctx.globalAlpha = 0.16;
-        ctx.beginPath();
-        ctx.moveTo(i * 46, by - 20); ctx.lineTo(i * 46 + 23, by + bh + 20); ctx.lineTo(i * 46 + 46, by + bh + 20); ctx.lineTo(i * 46 + 23, by - 20);
-        ctx.closePath(); ctx.fill();
-      }
-      ctx.restore();
-      pxBorder(-20, by, bw, bh, '#111111', 3);
-      drawPixelText('⚡ BREAKING NEWS ⚡', W / 2, by + bh / 2, 26, '#111111', { align: 'center', shadow: false });
-      const tIn = clamp((tt - 260) / 240, 0, 1);
-      if (tIn > 0 && p < 0.94) {
-        const ty = by + bh + 34 + (1 - easeOutBack(tIn)) * 60;
-        const sc = easeOutBack(tIn);
-        ctx.save();
-        ctx.translate(W / 2, ty); ctx.scale(sc, sc);
-        pxRect(-W / 2, -26, W, 52, '#111111');
-        pxBorder(-W / 2, -26, W, 52, '#FFD60A', 3);
-        drawPixelText(f.title, 0, 2, 30, '#FFFFFF', { align: 'center' });
-        ctx.restore();
-        if (f.sub) drawPixelText(f.sub, W / 2, ty + 58, 15, '#FF5A4E', { align: 'center' });
-      }
-      ctx.restore();
-      break;
-    }
-    case 'objection': {   // 法庭高潮：事件生效瞬间的全屏反对
-      const inP = clamp(tt / 140, 0, 1);
-      const outP = clamp((tt - (f.dur - 200)) / 200, 0, 1);
-      const a = clamp(Math.min(inP, 1 - outP), 0, 1);
-      ctx.save();
-      ctx.globalAlpha = a;
-      if (p < 0.1) { ctx.save(); ctx.globalAlpha = (0.1 - p) / 0.1 * 0.5; pxRect(0, 0, W, H, '#FFFFFF'); ctx.restore(); }
-      else if (p > 0.45 && p < 0.6) { ctx.save(); ctx.globalAlpha = (0.6 - p) / 0.15 * 0.22; pxRect(0, 0, W, H, '#FF3B30'); ctx.restore(); }
-      pxRect(0, 0, W, H, 'rgba(10,12,20,0.42)');
-      ctx.translate(W / 2, H * 0.32);
-      ctx.scale(easeOutBack(inP), easeOutBack(inP));
-      pxRect(-W * 0.38, -36, W * 0.76, 72, '#111111');
-      pxBorder(-W * 0.38, -36, W * 0.76, 72, '#FFD60A', 5);
-      drawPixelText('OBJECTION!', 0, 2, 46, '#FFD60A', { align: 'center', shadow: false });
-      if (f.sub) drawPixelText(f.sub, 0, 66, 17, '#FFFFFF', { align: 'center' });
-      ctx.restore();
-      break;
-    }
     case 'count': {
       const cx = W - 262, cy = 64, cw = 252, chh = 150;
       const a = p < 0.08 ? p / 0.08 : (p > 0.9 ? (1 - p) / 0.1 : 1);
       ctx.save();
       ctx.globalAlpha = clamp(a, 0, 1);
       pxRect(cx, cy, cw, chh, 'rgba(10,16,28,0.94)');
-      pxBorder(cx, cy, cw, chh, '#FFD60A', 3);
-      drawPixelText('审 议 中', cx + cw / 2, cy + 18, 17, '#FFD60A', { align: 'center', shadow: false });
+      pxBorder(cx, cy, cw, chh, PAL.gold, 3);
+      drawPixelText('审 议 中', cx + cw / 2, cy + 18, 17, PAL.gold, { align: 'center', shadow: false });
       const votes = f.votes, mx = Math.max(1, ...votes);
       const n = votes.length;
       const bw2 = Math.min(44, (cw - 30) / n - 6);
@@ -615,66 +490,29 @@ function drawFx(f) {
         const bh2 = Math.max(6, (v / mx) * 74 * grow);
         const by = cy + chh - 42 - bh2;
         pxRect(bx, by, bw2, bh2, f.cols[i]);
-        pxBorder(bx, by, bw2, bh2, '#111111', 2);
+        pxBorder(bx, by, bw2, bh2, PAL.black, 2);
         const dg = Math.round(v * grow);
         if (grow < 0.92) {
-          drawPixelText(String(dg), bx + bw2 / 2, by - 12, 15, '#FFFFFF', { align: 'center', shadow: false });
+          drawPixelText(String(dg), bx + bw2 / 2, by - 12, 15, PAL.white, { align: 'center', shadow: false });
         } else {
           // 计票大数字：完成后向上弹出爆出（最高票金色放大+星星）
           const pop = easeOutBack(clamp((p - i * 0.12 - 0.86) / 0.14, 0, 1));
           const isWin = v === mx && f.t > 0;
           const sz = 15 + 14 * pop;
           const py = by - 12 - pop * 30;
-          drawPixelText(String(dg), bx + bw2 / 2, py, sz, isWin ? '#FFD400' : '#FFFFFF', { align: 'center', shadow: false });
+          drawPixelText(String(dg), bx + bw2 / 2, py, sz, isWin ? PAL.gold : PAL.white, { align: 'center', shadow: false });
           if (isWin) {
             const tw = Math.sin(f.t / 60) * 3;
-            drawPixelText('★ 领先', bx + bw2 / 2, py - sz - 6 + tw, 11, '#FFD60A', { align: 'center', shadow: false });
+            UIKit.drawSkillIcon(ctx, 'star', bx + bw2 / 2 - 14, py - sz - 5 + tw, 13, PAL.gold);
+            drawPixelText('领先', bx + bw2 / 2 + 1, py - sz - 6 + tw, 11, PAL.gold, { align: 'left', shadow: false });
             const sp = clamp((f.t % 420) / 420, 0, 1);
             if (sp > 0.02 && sp < 0.9) {
-              drawPixelText('✦', bx + bw2 / 2 + Math.sin(sp * 40) * 26, py - sz - 18 - sp * 34, 8 + 8 * sp, '#FFD60A', { align: 'center', shadow: false });
+              UIKit.drawSkillIcon(ctx, 'star', bx + bw2 / 2 + Math.sin(sp * 40) * 26, py - sz - 18 - sp * 34, 8 + 8 * sp, PAL.gold);
             }
           }
         }
-        drawPixelText(f.names[i].charAt(0), bx + bw2 / 2, cy + chh - 26, 13, '#FFD60A', { align: 'center', shadow: false });
+        drawPixelText(f.names[i].charAt(0), bx + bw2 / 2, cy + chh - 26, 13, PAL.gold, { align: 'center', shadow: false });
       });
-      ctx.restore();
-      break;
-    }
-    case 'podium': {
-      const cx = W - 262, cy = 64, cw = 252, chh = 150;
-      const a = p < 0.08 ? p / 0.08 : (p > 0.9 ? (1 - p) / 0.1 : 1);
-      ctx.save();
-      ctx.globalAlpha = clamp(a, 0, 1);
-      pxRect(cx, cy, cw, chh, 'rgba(10,16,28,0.94)');
-      pxBorder(cx, cy, cw, chh, '#FFD60A', 3);
-      drawPixelText('本轮排名', cx + cw / 2, cy + 16, 17, '#FFD60A', { align: 'center', shadow: false });
-      const order = f.order;
-      const hs = [52, 34, 20];
-      order.forEach((o, i) => {
-        const px = cx + 22 + i * 70;
-        const base = cy + chh - 26;
-        const hh = hs[i] * easeOutBack(clamp((tt - i * 160) / 400, 0, 1));
-        pxRect(px, base - hh, 58, hh, o.col);
-        pxBorder(px, base - hh, 58, hh, '#111111', 2);
-        drawPixelText(String(i + 1), px + 10, base - hh + 10, 12, contrast(o.col), { shadow: false });
-        pxRect(px + 8, base - hh - 22, 42, 22, o.col);
-        pxBorder(px + 8, base - hh - 22, 42, 22, '#111111', 2);
-        drawPixelText(o.name.charAt(0), px + 29, base - hh - 11, 12, contrast(o.col), { align: 'center', shadow: false });
-        if (i === 0 && hh > 40) {
-          drawPixelText('👑', px + 29, base - hh - 36 + Math.sin(f.t / 80) * 3, 16, '#FFD60A', { align: 'center', shadow: false });
-          if (p > 0.6) {
-            const cp = clamp((p - 0.6) / 0.35, 0, 1);
-            const rnd = f.seed || 5;
-            for (let k = 0; k < (fxLowQ ? 5 : 10); k++) {
-              const an = k / 10 * Math.PI * 2 + f.t * 0.012;
-              const rr = cp * 26 * (0.5 + ((rnd + k) % 5) / 6);
-              ctx.fillStyle = ['#FFD60A', '#FF5A4E', '#FFFFFF', '#0A84FF'][(rnd + k) % 4];
-              ctx.fillRect(px + 29 + Math.cos(an) * rr - 2.5, base - hh - 26 + Math.sin(an) * rr - 2.5, 5, 5);
-            }
-          }
-        }
-      });
-      if (p > 0.35 && p < 0.8) drawPixelText('🏆 领先', cx + cw - 58, cy + 44, 14, '#FFD60A', { align: 'center', shadow: false });
       ctx.restore();
       break;
     }
@@ -685,19 +523,7 @@ function drawFx(f) {
       ctx.globalAlpha = al;
       const sc = 1 + 0.5 * Math.sin(Math.min(1, p * 3) * Math.PI) * 0.3;
       ctx.translate(f.x, fy); ctx.scale(sc, sc);
-      drawPixelText(f.text, 0, 0, f.size || 22, f.col || '#FFD400', { align: 'center' });
-      ctx.restore();
-      break;
-    }
-    case 'coin': {
-      const al = p < 0.7 ? 1 : (1 - p) / 0.3;
-      ctx.save();
-      ctx.globalAlpha = al;
-      ctx.translate(f.x, f.y - 26 * easeOutCubic(p));
-      pxRect(-14, -14, 28, 28, '#E8A418');
-      pxBorder(-14, -14, 28, 28, '#111111', 3);
-      drawPixelText('⊙', 0, 1, 16, '#4A3100', { align: 'center', shadow: false, lineW: 0 });
-      drawPixelText(f.text, 22, 4, 18, '#E8A418', { shadow: false });
+      drawPixelText(f.text, 0, 0, f.size || 22, f.col || PAL.gold, { align: 'center' });
       ctx.restore();
       break;
     }
@@ -709,37 +535,7 @@ function drawFx(f) {
       ctx.globalAlpha = clamp(p * 4, 0, 1);
       ctx.translate(-f.w / 2, -f.h / 2);
       if (f.draw) f.draw();
-      else { pxRect(0, 0, f.w, f.h, 'rgba(255,255,255,0.55)'); pxBorder(0, 0, f.w, f.h, '#FFD400', 2); }
-      ctx.restore();
-      break;
-    }
-    case 'shatter': {
-      ctx.save();
-      ctx.globalAlpha = 1 - p;
-      const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
-      const rnd = f.seed || 7;
-      for (let i = 0; i < (fxLowQ ? 7 : 14); i++) {
-        const ang = ((rnd * (i + 1) * 1.7) % 6.28) + 0.15;
-        const dist = p * 90 * (0.4 + ((rnd * i) % 10) / 12);
-        const px = cx + Math.cos(ang) * dist, py = cy + Math.sin(ang) * dist;
-        ctx.save();
-        ctx.translate(px, py);
-        ctx.rotate(ang + p * 3);
-        const s = 6 + ((rnd * (i + 3)) % 8);
-        ctx.fillStyle = f.col || '#E6392F';
-        ctx.fillRect(-s / 2, -s / 2, s, s);
-        ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
-        ctx.strokeRect(-s / 2, -s / 2, s, s);
-        ctx.restore();
-      }
-      ctx.restore();
-      break;
-    }
-    case 'pulse': {
-      ctx.save();
-      const on = Math.sin(tt / 90) > 0 ? 0.8 : 0.2;
-      ctx.globalAlpha = on * (1 - p * 0.5);
-      pxRect(f.x - 3, f.y - 3, f.w + 6, f.h + 6, f.col || '#FFD400');
+      else { pxRect(0, 0, f.w, f.h, 'rgba(255,255,255,0.55)'); pxBorder(0, 0, f.w, f.h, PAL.gold, 2); }
       ctx.restore();
       break;
     }
@@ -747,7 +543,7 @@ function drawFx(f) {
       const a = p < 0.15 ? p / 0.15 : (p > 0.8 ? (1 - p) / 0.2 : 1);
       ctx.save();
       ctx.globalAlpha = clamp(a, 0, 1) * 0.85;
-      ctx.strokeStyle = f.col || '#FFD60A';
+      ctx.strokeStyle = f.col || PAL.gold;
       ctx.lineWidth = 10 * (1 - p * 0.6);
       ctx.lineCap = 'butt';
       ctx.beginPath();
@@ -772,308 +568,24 @@ function drawFx(f) {
       ctx.globalAlpha = clamp(a, 0, 1);
       const bh = 64;
       pxRect(0, H * 0.3, W, bh, '#101418');
-      pxBorder(0, H * 0.3, W, bh, '#FFD60A', 3);
+      pxBorder(0, H * 0.3, W, bh, PAL.gold, 3);
       // 红蓝双色左条 + 速度线
-      pxRect(0, H * 0.3, 12, bh, '#FF3B30');
-      pxRect(12, H * 0.3, 12, bh, '#0A84FF');
+      pxRect(0, H * 0.3, 12, bh, PAL.red);
+      pxRect(12, H * 0.3, 12, bh, PAL.blue);
       drawSpeedLine(W / 2, H * 0.3 + bh / 2, bh * 0.7, W * 0.48, 26, 'rgba(255,255,255,0.14)', 2);
-      drawPixelText((f.icon ? f.icon + ' ' : '') + '—— ' + f.label + ' ——', W / 2, H * 0.3 + bh / 2, 30, '#FFD60A', { align: 'center' });
-      ctx.restore();
-      break;
-    }
-    case 'confetti': {
-      ctx.save();
-      ctx.globalAlpha = p < 0.8 ? 1 : (1 - p) / 0.2;
-      const rnd = f.seed || 7;
-      const n = Math.min(f.n || 40, fxLowQ ? 18 : 40);
-      for (let i = 0; i < n; i++) {
-        const ang = ((rnd * (i + 1) * 1.7) % 6.28);
-        const dist = p * (60 + ((rnd * i) % 120));
-        const px = f.x + Math.cos(ang) * dist;
-        const py = f.y + Math.sin(ang) * dist + p * 40;
-        ctx.fillStyle = ['#E6392F', '#FFD60A', '#2f6fd8', '#2f9e62', '#E8A418'][(rnd + i) % 5];
-        const s = 5 + ((rnd * (i + 2)) % 6);
-        ctx.fillRect(px - s / 2, py - s / 2, s, s * 0.7);
-      }
-      ctx.restore();
-      break;
-    }
-    case 'star': {
-      const al = p < 0.7 ? 1 : (1 - p) / 0.3;
-      ctx.save();
-      ctx.globalAlpha = al;
-      ctx.translate(f.x, f.y - 20 * easeOutCubic(p));
-      drawPixelText(f.text, 0, 0, f.size || 22, f.col || '#FFD60A', { align: 'center' });
-      ctx.restore();
-      break;
-    }
-    case 'flow': {                // 支持度条填充：从左到右生长（x,y,w,h,col）
-      const pr2 = clamp(easeOutCubic(p), 0, 1);
-      ctx.save();
-      ctx.globalAlpha = p < 0.75 ? 1 : (1 - p) / 0.25;
-      pxRect(f.x, f.y, Math.max(2, f.w * pr2), f.h, f.col || '#FFD60A');
-      pxBorder(f.x, f.y, Math.max(2, f.w * pr2), f.h, '#111111', 1);
-      // 前缘高光
-      if (pr2 < 1) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(f.x + Math.max(1, f.w * pr2 - 3), f.y + 1, 3, f.h - 2); }
-      ctx.restore();
-      break;
-    }
-    case 'spotlight': {           // 聚光灯：从上方扫过行区域（x0,y0,w0,h0）
-      const a = p < 0.12 ? p / 0.12 : (p > 0.85 ? (1 - p) / 0.15 : 1);
-      ctx.save();
-      ctx.globalAlpha = clamp(a, 0, 1);
-      const sx = f.x0 + (f.w0 || W) * easeInOut(p);
-      const bw2 = (f.bw || 90) * (1 - p * 0.25);
-      ctx.fillStyle = '#FFF4C8';
-      ctx.beginPath();
-      ctx.moveTo(sx - bw2, f.y0 - 50);
-      ctx.lineTo(sx + bw2, f.y0 - 50);
-      ctx.lineTo(sx + bw2 * 3.1, f.y0 + f.h0 + 70);
-      ctx.lineTo(sx - bw2 * 3.1, f.y0 + f.h0 + 70);
-      ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = clamp(a, 0, 1) * 0.85;
-      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(sx, f.y0 - 50); ctx.lineTo(sx, f.y0 + f.h0 + 70); ctx.stroke();
-      ctx.restore();
-      break;
-    }
-    case 'wheel': {               // 庭审轮盘：旋转停在 winner 分区（cx,cy,r,seats[{name,col}],winner）
-      const inP = clamp(tt / 220, 0, 1);
-      const outP = clamp((tt - (f.dur - 300)) / 300, 0, 1);
-      const a = Math.min(inP, 1 - outP);
-      if (a <= 0) break;
-      const n = f.seats.length;
-      const r = f.r || 88;
-      const step = 2 * Math.PI / n;
-      let target = (-Math.PI / 2 - (f.winner * step + step / 2)) % (2 * Math.PI);
-      if (target < 0) target += 2 * Math.PI;
-      const rot = easeOutCubic(p) * (2 * Math.PI * 3 + target);
-      ctx.save();
-      ctx.globalAlpha = clamp(a, 0, 1);
-      const cx = f.cx, cy = f.cy;
-      // 外圈高帽边框
-      ctx.beginPath(); ctx.arc(cx, cy, r + 14, 0, Math.PI * 2);
-      ctx.fillStyle = '#111111'; ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, cy, r + 8, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFD60A'; ctx.fill();
-      ctx.save();
-      ctx.translate(cx, cy); ctx.rotate(rot);
-      for (let i = 0; i < n; i++) {
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, r, i * step, (i + 1) * step);
-        ctx.closePath();
-        ctx.fillStyle = f.seats[i].col;
-        ctx.fill();
-        ctx.strokeStyle = '#111111'; ctx.lineWidth = 3; ctx.stroke();
-      }
-      // 中心天平衡徽
-      ctx.fillStyle = '#111111';
-      ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
-      drawPixelText('⚖️', 0, 1, 16, '#FFFFFF', { align: 'center', shadow: false });
-      ctx.restore();
-      // 顶部金色指针
-      ctx.beginPath();
-      ctx.moveTo(cx - 8, cy - r - 8);
-      ctx.lineTo(cx + 8, cy - r - 8);
-      ctx.lineTo(cx, cy - r + 10);
-      ctx.closePath();
-      ctx.fillStyle = '#FF3B30'; ctx.fill();
-      ctx.strokeStyle = '#111111'; ctx.lineWidth = 2; ctx.stroke();
-      // 底部结果名（p 过半后弹出）
-      if (p > 0.42) {
-        const lp = clamp((p - 0.42) / 0.3, 0, 1);
-        ctx.globalAlpha = clamp(a, 0, 1) * lp;
-        ctx.save();
-        ctx.translate(cx, cy + r + 26);
-        ctx.scale(0.7 + 0.3 * easeOutBack(lp), 0.7 + 0.3 * easeOutBack(lp));
-        pxRect(-70, -16, 140, 32, '#FFD60A');
-        pxBorder(-70, -16, 140, 32, '#111111', 2.5);
-        drawPixelText('🎩 ' + f.seats[f.winner].name + ' 起始！', 0, 1, 14, '#111111', { align: 'center', shadow: false });
-        ctx.restore();
-      }
-      ctx.restore();
-      break;
-    }
-    case 'coinFlip': {            // 抛硬币决定阵营：全屏覆盖旋转 → 落下揭示（side: 'prosecutor'|'defense'）
-      const inP = clamp(tt / 180, 0, 1);
-      const outP = clamp((tt - (f.dur - 300)) / 300, 0, 1);
-      const a = Math.min(inP, 1 - outP);
-      if (a <= 0) break;
-      const cx = W / 2, cy = H * 0.38;
-      const R = f.r || Math.min(54, W * 0.09);
-      ctx.save();
-      ctx.globalAlpha = clamp(a, 0, 1);
-      // 深色遮罩突出硬币
-      ctx.fillStyle = 'rgba(8,10,18,0.72)';
-      ctx.fillRect(0, 0, W, H);
-      // 金币：旋转 6 圈下落，两面 ⚖(检方) / 🛡(辩护方) 交替，旋转到侧面时压扁
-      const spins = 6;
-      const faceP = (p * spins) % 1;
-      const isPro = faceP < 0.5;
-      const y = cy + (1 - easeOutCubic(p)) * -120;
-      const wob = Math.sin(p * Math.PI * spins * 2) * 0.1;
-      ctx.translate(cx, y);
-      ctx.scale(1 + wob, 1 - wob);
-      pxRect(-R, -R, R * 2, R * 2, '#E8A418');
-      pxBorder(-R, -R, R * 2, R * 2, '#111111', 4);
-      ctx.beginPath(); ctx.arc(0, 0, R - 6, 0, Math.PI * 2);
-      ctx.fillStyle = '#FFC61A'; ctx.fill();
-      ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke();
-      const squeeze = Math.abs(Math.cos(p * Math.PI * spins));   // 1 正面 / 0 侧面
-      ctx.globalAlpha = clamp(a, 0, 1) * (0.3 + 0.7 * squeeze);
-      drawPixelText(isPro ? '⚖' : '🛡', 0, 0, R * 0.95, '#4A3100', { align: 'center', shadow: false });
-      ctx.restore();
-      ctx.save();
-      ctx.globalAlpha = clamp(a, 0, 1);
-      drawPixelText('抛硬币决定阵营', cx, cy - R - 30, 15, '#FFD60A', { align: 'center' });
-      // 落地揭示：弹出版本横幅
-      if (p > 0.72) {
-        const lp = clamp((p - 0.72) / 0.22, 0, 1);
-        const side = f.side === 'prosecutor' ? '检方' : '辩护方';
-        const col = f.side === 'prosecutor' ? '#FF5A4E' : '#2F6FD8';
-        ctx.globalAlpha = clamp(a, 0, 1) * lp;
-        ctx.translate(cx, cy + R + 26);
-        ctx.scale(0.7 + 0.3 * easeOutBack(lp), 0.7 + 0.3 * easeOutBack(lp));
-        pxRect(-92, -20, 184, 40, col);
-        pxBorder(-92, -20, 184, 40, '#111111', 3.5);
-        drawPixelText('你代表【' + side + '】', 0, 1, 17, '#FFFFFF', { align: 'center', shadow: false });
-      }
-      ctx.restore();
-      break;
-    }
-    case 'chain': {               // 铁链锁卡：两条交叉链 + 中央金锁（x,y,w,h）
-      const al = p < 0.8 ? 1 : (1 - p) / 0.2;
-      ctx.save();
-      ctx.globalAlpha = clamp(al, 0, 1);
-      const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
-      const grow = easeOutCubic(clamp(p * 1.15, 0, 1));
-      ctx.strokeStyle = '#7A8494'; ctx.lineWidth = 9; ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(f.x + 4, f.y + 4);
-      ctx.lineTo(f.x + 4 + (f.w - 8) * grow, f.y + 4 + (f.h - 8) * grow);
-      ctx.moveTo(f.x + f.w - 4, f.y + 4);
-      ctx.lineTo(f.x + f.w - 4 - (f.w - 8) * grow, f.y + 4 + (f.h - 8) * grow);
-      ctx.stroke();
-      ctx.strokeStyle = '#3E4654'; ctx.lineWidth = 2.5;
-      for (let i = 0; i < 5; i++) {
-        const t = i / 4 * grow;
-        ctx.beginPath(); ctx.arc(f.x + 4 + (f.w - 8) * t, f.y + 4 + (f.h - 8) * t, 6, 0, Math.PI * 2); ctx.stroke();
-        ctx.beginPath(); ctx.arc(f.x + f.w - 4 - (f.w - 8) * t, f.y + 4 + (f.h - 8) * t, 6, 0, Math.PI * 2); ctx.stroke();
-      }
-      const lp = clamp((p - 0.45) / 0.4, 0, 1);
-      if (lp > 0) {
-        const ly = cy - 12 + (1 - easeOutBack(lp)) * 16;
-        pxRect(cx - 13, ly, 26, 22, '#FFD60A');
-        pxBorder(cx - 13, ly, 26, 22, '#111111', 2.5);
-        ctx.beginPath(); ctx.arc(cx, ly + 2, 8, Math.PI, 0);
-        ctx.strokeStyle = '#111111'; ctx.lineWidth = 3; ctx.stroke();
-        drawPixelText('🔒', cx, ly + 15, 12, '#111111', { align: 'center', shadow: false });
-      }
-      ctx.restore();
-      break;
-    }
-    case 'shred': {               // 碎纸机：市场卡切条坠落（x,y,w,h）
-      const al = p < 0.75 ? 1 : (1 - p) / 0.25;
-      ctx.save();
-      ctx.globalAlpha = clamp(al, 0, 1);
-      const n2 = 8;
-      for (let i = 0; i < n2; i++) {
-        const sx = f.x + (i / n2) * f.w;
-        const sw = f.w / n2 * 0.72;
-        const sy = f.y + easeOutCubic(p) * f.h * (0.55 + 0.5 * ((i * 37) % 10) / 10);
-        const rot = (p * 0.7 + i * 0.13) * ((i % 2) ? 1 : -1);
-        ctx.save();
-        ctx.translate(sx + sw / 2, sy); ctx.rotate(rot);
-        ctx.fillStyle = i % 2 ? '#E9D9B2' : '#F6E9C8';
-        ctx.fillRect(-sw / 2, 0, sw, 6 + (i % 3) * 2);
-        ctx.strokeStyle = '#111111'; ctx.lineWidth = 1;
-        ctx.strokeRect(-sw / 2, 0, sw, 6 + (i % 3) * 2);
-        ctx.restore();
-      }
-      ctx.fillStyle = '#D8C89E';
-      ctx.fillRect(f.x - 6, f.y + f.h - 8 + p * 8, f.w + 12, 12);
-      ctx.strokeStyle = '#111111'; ctx.lineWidth = 1.5;
-      ctx.strokeRect(f.x - 6, f.y + f.h - 8 + p * 8, f.w + 12, 12);
-      ctx.restore();
-      break;
-    }
-    case 'recycle': {             // 弃牌回收：卡背弧线飞入选票箱（x0,y0 → x1,y1）
-      const al = p < 0.8 ? 1 : (1 - p) / 0.2;
-      ctx.save();
-      ctx.globalAlpha = clamp(al, 0, 1);
-      const x = f.x0 + (f.x1 - f.x0) * easeOutCubic(p);
-      const y = f.y0 + (f.y1 - f.y0) * easeOutCubic(p) + Math.sin(p * Math.PI * 3) * 14;
-      ctx.translate(x, y);
-      ctx.rotate(p * Math.PI * 2);
-      const sc = 1 - 0.45 * p;
-      ctx.scale(sc, sc);
-      UIKit.drawCardBackAt(ctx, -f.w / 2, -f.h / 2, f.w, f.h, '#7E93B0');
-      ctx.restore();
-      if (p > 0.55) {
-        ctx.save();
-        ctx.globalAlpha = clamp((p - 0.55) / 0.35, 0, 1) * 0.92;
-        drawRecycleBin(f.x1, f.y1);
-        ctx.restore();
-      }
-      break;
-    }
-    case 'flyTo': {               // 购买飞牌/出牌飞行：x0,y0,w0,h0 → x1,y1,w1,h1
-      const al = p < 0.85 ? 1 : (1 - p) / 0.15;
-      ctx.save();
-      ctx.globalAlpha = clamp(al, 0, 1);
-      const x = f.x0 + (f.x1 - f.x0) * easeOutCubic(p);
-      const y = f.y0 + (f.y1 - f.y0) * easeOutCubic(p) - Math.sin(p * Math.PI) * 30;
-      const w = f.w0 + (f.w1 - f.w0) * p, h = f.h0 + (f.h1 - f.h0) * p;
-      ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate(Math.sin(p * Math.PI) * 0.35);
-      ctx.translate(-w / 2, -h / 2);
-      if (f.card) UIKit.drawCard(ctx, 0, 0, w, h, f.card, { col: '#F6E9C8' });
-      else UIKit.drawCardBackAt(ctx, 0, 0, w, h, PAL.ui.b);
-      ctx.restore();
-      // 落台高亮：即将到位时金色脉冲描边
-      if (f.landGlow && p > 0.88) {
-        const gl = clamp((p - 0.88) / 0.12, 0, 1) * (0.5 + 0.5 * Math.sin(f.t / 70));
-        ctx.save();
-        ctx.globalAlpha = gl;
-        pxBorder(f.x1 - 5, f.y1 - 5, f.w1 + 10, f.h1 + 10, '#FFD60A', 4);
-        ctx.restore();
-      }
-      break;
-    }
-    case 'tombstone': {           // 墓碑落下：标记被炸毁的牌（x,y,w,h）
-      const al = p < 0.8 ? 1 : (1 - p) / 0.2;
-      ctx.save();
-      ctx.globalAlpha = clamp(al, 0, 1);
-      const rise = easeOutBack(clamp(p / 0.55, 0, 1));
-      const cx = f.x + f.w / 2, cy = f.y + f.h / 2;
-      const tw = 44 * rise, th = 58 * rise;
-      ctx.fillStyle = '#8B93A3';
-      ctx.beginPath();
-      ctx.moveTo(cx - tw, cy);
-      ctx.lineTo(cx - tw, cy - th * 0.72);
-      ctx.quadraticCurveTo(cx, cy - th, cx + tw, cy - th * 0.72);
-      ctx.lineTo(cx + tw, cy);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = '#111111'; ctx.lineWidth = 2.5; ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(cx - tw * 0.55, cy + 6);
-      ctx.lineTo(cx + tw * 0.55, cy + 6);
-      ctx.stroke();
-      drawPixelText('✝', cx, cy - th * 0.5, 13, '#FFFFFF', { align: 'center', shadow: false });
-      drawPixelText('RIP', cx, cy - 8, 10, '#E9ECF2', { align: 'center', shadow: false });
+      drawPixelText((f.icon ? f.icon + ' ' : '') + '—— ' + f.label + ' ——', W / 2, H * 0.3 + bh / 2, 30, PAL.gold, { align: 'center' });
       ctx.restore();
       break;
     }
   }
 }
 function drawRecycleBin(cx, cy) {   // 蓝色选票回收箱
-  pxRect(cx - 26, cy - 20, 52, 36, '#0A84FF');
-  pxBorder(cx - 26, cy - 20, 52, 36, '#111111', 2.5);
-  pxRect(cx - 30, cy - 26, 60, 10, '#FFD60A');
-  pxBorder(cx - 30, cy - 26, 60, 10, '#111111', 2);
+  pxRect(cx - 26, cy - 20, 52, 36, PAL.blue);
+  pxBorder(cx - 26, cy - 20, 52, 36, PAL.black, 2.5);
+  pxRect(cx - 30, cy - 26, 60, 10, PAL.gold);
+  pxBorder(cx - 30, cy - 26, 60, 10, PAL.black, 2);
   pxRect(cx - 26, cy - 12, 52, 3, 'rgba(255,255,255,0.18)');
-  drawPixelText('�', cx, cy + 1, 14, '#FFFFFF', { align: 'center', shadow: false });
+  drawPixelText('�', cx, cy + 1, 14, PAL.white, { align: 'center', shadow: false });
 }
 
 /* 风味名池数据唯一源 = shared/flavor.js（挂 window.VOTER_FLAVOR），flavorName 直接引用全局 */
@@ -1186,6 +698,180 @@ function defaultName() {
   if (n) return n;
   return '玩家' + Math.floor(100 + Math.random() * 900);
 }
+
+/* ============================ 律师档案（局外成长 P2-1） ============================
+ * localStorage 持久化：经验/等级/称号/胜场/成就/解锁角色。跨会话、跨页面生效。 */
+const PROFILE_KEY = 'elec_profile_v1';
+const XP_PER_LV = 100;                       // 每级经验
+const TITLES = ['实习律师', '助理律师', '出庭律师', '大律师', '御用大状', '律政先锋', '法庭传说'];
+const CHARS_UNLOCK_LV = {                    // 角色解锁等级（draft 屏灰显锁）
+  'alex': 1, 'jordan': 1, 'casey': 1,        // 新手三件套默认可用
+  'rin': 2, 'sunny': 2, 'dana': 3, 'vance': 4, 'mira': 5
+};
+function Profile() {
+  let p = null;
+  try { p = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) { p = null; }
+  if (!p || typeof p !== 'object') p = { xp: 0, wins: 0, games: 0, ach: {}, chars: {} };
+  p.ach = p.ach || {}; p.chars = p.chars || {};
+  const save = () => { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); } catch (e) { /* 隐私模式忽略 */ } };
+  return {
+    get lv() { return 1 + Math.floor(p.xp / XP_PER_LV); },
+    get xp() { return p.xp; },
+    get xpInLv() { return p.xp % XP_PER_LV; },
+    get title() { return TITLES[Math.min(TITLES.length - 1, this.lv - 1)]; },
+    get wins() { return p.wins || 0; },
+    get games() { return p.games || 0; },
+    gainXp(n) {
+      p.xp += n; p.games++;
+      const lvBefore = this.lv; save();
+      const lv = this.lv;
+      if (lv > lvBefore) { toast('晋升 Lv.' + lv + ' · ' + this.title, false); sfx('win'); }
+      return { lv, leveled: lv > lvBefore };
+    },
+    recordWin() { p.wins++; save(); },
+    unlockChar(id) { p.chars[id] = true; save(); },
+    isUnlocked(id) { const need = CHARS_UNLOCK_LV[id]; return need == null || need <= this.lv; },
+    nextUnlock() {
+      let best = null;
+      for (const id in CHARS_UNLOCK_LV) if (!this.isUnlocked(id) && (!best || CHARS_UNLOCK_LV[id] < CHARS_UNLOCK_LV[best])) best = id;
+      return best ? { id: best, lv: CHARS_UNLOCK_LV[best] } : null;
+    },
+    isAch(id) { return !!p.ach[id]; },
+    giveAch(id) { if (!p.ach[id]) { p.ach[id] = true; save(); toast('成就达成！', false); sfx('star'); } },
+    get data() { return p; },
+    save
+  };
+}
+const profile = Profile();
+/* 渲染主菜单档案卡 */
+function renderProfileCard() {
+  const el = id => document.getElementById(id);
+  const pn = el('pf-name'), pt = el('pf-title'), pl = el('pf-lv'), px = el('pf-xp'), pf = el('pf-xp-fill'), pw = el('pf-wins'), pa = el('pf-avatar');
+  if (!pn) return;
+  pn.textContent = 'Lv.' + profile.lv + ' ' + profile.title;
+  pt.textContent = profile.title + ' · 已审理 ' + profile.games + ' 案';
+  pl.textContent = 'Lv.' + profile.lv;
+  px.textContent = profile.xpInLv + ' / ' + XP_PER_LV;
+  pf.style.width = Math.min(100, profile.xpInLv / XP_PER_LV * 100) + '%';
+  pw.textContent = '胜场 ' + profile.wins;
+  if (pa) pa.textContent = ['衡', '由', '卷', '鸮', '剑', '焰', '冠'][Math.min(6, profile.lv - 1)];
+}
+
+/* ============================ 成就（P2-4） ============================ */
+const ACHIEVEMENTS = {
+  firstBlood: { name: '首战告捷', desc: '完成第一场对局' },
+  firstWin: { name: '首胜', desc: '赢下第一场胜诉' },
+  soloWin: { name: '孤胆律师', desc: '单人模式胜诉' },
+  cleanSweep: { name: '横扫法庭', desc: '连续 3 场胜诉' },
+  vet: { name: '老江湖', desc: '累计审理 10 场' }
+};
+
+/* ============================ 设置（P1-5 音画设置） ============================ */
+const SETTINGS_KEY = 'elec_settings_v1';
+const settings = Object.assign({ music: 50, sfx: 80, gavel: true, quality: 'high', quick: false, muted: false },
+  (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch (e) { return {}; } })());
+function saveSettings() {
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* 忽略 */ }
+  if (window.MUSIC && MUSIC.on) MUSIC.setVol(settings.music / 100);
+  const cs = document.getElementById('set-music');
+  if (cs) cs.value = settings.music;
+  const ss = document.getElementById('set-sfx');
+  if (ss) ss.value = settings.sfx;
+  const qs = document.getElementById('set-quality');
+  if (qs) qs.value = settings.quality;
+  const gv = document.getElementById('set-gavel');
+  if (gv) gv.textContent = settings.gavel ? '开' : '关';
+  const qk = document.getElementById('set-quick');
+  if (qk) qk.textContent = settings.quick ? '开' : '关';
+}
+function initSettings() {
+  const $s = id => document.getElementById(id);
+  if (!$s('btn-settings')) return;
+  $s('btn-settings').onclick = () => { saveSettings(); show('settings'); };
+  $s('settings-close').onclick = () => { hide('settings'); };
+  $s('set-music').oninput = e => { settings.music = +e.target.value; saveSettings(); };
+  $s('set-sfx').oninput = e => { settings.sfx = +e.target.value; saveSettings(); };
+  $s('set-gavel').onclick = () => { settings.gavel = !settings.gavel; saveSettings(); };
+  $s('set-quality').onchange = e => { settings.quality = e.target.value; saveSettings(); };
+  $s('set-quick').onclick = () => { settings.quick = !settings.quick; saveSettings(); toast(settings.quick ? '快速模式：开（1 轮试玩）' : '快速模式：关（完整 5 轮）'); };
+  $s('set-fullscreen').onclick = () => { toggleFullscreen(); };
+  saveSettings();
+}
+function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  } catch (e) { /* 不支持则忽略 */ }
+}
+
+/* ============================ 氛围音乐（P3-2 WebAudio 合成） ============================ */
+const MUSIC = { on: false, ac: null, gain: null, timer: null, vol: 0.5 };
+MUSIC.setVol = function (v) { this.vol = v; if (this.gain) this.gain.gain.setTargetAtTime(v * 0.25, this.ac.currentTime, 0.3); };
+MUSIC.start = function () {
+  if (this.on || settings.muted || settings.music <= 0) return;
+  try {
+    this.ac = new (window.AudioContext || window.webkitAudioContext)();
+    this.gain = this.ac.createGain();
+    this.gain.gain.value = 0.0001;
+    this.gain.connect(this.ac.destination);
+    this.gain.gain.setTargetAtTime(this.vol * 0.25, this.ac.currentTime, 0.8);
+    // 和弦 pad：Cm - Ab - Eb - Bb 循环（低音 + 柔和三角波）
+    const chords = [[130.81, 155.56, 196.0], [103.83, 130.81, 155.56], [164.81, 196.0, 261.63], [116.54, 146.83, 174.61]];
+    let ci = 0;
+    const playChord = () => {
+      const t = this.ac.currentTime;
+      const [f1, f2, f3] = chords[ci % chords.length]; ci++;
+      [f1, f2, f3].forEach((f, i) => {
+        const o = this.ac.createOscillator(), g = this.ac.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.05, t + 0.8);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 5.6);
+        o.connect(g); g.connect(this.gain);
+        o.start(t); o.stop(t + 6);
+      });
+      // 低音提琴
+      const b = this.ac.createOscillator(), bg = this.ac.createGain();
+      b.type = 'sine'; b.frequency.value = f1 / 2;
+      bg.gain.setValueAtTime(0.0001, t);
+      bg.gain.exponentialRampToValueAtTime(0.09, t + 0.3);
+      bg.gain.exponentialRampToValueAtTime(0.0001, t + 5.6);
+      b.connect(bg); bg.connect(this.gain);
+      b.start(t); b.stop(t + 6);
+    };
+    playChord();
+    this.timer = setInterval(playChord, 5600);
+    this.on = true;
+  } catch (e) { /* 音频不可用忽略 */ }
+};
+MUSIC.stop = function () { if (this.timer) clearInterval(this.timer); this.timer = null; if (this.gain) this.gain.gain.setTargetAtTime(0.0001, this.ac.currentTime, 0.5); this.on = false; };
+
+/* ============================ 键盘快捷键（P0-5） ============================ */
+function initHotkeys() {
+  window.addEventListener('keydown', (e) => {
+    // 输入框聚焦时不劫持
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const k = e.key;
+    // 空格=确认/下一步（仅在菜单/大厅/结算屏；对局内已有既有 keydown 逻辑）
+    if ((k === ' ' || k === 'Enter') && (screen === 'menu' || screen === 'lobby')) {
+      e.preventDefault();
+      if (screen === 'menu') { $('btn-solo').click(); }
+      else if (screen === 'lobby') { const b = $('btn-start'); if (b && !b.disabled) b.click(); }
+    } else if (k === 'f' || k === 'F') {
+      toggleFullscreen();
+    } else if (k === 'm' || k === 'M') {
+      settings.muted = !settings.muted; saveSettings();
+      if (settings.muted) MUSIC.stop(); else MUSIC.start();
+      toast(settings.muted ? '已静音' : '取消静音');
+    } else if (k === 'Escape') {
+      // Esc：关闭设置/关于等 HTML 弹层（回到菜单）；对局内既有逻辑处理其余
+      const any = document.querySelector('.overlay:not(.hidden)');
+      if (any && any.id !== 'menu') hide(any.id);
+    }
+  });
+}
+
 function initMenu() {
   $('inp-name').value = defaultName();
   // 恢复上次座位数设置（#108 localStorage）
@@ -1210,6 +896,10 @@ function initMenu() {
   $('inp-code').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
   // 昵称回车 → 跳到房间代码（触屏拉起键盘后按回车继续）
   $('inp-name').addEventListener('keydown', e => { if (e.key === 'Enter') $('inp-code').focus(); });
+  // P0-5/P1-5/P2 接入：档案卡渲染、设置弹窗、快捷键
+  renderProfileCard();
+  initSettings();
+  initHotkeys();
 }
 function setBusy(busy) {
   $('btn-create').disabled = busy;
@@ -1232,7 +922,7 @@ function doCreate(mode) {
   if (seed) { try { localStorage.setItem('elec_seed', seed); } catch (err) { /* 忽略 */ } }
   const password = $('inp-pass').value.trim();
   setBusy(true);
-  socket.emit('createRoom', { name, mode, maxSeats, seed, password }, ack => {
+  socket.emit('createRoom', { name, mode, maxSeats, seed, password, roundsLimit: settings.quick ? 1 : undefined }, ack => {
     setBusy(false);
     if (ack && !ack.ok) { $('menu-msg').textContent = ack.msg; return; }
     lastRoomCode = ack.code;
@@ -1317,7 +1007,7 @@ function renderLobby() {
   const humans = roomInfo.seats.filter(s => s.connected).length;
   if (mySeat < 0) {
     // 观战者：不占座位，等待对局开始（未开局旁观）或等 state 切入对局画面
-    $('lobby-msg').textContent = '👁 旁观中：等待对局画面…';
+    $('lobby-msg').textContent = '旁观中：等待对局画面…';
     hide('btn-start');
     return;
   }
@@ -1391,13 +1081,14 @@ function renderDraft() {
   buttons = [];
   hoverCards = [];
   ctx.clearRect(0, 0, W, H);
-  pxRect(0, 0, W, H, PAL.draft.a);
+  // P0-3 场景化：档案卷宗室背景（独立构图，LOW_Q 降级为纯色）
+  RenderCore.sceneBg(ctx, 'draft', W, H, LOW_Q);
   if (!view) return;
   const me = view.seats[mySeat];
-  // 抛硬币揭示阵营：拿到 side 后播放一次（全屏动画，不挡 3 选 1 操作）
+  // 抛硬币揭示阵营：拿到 side 后播放一次（P0.4 降量：改为横幅揭示，不再全屏抛硬币）
   if (me && me.side && !sideRevealDone) {
     sideRevealDone = true;
-    addFx({ type: 'coinFlip', dur: 2100, side: me.side });
+    addFx({ type: 'phase', dur: 1300, label: '你代表【' + (me.side === 'prosecutor' ? '检方' : '辩护方') + '】' });
     sfx('coin');
   }
   const draftTitle = me && me.side === 'prosecutor' ? '抽取检察官 · 3 选 1 · 同时亮出'
@@ -1406,7 +1097,7 @@ function renderDraft() {
   drawPixelText(draftTitle, W / 2, 44, 26, PAL.draft.b, { align: 'center' });
   if (me && me.side) {
     const isPro = me.side === 'prosecutor';
-    drawPixelText('你代表【' + (isPro ? '检方' : '辩护方') + '】出庭', W / 2, 72, 15, isPro ? '#FF5A4E' : '#2F6FD8', { align: 'center' });
+    drawPixelText('你代表【' + (isPro ? '检方' : '辩护方') + '】出庭', W / 2, 72, 15, isPro ? PAL.red : PAL.blue, { align: 'center' });
   }
   if (me && !me.char) {
     const cands = view.draftCandidates || [];
@@ -1418,10 +1109,18 @@ function renderDraft() {
     const myRole = me.side === 'prosecutor' ? '检察官' : '辩护律师';
     drawPixelText('你的' + myRole + '（点击选择，或按 1/2/3）', W / 2, cy - 48, 18, PAL.draft.b, { align: 'center' });
     cands.forEach(c => {
-      const hv = mouse.x >= cx && mouse.x <= cx + cw && mouse.y >= cy && mouse.y <= cy + ch;
+      const locked = !profile.isUnlocked(c.id);   // P2-1 角色解锁：未达等级灰显锁
+      const hv = !locked && mouse.x >= cx && mouse.x <= cx + cw && mouse.y >= cy && mouse.y <= cy + ch;
+      ctx.save();
+      if (locked) ctx.globalAlpha = 0.45;
       UIKit.drawCharCard(ctx, cx, hv ? cy - 6 : cy, cw, ch, c, campColor(mySeat), false);
-      if (hv) pxBorder(cx - 4, cy - 10, cw + 8, ch + 8, '#FFD60A', 4);
-      hoverCards.push({ x: cx, y: cy, w: cw, h: ch, kind: 'char', data: c });
+      ctx.restore();
+      if (locked) {
+        // 锁标 + 解锁等级提示
+        UIKit.drawSkillIcon(ctx, 'lock', cx + cw / 2 - 22, cy + ch / 2, 12, PAL.white);
+        drawPixelText('Lv.' + (CHARS_UNLOCK_LV[c.id] || 1) + ' 解锁', cx + cw / 2, cy + ch / 2, 16, PAL.white, { align: 'left' });
+      } else if (hv) pxBorder(cx - 4, cy - 10, cw + 8, ch + 8, PAL.gold, 4);
+      if (!locked) hoverCards.push({ x: cx, y: cy, w: cw, h: ch, kind: 'char', data: c });
       cx += cw + 34;
     });
   } else {
@@ -1435,7 +1134,7 @@ function renderDraft() {
       if (s.char) {
         UIKit.drawCharCard(ctx, cx, H * 0.24, cw, ch, s.char, campColor(i), false);
         drawPixelText(s.name + (i === mySeat ? '（你）' : ''), cx + cw / 2, H * 0.24 + ch + 20, 15, campColor(i), { align: 'center' });
-        if (s.side) drawPixelText(s.side === 'prosecutor' ? '【检方】' : '【辩护方】', cx + cw / 2, H * 0.24 + ch + 36, 11, s.side === 'prosecutor' ? '#FF5A4E' : '#2F6FD8', { align: 'center' });
+        if (s.side) drawPixelText(s.side === 'prosecutor' ? '【检方】' : '【辩护方】', cx + cw / 2, H * 0.24 + ch + 36, 11, s.side === 'prosecutor' ? PAL.red : PAL.blue, { align: 'center' });
       } else {
         UIKit.drawCardBackAt(ctx, cx, H * 0.24, cw, ch, PAL.ui.b);
         drawPixelText(s.name + ' 正在选择…', cx + cw / 2, H * 0.24 + ch + 20, 14, PAL.draft.b, { align: 'center' });
@@ -1452,21 +1151,67 @@ function renderGame() {
   // 渲染骨架收敛至 shared/render-core.js（renderScene）：清屏+背景+六段+尾部
   const env = renderEnv();
   env.drawBackdrop = () => {
+    // P0-4 法庭场景：深景渐变 + 木饰墙板 + 法官席轮廓 + 地板透视 + 聚光灯
     pxRect(0, 0, W, H, PAL.bg.a);
-    // 演播室背景：斜向速度线 + 顶部聚光灯锥（低画质 LOW_Q 跳过装饰，保帧率）
     if (LOW_Q) return;
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#101224');
+    sky.addColorStop(0.55, '#171a30');
+    sky.addColorStop(1, '#0b0d18');
     ctx.save();
-    ctx.strokeStyle = 'rgba(255,255,255,0.045)';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+    // ① 墙板：垂直木饰条（低透明度，不干扰信息）
+    ctx.strokeStyle = 'rgba(212,175,110,0.06)';
+    ctx.lineWidth = 1;
+    const plankW = Math.max(44, W * 0.055);
+    for (let x = plankW / 2; x < W; x += plankW) {
+      ctx.beginPath(); ctx.moveTo(Math.round(x), HUD_H); ctx.lineTo(Math.round(x), H * 0.92); ctx.stroke();
+    }
+    // 横向饰线（墙裙）
+    ctx.fillStyle = 'rgba(212,175,110,0.05)';
+    ctx.fillRect(0, H * 0.30, W, 1.5);
+    ctx.fillStyle = 'rgba(212,175,110,0.04)';
+    ctx.fillRect(0, H * 0.30 + 6, W, 1);
+    // ② 中央穹顶拱门轮廓（法徽位，半透明弧线）
+    ctx.strokeStyle = 'rgba(233,196,106,0.10)';
+    ctx.lineWidth = 2;
+    const archCx = W / 2, archR = Math.min(W * 0.30, H * 0.30);
     ctx.beginPath();
-    const step = 34;
-    for (let x = -H; x < W + H; x += step) { ctx.moveTo(x, HUD_H); ctx.lineTo(x + H, H); }
+    ctx.arc(archCx, H * 0.30 + archR * 0.55, archR, Math.PI, 0);
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.strokeStyle = 'rgba(233,196,106,0.06)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = -H; x < W + H; x += step) { ctx.moveTo(x + step / 2, HUD_H); ctx.lineTo(x + step / 2 + H, H); }
+    ctx.arc(archCx, H * 0.30 + archR * 0.55, archR * 0.82, Math.PI, 0);
     ctx.stroke();
-    // 顶部两束聚光灯锥
+    // ③ 地板透视（下 1/4 区域）：横向木条 + 纵向透视线
+    const floorY = H * 0.80;
+    const fg = ctx.createLinearGradient(0, floorY, 0, H);
+    fg.addColorStop(0, 'rgba(20,16,10,0.25)');
+    fg.addColorStop(1, 'rgba(8,6,4,0.55)');
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, floorY, W, H - floorY);
+    ctx.strokeStyle = 'rgba(212,175,110,0.07)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 4; i++) {
+      const fy = floorY + (H - floorY) * (i / 4);
+      ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(212,175,110,0.05)';
+    for (let i = 0; i <= 4; i++) {
+      const t = i / 4;
+      const x0 = W / 2 + (W * 0.10 - W / 2) * t;
+      const x1 = W / 2 + (W * 0.90 - W / 2) * t;
+      ctx.beginPath(); ctx.moveTo(x0, floorY); ctx.lineTo(x1, H); ctx.stroke();
+    }
+    // ④ 法官席轮廓（拱门下的深色剪影 + 顶线金饰）
+    const benchY = H * 0.30 + archR * 1.05;
+    ctx.fillStyle = 'rgba(12,10,8,0.5)';
+    ctx.fillRect(W / 2 - archR * 0.6, benchY, archR * 1.2, 4);
+    ctx.fillStyle = 'rgba(233,196,106,0.12)';
+    ctx.fillRect(W / 2 - archR * 0.55, benchY + 4, archR * 1.1, 1.5);
+    // ⑤ 聚光灯锥（保留原演播室两束，调成暖白）
     ctx.fillStyle = 'rgba(255,244,200,0.05)';
     ctx.beginPath();
     ctx.moveTo(W * 0.18, HUD_H); ctx.lineTo(W * 0.42, HUD_H); ctx.lineTo(W * 0.34, H); ctx.lineTo(W * 0.02, H); ctx.closePath(); ctx.fill();
@@ -1477,8 +1222,74 @@ function renderGame() {
   };
   env.renderRowArea = renderRowArea;
   env.renderLogs = renderLogs;
-  env.renderTail = () => renderFx();
+  env.renderTail = () => { renderTutorialBanner(); renderConfirmModal(); renderFx(); };
   RenderCore.renderScene(env);
+}
+
+/* ============================ P1-3 确认撤销弹层 ============================
+ * 危险操作（结束取证/结束举证/跳过事件）先弹确认：深色遮罩 + 金边卡片 +
+ * 「取消 / 确认」双按钮；确认层打开时 onClick 屏蔽其余交互。 */
+function renderConfirmModal() {
+  if (!confirmAsk || screen !== 'game') return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,8,14,0.62)';
+  ctx.fillRect(0, 0, W, H);
+  const cw = Math.min(430, W - 30), ch = 128;
+  const cx = (W - cw) / 2, cy = H * 0.5 - ch / 2;
+  pxRect(cx, cy, cw, ch, '#1B1E2E');
+  pxBorder(cx, cy, cw, ch, 'rgba(233,196,106,0.7)', 1.5);
+  drawPixelText('确认：' + confirmAsk.title, cx + cw / 2, cy + 26, 17, PAL.gold, { align: 'center', shadow: false });
+  drawWrapText(confirmAsk.body, cx + 16, cy + 50, 12.5, '#C6D2E4', cw - 32, 18, { maxLines: 2, shadow: false });
+  const bw2 = (cw - 44) / 2;
+  addButton('cfmNo', cx + 14, cy + ch - 44, bw2, 32, '取 消');
+  addButton('cfmYes', cx + cw - 14 - bw2, cy + ch - 44, bw2, 32, '确 认', { primary: true });
+  ctx.restore();
+}
+
+/* ============================ P1-1 首局渐进教学 ============================
+ * 只在新玩家首局（profile.games === 0）显示：买 → 出 → 亮 三步大横幅，
+ * 配合 drawGoalGuide 的引导条/箭头；打完首局后 localStorage 标记不再显示。
+ * 横幅不拦截点击（纯提示层），位置在顶部 HUD 下方居中。 */
+let tutDone = false;
+try { tutDone = localStorage.getItem('elec_tut_done') === '1'; } catch (e) { /* 忽略 */ }
+function renderTutorialBanner() {
+  if (tutDone || (profile && profile.games > 0)) return;
+  if (screen !== 'game' || !view || !view.seats || !view.seats[mySeat]) return;
+  const ph = view.phase;
+  let step = '', title = '', body = '';
+  const myTurn = (view.turn === mySeat) || (view.playTurn === mySeat) || (view.eventTurnSeat === mySeat);
+  if (ph === 'buy' && view.turn === mySeat) {
+    step = '第 1 步 · 取证'; title = '买入证据（传唤）'; body = '点击下方证物架里的卡牌，花 ⊙ 收入手牌；凑齐你的举证阵容。';
+  } else if (ph === 'play' && view.playTurn === mySeat) {
+    step = '第 2 步 · 举证'; title = '暗置出牌'; body = '点击手牌提交 1-2 份证据，牌面朝下；每轮至少 1 份，最后一位可放弃。';
+  } else if (ph === 'reveal' && view.revealIndex === 0) {
+    step = '第 3 步 · 亮出'; title = '证据亮出'; body = '所有牌从左到右翻开，技能依次发动——注意【证据排除】可作废对方证据。';
+  } else if (ph === 'count' && view.votes && view.votes.length) {
+    step = '第 4 步 · 审议'; title = '计票进行中'; body = '每张证据按票数计票，事件与技能修正后形成本轮排名。';
+  } else if (ph === 'preEvent' || ph === 'postEvent') {
+    step = '庭审事件'; title = '事件牌可改变局势'; body = '事件区可打出事件牌（花 ⊙），或点「跳过」保留手牌。';
+  } else {
+    return;
+  }
+  const bw = Math.min(620, W - 24), bh = 56;
+  const bx = (W - bw) / 2, by = HUD_H + 8;
+  ctx.save();
+  const g = ctx.createLinearGradient(0, by, 0, by + bh);
+  g.addColorStop(0, 'rgba(24,28,46,0.94)');
+  g.addColorStop(1, 'rgba(16,19,34,0.94)');
+  ctx.fillStyle = g;
+  ctx.fillRect(Math.round(bx), Math.round(by), Math.round(bw), Math.round(bh));
+  ctx.strokeStyle = 'rgba(233,196,106,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(Math.round(bx) + 0.75, Math.round(by) + 0.75, Math.round(bw) - 1.5, Math.round(bh) - 1.5);
+  ctx.fillStyle = 'rgba(233,196,106,0.16)';
+  ctx.fillRect(Math.round(bx), Math.round(by), 5, Math.round(bh));
+  drawPixelText(step, bx + 18, by + 16, 12, PAL.goldSoft, { shadow: false });
+  drawPixelText(title, bx + 18, by + 36, 16, PAL.white, { shadow: false });
+  const tw = drawPixelText(step, 0, 0, 0, '#000', { shadow: false }).w;   // 占位
+  void tw;
+  drawWrapText(body, bx + 118, by + 36, 12.5, '#C6D2E4', bw - 140, 17, { maxLines: 2, shadow: false });
+  ctx.restore();
 }
 /* ===== 共享渲染模块接入（shared/render-core.js）：env 组装 + 薄封装 =====
  * 渲染函数本体已收敛至 RenderCore（单一事实源），此处仅注入差异参数。
@@ -1528,25 +1339,25 @@ function renderEnv() {
     drawRowBackdrop: (cy, rh) => {
       // 辩论台底座：深色台面 + 金色边线 + 中央微标（renderRowArea 已收敛至 RenderCore）
       pxRect(8, cy - 24, W - 16, rh + 34, PAL.bg.b);
-      pxBorder(8, cy - 24, W - 16, rh + 34, '#FFD60A', 2);
+      pxBorder(8, cy - 24, W - 16, rh + 34, PAL.gold, 2);
       ctx.save();
       ctx.globalAlpha = 0.5;
-      drawPixelText('⚖️ 庭审区 ★', W / 2, cy - 14, 11, '#FFD60A', { align: 'center', shadow: false });
+      drawPixelText('庭审区', W / 2, cy - 14, 11, PAL.gold, { align: 'center', shadow: false });
       ctx.restore();
     },
     navBtn: (id, x, y, w, h, text, enabled) => addButton(id, x, y, w, h, text, { disabled: !enabled }),
     rowFolded: () => rowFolded,   // Task 6 竖屏行区折叠状态（renderRowArea 读取）
     copy: {
-      buyTip: '调查取证：传唤证物架上的证据', playTip: '暗置举证：从手牌打 1 张',
+      buyTip: '调查取证：传唤证物架（商店）上的证据', playTip: '暗置举证：从手牌提交 1-2 份',
       // —— renderHudOf：联机差异（默认值为联机侧，显式写出与单机成对）——
       roundTxt: (g) => g.round > 0 ? '第 ' + g.round + ' 轮' : '准备中',
-      roundPos: { x: 14, y: HUD_H / 2, size: 20 },
+      roundPos: { x: 18, y: 16, size: compact ? 13 : 17 },
       phaseTxt: (g) => g.phaseLabel || g.phase,
-      phasePos: { x: W / 2, y: HUD_H / 2, size: 22 },
-      trackElse: (tY, tH) => { pxRect(0, tY, W * 0.5, tH, '#FF3B30'); pxRect(W * 0.5, tY, W * 0.5, tH, '#0A84FF'); },
+      phasePos: { x: 18, y: HUD_H - 13, size: compact ? 14 : 18 },
+      trackElse: (tY, tH) => { pxRect(0, tY, W * 0.5, tH, PAL.red); pxRect(W * 0.5, tY, W * 0.5, tH, PAL.blue); },
       isSpectator: () => mySeat < 0,
       startTxt: (g) => g.startingSeat != null && g.seats[g.startingSeat] ? '起始：' + g.seats[g.startingSeat].name : '',
-      startPos: { x: W - 118, y: HUD_H / 2, size: 15 },   // 左移让位：最右留给倒计时（痛点二）
+      startPos: { x: W - 14, y: 16, size: compact ? 11 : 14 },   // 右面板右对齐（倒计时徽章在面板内右侧最边缘）
       countdown: () => {
         // 行动倒计时（我行动时）：屏幕右上角最靠上边缘（HUD 内容区外），不挤占阶段标题
         if (deadline && deadline > Date.now() && myTurn()) {
@@ -1559,8 +1370,8 @@ function renderEnv() {
           const ctxt = '⏱ ' + remain + 's';
           const csz = urgent ? 22 : 16;
           pxRect(W - 66, 4, 58, HUD_H - 10, 'rgba(16,20,28,0.85)');
-          pxBorder(W - 66, 4, 58, HUD_H - 10, urgent ? '#FF5A4E' : '#3A4258', urgent ? 2 : 1.5);
-          drawPixelText(ctxt, W - 37, HUD_H / 2, csz, urgent ? '#FF5A4E' : '#FFD60A', { align: 'center', shadow: false });
+          pxBorder(W - 66, 4, 58, HUD_H - 10, urgent ? PAL.red : PAL.border, urgent ? 2 : 1.5);
+          drawPixelText(ctxt, W - 37, HUD_H / 2, csz, urgent ? PAL.red : PAL.gold, { align: 'center', shadow: false });
           ctx.restore();
           if (urgent && remain !== lastTickSec) {
             lastTickSec = remain;
@@ -1570,15 +1381,15 @@ function renderEnv() {
       },
       stepBar: {
         maxW: 30, baseW: 320, mobile: isMobile ? 16 : null,
-        sx0: () => Math.max(76, isMobile ? 108 : 148), availR: () => W - 88,
+        sx0: () => hudPanelW('L') + 16, availR: () => W - hudPanelW('R') - 14,
         nextSize: () => isMobile ? 10.5 : 12, nextCol: '#DCE6F5', nextDX: 6,
-        nextGuard: (sx) => sx + 12 < W
+        nextGuard: (sx) => sx + 12 < W - hudPanelW('R')
       },
       // —— renderPanelsOf：联机差异（默认值为联机侧）——
       // 痛点二：HUD 只写角色名（无技能简述）；技能详情悬停头像/卡牌 tooltip 查看
       charBrief: (s) => s.char ? s.char.name : '',
       charSize: compact ? 11.5 : 13.5,
-      charCol: '#C0392B',
+      charCol: PAL.red,
       lockShow: (s, isMe, g) => UI.show.locked && s.lockedCount,
       scandalBar: (s, sc) => UI.show.scandalBar,
       // —— renderBottomOf：联机差异（默认值为联机侧）——
@@ -1653,7 +1464,7 @@ function addActionBtn(bx, bw, by, label, act, enabled, col) {
   // 三态：常态 / 悬停（金色边框+微光+上浮）/ 禁用（灰底+斜纹）
   const hov = !b.disabled && mouse.x >= bx - 3 && mouse.x <= bx + bw + 3 && mouse.y >= by - 3 && mouse.y <= by + bh + 3;
   comicShadow(b.x, b.y, b.w, b.h, hov ? 5 : 3, hov ? 5 : 3);
-  pxRect(b.x, b.y, b.w, b.h, b.disabled ? '#e8e0c8' : (col || PAL.accent.a));
+  pxRect(b.x, b.y, b.w, b.h, b.disabled ? '#EAE2C8' : (col || PAL.accent.a));
   if (b.disabled) {
     // P1：禁用态灰色斜纹
     ctx.save();
@@ -1662,15 +1473,15 @@ function addActionBtn(bx, bw, by, label, act, enabled, col) {
     for (let dx = -b.h; dx < b.w + b.h; dx += 8) { ctx.moveTo(b.x + dx, b.y + b.h); ctx.lineTo(b.x + dx + b.h, b.y); }
     ctx.stroke(); ctx.restore();
   } else if (hov) {
-    ctx.save(); ctx.globalAlpha = 0.22; pxRect(b.x, b.y, b.w, b.h, '#FFFFFF'); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.22; pxRect(b.x, b.y, b.w, b.h, PAL.white); ctx.restore();
   }
-  pxBorder(b.x, b.y, b.w, b.h, hov ? '#FFD60A' : '#111111', hov ? 4 : 2.5);
+  pxBorder(b.x, b.y, b.w, b.h, hov ? PAL.gold : PAL.black, hov ? 4 : 2.5);
   // P1：文字自动缩字/截断，避免小按钮溢出
   const f = fitText(b.text, b.w - 14, isMobile ? 17 : 16);
   drawPixelText(f.text, b.x + b.w / 2, b.y + b.h / 2 - (hov ? 1.5 : 0), f.size, b.disabled ? '#9c9278' : contrast(col || PAL.accent.a), { align: 'center', shadow: false });
   // P1：点击闪光反馈
   if (btnFlash[act]) {
-    ctx.save(); ctx.globalAlpha = btnFlash[act]; pxRect(b.x, b.y, b.w, b.h, '#FFFFFF'); ctx.restore();
+    ctx.save(); ctx.globalAlpha = btnFlash[act]; pxRect(b.x, b.y, b.w, b.h, PAL.white); ctx.restore();
   }
   return b;
 }
@@ -1680,7 +1491,7 @@ function addButton(id, x, y, w, h, text, opts) {
   buttons.push(b);
   const hov = !b.disabled && mouse.x >= x - 3 && mouse.x <= x + w + 3 && mouse.y >= y - 3 && mouse.y <= y + h + 3;
   comicShadow(x, y, w, h, hov ? 5 : 3, hov ? 5 : 3);
-  pxRect(x, y, w, h, b.disabled ? '#e8e0c8' : (opts.primary ? PAL.accent.a : '#ffffff'));
+  pxRect(x, y, w, h, b.disabled ? '#EAE2C8' : (opts.primary ? PAL.accent.a : '#ffffff'));
   if (b.disabled) {
     ctx.save();
     ctx.strokeStyle = 'rgba(120,110,90,0.35)'; ctx.lineWidth = 2;
@@ -1688,13 +1499,13 @@ function addButton(id, x, y, w, h, text, opts) {
     for (let dx = -h; dx < w + h; dx += 8) { ctx.moveTo(x + dx, y + h); ctx.lineTo(x + dx + h, y); }
     ctx.stroke(); ctx.restore();
   } else if (hov) {
-    ctx.save(); ctx.globalAlpha = 0.25; pxRect(x, y, w, h, opts.primary ? '#FFFFFF' : '#FFD60A'); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.25; pxRect(x, y, w, h, opts.primary ? PAL.white : PAL.gold); ctx.restore();
   }
-  pxBorder(x, y, w, h, hov ? '#FFD60A' : '#111111', b.disabled ? 2 : (hov ? 4 : 2.5));
+  pxBorder(x, y, w, h, hov ? PAL.gold : PAL.black, b.disabled ? 2 : (hov ? 4 : 2.5));
   const f = fitText(text, w - 10, isMobile ? 16 : 15);
   drawPixelText(f.text, x + w / 2, y + h / 2 - (hov ? 1.5 : 0), f.size, b.disabled ? '#9c9278' : (opts.primary ? contrast(PAL.accent.a) : '#1c1c1c'), { align: 'center', shadow: false });
   if (btnFlash[id]) {
-    ctx.save(); ctx.globalAlpha = btnFlash[id]; pxRect(x, y, w, h, '#FFFFFF'); ctx.restore();
+    ctx.save(); ctx.globalAlpha = btnFlash[id]; pxRect(x, y, w, h, PAL.white); ctx.restore();
   }
   return b;
 }
@@ -1715,43 +1526,43 @@ function renderActionButtons(me) {
       case 'buy':
         if (!me.buyDone) {
           // 痛点一：仅「结束取证」金色强调（执行按钮），换证/切模式白底次要
-          mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), '#FFFFFF');
-          mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, '#FFFFFF');
+          mk('换证 ⊙' + ElectionCore.refreshCostOf(me), 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.white);
+          mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.white);
           mk('结束取证', 'endBuy', true, PAL.accent.a);
         } else {
-          hint('已结束取证', '#C9D6EA');
+          hint('已结束取证', PAL.textSoft);
         }
         break;
       case 'play':
         if (g.turn === mySeat && !me.playDone) {
           mk('举证（' + selected.length + '/1）', 'playSel', selected.length > 0, PAL.accent.a);
-          mk('结束举证', 'finishPlay', true, '#FFFFFF');
-          hint('每回合举证 1 份', '#C9D6EA');
+          mk('结束举证', 'finishPlay', true, PAL.white);
+          hint('每回合举证 1 份', PAL.textSoft);
         } else if (g.playLastSeat === mySeat && !me.playDone) {
-          mk('结束举证', 'finishPlay', true, '#FFFFFF');
+          mk('结束举证', 'finishPlay', true, PAL.white);
         }
         break;
       case 'preEvent': case 'postEvent':
         if (g.eventTurnSeat === mySeat) {
           mk('打出选中事件', 'playEventSel', eventPick !== null && eventPick.seat === mySeat && eventPick.target >= 0, PAL.accent.a);
-          mk('不打出', 'passEvent', true, '#FFFFFF');
-          hint('最多连续 2 张 · 点事件牌', '#C9D6EA');
+          mk('不打出', 'passEvent', true, PAL.white);
+          hint('最多连续 2 张 · 点事件牌', PAL.textSoft);
         }
         break;
       case 'discard':
         if (g.discardSeat === mySeat && !me.keepDone) {
           mk('确认保留（' + selected.length + '/' + Math.min(keepMax(), me.hand.length) + '）', 'finishKeep', selected.length >= Math.min(keepMax(), me.hand.length), PAL.accent.a);
-          hint('保留最多 ' + keepMax() + ' 张', '#C9D6EA');
+          hint('保留最多 ' + keepMax() + ' 张', PAL.textSoft);
         }
         break;
       case 'count':
-        if (g.swapPending && g.swapPending.owner === mySeat) hint('政治操盘：点击场上任意其他牌互换', '#C9D6EA');
+        if (g.swapPending && g.swapPending.owner === mySeat) hint('政治操盘：点击场上任意其他牌互换', PAL.textSoft);
         break;
       case 'reveal':
-        if (g.revealPending && g.revealPending.owner === mySeat) hint('点击对手已亮出的证据', '#FF5A4E');
+        if (g.revealPending && g.revealPending.owner === mySeat) hint('点击对手已亮出的证据', PAL.red);
         break;
       case 'chooseStarter':
-        if (g.starterPicker === mySeat && !g.starterChosen) hint('点击选择本轮起始玩家', '#FFD60A');
+        if (g.starterPicker === mySeat && !g.starterChosen) hint('点击选择本轮起始玩家', PAL.gold);
         break;
     }
     if (items.length) {
@@ -1771,9 +1582,9 @@ function renderActionButtons(me) {
     case 'buy':
       if (!me.buyDone) {
         // 痛点一：仅「结束取证」金色强调，换证/切模式白底次要
-        mk('换证 ⊙' + ElectionCore.refreshCostOf(me) + ' ［R］', 'refresh', me.money >= ElectionCore.refreshCostOf(me), '#FFFFFF');
-        if (view.leaderStreak >= 2 && view.prevFirst === mySeat) tipTxt = '👑 连胜税 +1⊙';
-        mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, '#FFFFFF');
+        mk('换证 ⊙' + ElectionCore.refreshCostOf(me) + ' ［R］', 'refresh', me.money >= ElectionCore.refreshCostOf(me), PAL.white);
+        if (view.leaderStreak >= 2 && view.prevFirst === mySeat) tipTxt = '连胜税 +1⊙';
+        mk(buyMode === 'lock' ? '切到传唤' : '切到留证', 'toggleBuyMode', true, PAL.white);
         mk('结束取证 ［B］', 'endBuy', true, PAL.accent.a);
       } else {
         tipTxt = '已结束取证';
@@ -1782,16 +1593,16 @@ function renderActionButtons(me) {
     case 'play':
       if (g.turn === mySeat && !me.playDone) {
         mk('举证（' + selected.length + '/1）', 'playSel', selected.length > 0, PAL.accent.a);
-        mk('结束举证 ［P］', 'finishPlay', true, '#FFFFFF');
+        mk('结束举证 ［P］', 'finishPlay', true, PAL.white);
         tipTxt = '点牌选 1 张 · 回车举证';
       } else if (g.playLastSeat === mySeat && !me.playDone) {
-        mk('结束举证 ［P］', 'finishPlay', true, '#FFFFFF');
+        mk('结束举证 ［P］', 'finishPlay', true, PAL.white);
       }
       break;
     case 'preEvent': case 'postEvent':
       if (g.eventTurnSeat === mySeat) {
         mk('打出选中事件', 'playEventSel', eventPick !== null && eventPick.seat === mySeat && eventPick.target >= 0, PAL.accent.a);
-        mk('不打出 ［Enter］', 'passEvent', true, '#FFFFFF');
+        mk('不打出 ［Enter］', 'passEvent', true, PAL.white);
         tipTxt = '最多连续 2 张 · 点事件牌';
       }
       break;
@@ -1826,7 +1637,7 @@ function renderActionButtons(me) {
     drawPixelText(f.text, 10, y + btnH / 2, f.size, '#DCE7F7', { shadow: false });
   }
 }
-let logExpanded = false;   // 日志📜折叠按钮状态（默认收起，点击展开右上角浮动面板）
+let logExpanded = false;   // 日志折叠按钮状态（默认收起，点击展开右上角浮动面板）
 let logRect = null;        // 展开时日志面板区域（点击外部自动收起）
 let rowFolded = true;      // Task 6 竖屏单焦点：行区默认折叠为状态条（点击「▾ 展开」查看完整辩论台）
 function renderLogs() {
@@ -1846,9 +1657,9 @@ function renderLogs() {
   ctx.save();
   ctx.globalAlpha = 0.92;
   pxRect(px0, py0, panelW, ph2, 'rgba(16,20,28,0.92)');
-  pxBorder(px0, py0, panelW, ph2, '#3A4258', 1.5);
+  pxBorder(px0, py0, panelW, ph2, PAL.border, 1.5);
   ctx.globalAlpha = 1;
-  drawPixelText('📜 庭审记录', px0 + 10, py0 + 10, 12, '#FFD60A', { shadow: false });
+  drawPixelText('庭审记录', px0 + 10, py0 + 10, 12, PAL.gold, { shadow: false });
   let yy = py0 + 24;
   show.forEach(ln => {
     const f = fitText('· ' + ln, panelW - 20, 13);
@@ -1856,15 +1667,15 @@ function renderLogs() {
     yy += 15;
   });
   ctx.restore();
-  addButton('toggleLog', px0 + panelW - 42, py0 + 4, 34, 20, logExpanded ? '✕' : '📜', {});
+  addButton('toggleLog', px0 + panelW - 42, py0 + 4, 34, 20, logExpanded ? '✕' : '≡', {});
 }
 
 /* ---------------- 屏幕渲染：结算（gameover） ---------------- */
 function drawCourthouse(x, y, s) {
   ctx.save();
   ctx.translate(x, y); ctx.scale(s, s);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#111111'; ctx.lineWidth = 2; ctx.lineJoin = 'miter';
+  ctx.fillStyle = PAL.white;
+  ctx.strokeStyle = PAL.black; ctx.lineWidth = 2; ctx.lineJoin = 'miter';
   // 主楼（法院门廊）
   ctx.fillRect(-70, -40, 140, 40); ctx.strokeRect(-70, -40, 140, 40);
   // 中央凸出
@@ -1877,10 +1688,10 @@ function drawCourthouse(x, y, s) {
   ctx.beginPath(); ctx.moveTo(-12, -100); ctx.lineTo(-9, -106); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(12, -100); ctx.lineTo(9, -106); ctx.stroke();
   // 立柱
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = PAL.white;
   for (let i = -3; i <= 3; i++) { ctx.fillRect(i * 18 - 3, -40, 6, 36); ctx.strokeRect(i * 18 - 3, -40, 6, 36); }
   // 台阶
-  ctx.fillStyle = '#0E8A5F';
+  ctx.fillStyle = PAL.green;
   ctx.fillRect(-90, 0, 180, 8); ctx.strokeRect(-90, 0, 180, 8);
   ctx.restore();
 }
@@ -1888,30 +1699,31 @@ function renderOver() {
   buttons = [];
   hoverCards = [];
   ctx.clearRect(0, 0, W, H);
-  pxRect(0, 0, W, H, PAL.draft.a);
+  // P0-3 场景化：胜利荣光背景（独立构图，LOW_Q 降级为纯色）
+  RenderCore.sceneBg(ctx, 'over', W, H, LOW_Q);
   if (!view) return;
   const win = view.winner != null ? view.seats[view.winner] : view.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat)[0];
   drawCourthouse(W / 2, H * 0.30, 1.6);
   const winSide = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
-  drawPixelText('🏆 ' + win.name + (winSide ? '（' + winSide + '）' : '') + ' 胜诉！', W / 2, H * 0.50, 46, '#FFD400', { align: 'center' });
+  drawPixelText(win.name + (winSide ? '（' + winSide + '）' : '') + ' 胜诉！', W / 2, H * 0.50, 46, PAL.gold, { align: 'center' });
   // 胜利类型说明（先例胜利 / 陪审团否决 / 常规倾向）
   let winSub = '—— 最终陪审团倾向 ——';
-  if (view.winType === 'precedent') winSub = '⚖️ 先例胜利：判例已确立，后世以此为鉴';
-  else if (view.winType === 'juryNull') winSub = '🕊️ 陪审团否决：人民拒绝适用恶法';
-  drawPixelText(winSub, W / 2, H * 0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? '#FFFFFF' : '#FFD400', { align: 'center' });
-  drawPixelText('—— 最终陪审团倾向 ——', W / 2, H * 0.585, 18, '#FFFFFF', { align: 'center' });
+  if (view.winType === 'precedent') winSub = '先例胜利：判例已确立，后世以此为鉴';
+  else if (view.winType === 'juryNull') winSub = '陪审团否决：人民拒绝适用恶法';
+  drawPixelText(winSub, W / 2, H * 0.50 + 40, 16, winSub === '—— 最终陪审团倾向 ——' ? PAL.white : PAL.gold, { align: 'center' });
+  drawPixelText('—— 最终陪审团倾向 ——', W / 2, H * 0.585, 18, PAL.white, { align: 'center' });
   // #13 种子码（可复现，分享战绩用；显示用户输入原串 seedRaw，留空显示随机数字）
   const seedShow = view.seedRaw != null ? view.seedRaw : view.seed;
-  if (seedShow != null) drawPixelText('🌱 种子 ' + seedShow, W - 20, H * 0.585, 13, '#C9D6EA', { align: 'right', shadow: false });
+  if (seedShow != null) drawPixelText('种子 ' + seedShow, W - 20, H * 0.585, 13, PAL.textSoft, { align: 'right', shadow: false });
   const order = view.seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat);
   let y = Math.min(H * 0.635, H - 130 - order.length * 46);   // S4：4 人局整体上移，避免与“返回大厅”按钮重叠
   order.forEach((s, i) => {
     pxRect(W / 2 - 180, y - 16, 360, 40, i === 0 ? campColor(s.seat) : PAL.ui.b);
-    pxBorder(W / 2 - 180, y - 16, 360, 40, '#111111', 2);
-    pxRect(W / 2 - 170, y - 6, 300, 8, '#DDD5BC');
-    pxBorder(W / 2 - 170, y - 6, 300, 8, '#111111', 1);
+    pxBorder(W / 2 - 180, y - 16, 360, 40, PAL.black, 2);
+    pxRect(W / 2 - 170, y - 6, 300, 8, '#39425A');
+    pxBorder(W / 2 - 170, y - 6, 300, 8, PAL.black, 1);
     pxRect(W / 2 - 168, y - 4, Math.max(3, 296 * Math.min(1, s.support / 14)), 4, campColor(s.seat));
-    drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W / 2, y - 16, 16, i === 0 ? contrast(campColor(s.seat)) : '#111111', { align: 'center' });
+    drawPixelText((i + 1) + '. ' + s.name + '  ' + s.support + ' 倾向', W / 2, y - 16, 16, i === 0 ? contrast(campColor(s.seat)) : PAL.black, { align: 'center' });
     y += 46;
   });
   // 窄屏收缩：按钮宽度/间距按 W 自适应，避免出屏（P1 修复）
@@ -1922,15 +1734,61 @@ function renderOver() {
     cbx = Math.max(10, W / 2 - (cbw * 2 + cgap) / 2);
     bbx = cbx + cbw + cgap;
   }
-  addButton('copyReport', cbx, H - 104, cbw, 50, '📋 复制战绩', {});
+  addButton('copyReport', cbx, H - 104, cbw, 50, '复制战绩', {});
   addButton('backMenu', bbx, H - 104, cbw, 50, '返回大厅', { primary: true });
+  // P2-2 战报库：右上角入口（历史战绩面板）
+  addButton('reportLib', W - 130, HUD_H + 8, 120, 28, '战报库', {});
+  if (reportLib) renderReportLib();
+}
+
+/* ---------------- P2-2 战报库（最近 6 局历史战绩） ---------------- */
+let reportLib = false;   // 战报库面板开关
+function reportLibData() {
+  try {
+    const raw = localStorage.getItem('elec_report_lib');
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function renderReportLib() {
+  if (!view) return;
+  buttons = buttons.filter(b => b.id !== 'reportLib');
+  ctx.save();
+  ctx.fillStyle = 'rgba(6,8,14,0.68)';
+  ctx.fillRect(0, 0, W, H);
+  const cw = Math.min(560, W - 24), ch = Math.min(460, H - 60);
+  const cx = (W - cw) / 2, cy = (H - ch) / 2;
+  pxRect(cx, cy, cw, ch, '#10141C');
+  pxBorder(cx, cy, cw, ch, 'rgba(233,196,106,0.8)', 2.5);
+  drawPixelText('战报库 · 最近对局', cx + cw / 2, cy + 26, 18, PAL.goldSoft, { align: 'center', shadow: false });
+  const lib = reportLibData();
+  if (!lib.length) {
+    drawPixelText('（暂无战报——完成一局后自动归档）', cx + cw / 2, cy + ch / 2, 14, '#8A94A8', { align: 'center', shadow: false });
+  } else {
+    let yy = cy + 50;
+    lib.forEach((r, i) => {
+      if (yy > cy + ch - 66) return;
+      const d = new Date(r.t);
+      const dstr = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      const wt = r.wt === 'precedent' ? '先例' : (r.wt === 'juryNull' ? '否决' : '倾向');
+      const line = '#' + (i + 1) + '  ' + r.win + ' 胜 · ' + wt + ' · ' + r.rounds + '轮 · 种子 ' + r.seed + ' · ' + dstr;
+      drawPixelText(fitText(line, cw - 36, 13).text, cx + 18, yy, 13, '#DCE6F5', { align: 'left', shadow: false });
+      const sup = (r.names || []).map((nm, si) => nm + ' ' + (r.supports[si] || 0)).join('　');
+      drawPixelText(fitText(sup, cw - 36, 11).text, cx + 18, yy + 17, 11, '#8A94A8', { align: 'left', shadow: false });
+      if (i < lib.length - 1) pxRect(cx + 14, yy + 25, cw - 28, 1, 'rgba(255,255,255,0.10)');
+      yy += 38;
+    });
+  }
+  addButton('reportLibClose', cx + cw / 2 - 60, cy + ch - 46, 120, 34, '关 闭', { primary: true });
+  ctx.restore();
 }
 
 /* #13 战绩文本快照（纯文本，可粘贴分享/复盘） */
 function buildReport(seats, seedVal, winType) {
   const win = seats.slice().sort((a, b) => b.support - a.support || a.seat - b.seat)[0];
   const winSide = win.side ? (win.side === 'prosecutor' ? '检方' : '辩护方') : '';
-  const wt = winType === 'precedent' ? '⚖️ 先例胜利' : (winType === 'juryNull' ? '🕊️ 陪审团否决' : '最终陪审团倾向');
+  const wt = winType === 'precedent' ? '先例胜利' : (winType === 'juryNull' ? '陪审团否决' : '最终陪审团倾向');
   const lines = [
     '【合理怀疑 · 世纪审判】战报',
     '胜诉方：' + win.name + (winSide ? '（' + winSide + '）' : ''),
@@ -1944,7 +1802,7 @@ function buildReport(seats, seedVal, winType) {
 }
 /* #13 复制到剪贴板（clipboard API + execCommand 兜底） */
 function copyText(t, okMsg) {
-  const done = () => toast(okMsg || '✅ 已复制到剪贴板');
+  const done = () => toast(okMsg || '已复制到剪贴板');
   const fallback = () => {
     try {
       const ta = document.createElement('textarea');
@@ -2081,14 +1939,14 @@ function termPopupData(pp) {
 }
 function drawHelp() {
   ctx.clearRect(0, 0, W, H);
-  pxRect(0, 0, W, H, '#0F1B2D');
+  pxRect(0, 0, W, H, PAL.darkBg);
   const pg = TUTORIAL_PAGES[helpPage || 0];
-  drawPixelText('新 手 教 程', W / 2, 36, 28, '#FF3B30', { align: 'center' });
-  drawPixelText('第 ' + ((helpPage || 0) + 1) + ' / ' + TUTORIAL_PAGES.length + ' 页 · ← → 翻页', W / 2, 64, 13.5, '#C9D6EA', { align: 'center' });
+  drawPixelText('新 手 教 程', W / 2, 36, 28, PAL.red, { align: 'center' });
+  drawPixelText('第 ' + ((helpPage || 0) + 1) + ' / ' + TUTORIAL_PAGES.length + ' 页 · ← → 翻页', W / 2, 64, 13.5, PAL.textSoft, { align: 'center' });
   const cw = Math.min(660, W * 0.88), chh = Math.min(360, H * 0.56);
   const cx0 = W / 2 - cw / 2, cy0 = H * 0.13;
   pxRect(cx0, cy0, cw, chh, '#ffffff');
-  pxBorder(cx0, cy0, cw, chh, '#2b2b2b', 3);
+  pxBorder(cx0, cy0, cw, chh, PAL.black, 3);
   drawPixelText(pg.title, W / 2, cy0 + 46, 23, '#2e2618', { align: 'center', shadow: false });
   let ty = cy0 + 94;
   for (const it of pg.body) {
@@ -2114,17 +1972,17 @@ function drawHelp() {
 }
 function drawGlossary() {
   ctx.clearRect(0, 0, W, H);
-  pxRect(0, 0, W, H, '#0F1B2D');
-  drawPixelText('术 语 百 科', W / 2, 36, 28, '#FF3B30', { align: 'center' });
-  drawPixelText('点击术语查看解释 · 技能页可查看全部证人/证据技能 · ← → 翻页', W / 2, 66, 13.5, '#C9D6EA', { align: 'center' });
+  pxRect(0, 0, W, H, PAL.darkBg);
+  drawPixelText('术 语 百 科', W / 2, 36, 28, PAL.red, { align: 'center' });
+  drawPixelText('点击术语查看解释 · 技能页可查看全部证人/证据技能 · ← → 翻页', W / 2, 66, 13.5, PAL.textSoft, { align: 'center' });
   const tabs = [['terms', '术 语'], ['skills', '技 能']];
   const tabW = 130, tabH = 40;
   tabs.forEach((t, i) => {
     const x = W / 2 - (tabW * 2 + 12) / 2 + i * (tabW + 12);
     const active = GLOSSARY_TAB.tab === t[0];
-    pxRect(x, 86, tabW, tabH, active ? '#FF3B30' : '#ffffff');
-    pxBorder(x, 86, tabW, tabH, '#2b2b2b', active ? 3 : 2);
-    drawPixelText(t[1], x + tabW / 2, 86 + tabH / 2 + 1, 15, active ? '#ffffff' : '#2b2b2b', { align: 'center', shadow: false });
+    pxRect(x, 86, tabW, tabH, active ? PAL.red : '#ffffff');
+    pxBorder(x, 86, tabW, tabH, PAL.black, active ? 3 : 2);
+    drawPixelText(t[1], x + tabW / 2, 86 + tabH / 2 + 1, 15, active ? '#ffffff' : PAL.black, { align: 'center', shadow: false });
     addButton('glTab_' + t[0], x, 86, tabW, tabH, '');
   });
   const terms = TERMS;
@@ -2141,8 +1999,8 @@ function drawGlossary() {
     terms.slice(GLOSSARY_TAB.page * perPage, (GLOSSARY_TAB.page + 1) * perPage).forEach(t => {
       const x = W / 2 - 320;
       pxRect(x, y, 640, rowH, '#ffffff');
-      pxBorder(x, y, 640, rowH, '#2b2b2b', 2);
-      drawPixelText(t.name, x + 18, y + 20, 16, '#FF3B30', { shadow: false });
+      pxBorder(x, y, 640, rowH, PAL.black, 2);
+      drawPixelText(t.name, x + 18, y + 20, 16, PAL.red, { shadow: false });
       drawPixelText(t.cat, x + 18, y + 46, 12, '#a8720f', { shadow: false });
       drawWrapText(t.text, x + 132, y + rowH / 2, 13.5, '#2e2618', 492, 18);
       termHits.push({ x: x + 16, y, w: 110, h: rowH, kind: 'term', id: t.id });
@@ -2152,9 +2010,9 @@ function drawGlossary() {
     skills.slice(GLOSSARY_TAB.page * perPage, (GLOSSARY_TAB.page + 1) * perPage).forEach(k => {
       const x = W / 2 - 320;
       pxRect(x, y, 640, rowH, '#ffffff');
-      pxBorder(x, y, 640, rowH, '#2b2b2b', 2);
+      pxBorder(x, y, 640, rowH, PAL.black, 2);
       const sk = ElectionCore.data.SKILLS[k];
-      drawPixelText((sk ? sk.name + ' ' + lvMark(sk.lv) : k), x + 18, y + 20, 14, '#2f6fd8', { shadow: false });
+      drawPixelText((sk ? sk.name + ' ' + lvMark(sk.lv) : k), x + 18, y + 20, 14, PAL.blue, { shadow: false });
       drawWrapText(sk ? sk.desc : '', x + 18, y + 48, 12.5, '#2e2618', 604, 16);
       termHits.push({ x, y, w: 640, h: rowH, kind: 'skill', id: k });
       y += rowH + gap;
@@ -2162,7 +2020,7 @@ function drawGlossary() {
   }
   addButton('glPrev', W / 2 - 210, H - 64, 100, 38, '上 一 页', { disabled: GLOSSARY_TAB.page === 0 });
   addButton('glNext', W / 2 + 110, H - 64, 100, 38, '下 一 页', { disabled: GLOSSARY_TAB.page >= pages - 1 });
-  drawPixelText((GLOSSARY_TAB.page + 1) + ' / ' + pages, W / 2, H - 45, 12.5, '#C9D6EA', { align: 'center' });
+  drawPixelText((GLOSSARY_TAB.page + 1) + ' / ' + pages, W / 2, H - 45, 12.5, PAL.textSoft, { align: 'center' });
   addButton('back', W / 2 - 110, H - 100, 220, 36, '返 回');
 }
 function drawTermPopup() {
@@ -2176,8 +2034,8 @@ function drawTermPopup() {
   const x = clamp(W / 2 - w / 2, 8, W - w - 8);
   const y = clamp(H / 2 - bh / 2, 8, H - bh - 8);
   pxRect(x, y, w, bh, '#ffffff');
-  pxBorder(x, y, w, bh, '#2b2b2b', 3);
-  pxRect(x, y, w, 36, '#FF3B30');
+  pxBorder(x, y, w, bh, PAL.black, 3);
+  pxRect(x, y, w, 36, PAL.red);
   drawPixelText((data.cat ? data.cat + ' · ' : '') + data.title, x + w / 2, y + 19, 16, '#ffffff', { align: 'center', shadow: false });
   lines.forEach((ln, i) => drawWrapText(ln, x + pad, y + 50 + i * lh + lh / 2, 14.5, '#2e2618', w - pad * 2, lh));
   addButton('termClose', x + w - 32, y + 5, 28, 26, '✕');
@@ -2200,7 +2058,7 @@ function drawDebugPanel() {
   ctx.save();
   ctx.fillStyle = 'rgba(20,20,28,0.72)';
   ctx.fillRect(x, y, pw, ph);
-  ctx.strokeStyle = '#3a342a';
+  ctx.strokeStyle = PAL.black;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x + 0.75, y + 0.75, pw - 1.5, ph - 1.5);
   ctx.font = '10px monospace';
@@ -2231,12 +2089,12 @@ function tooltipInfo(h) {
     const ch = h.data.ch;
     const sk = ch.skill ? ElectionCore.data.SKILLS[ch.skill] : null;
     if (!sk) return null;
-    return { title: ch.name + ' · ' + sk.name, catCol: '#c98a1b', lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
+    return { title: ch.name + ' · ' + sk.name, catCol: '#FFB020', lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
   }
   if (k === 'event' && h.data && h.data.ev) {
     const ev = h.data.ev;
     const effTxt = ev.eff ? (ev.eff.type === 'vote' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' 票' : ev.eff.type === 'money' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' ⊙' : ev.eff.type === 'support' ? '倾向 ' + (ev.eff.val > 0 ? '+' : '') + ev.eff.val : '全体加成') : '';
-    return { title: ev.name, catCol: '#7A0E0E', lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
+    return { title: ev.name, catCol: '#A31B1B', lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
   }
   const card = h.card || (h.data && (h.data.card || h.data.ev));
   if (card && card.votes !== undefined) {
@@ -2246,7 +2104,7 @@ function tooltipInfo(h) {
     else lines.push('铁证证词：稳定提供票数');
     const fv = flavorName(card);
     if (fv) lines.push('— ' + fv + ' —');
-    return { title: card.name, catCol: '#0E8A5F', lines, extra: ['⚖ ' + card.votes + ' 票' + (card.cost != null ? ' · 传唤 ⊙' + card.cost : '')] };
+    return { title: card.name, catCol: PAL.green, lines, extra: ['×' + card.votes + ' 票' + (card.cost != null ? ' · 传唤 ⊙' + card.cost : '')] };
   }
   if (k === 'eventTarget' || k === 'starter' || k === 'target' || k === 'swapTarget') {
     let seat = -1;
@@ -2284,7 +2142,7 @@ function render() {
     ctx.save();
     ctx.fillStyle = 'rgba(10,14,24,0.45)';
     ctx.fillRect(0, 0, W, H);
-    drawPixelText('🤔 ' + ((view.seats[thinkSeat] && view.seats[thinkSeat].name) || '对手') + ' 思考中…', W / 2, H * 0.42, 22, '#FFD60A', { align: 'center' });
+    drawPixelText(((view.seats[thinkSeat] && view.seats[thinkSeat].name) || '对手') + ' 思考中…', W / 2, H * 0.42, 22, PAL.gold, { align: 'center' });
     ctx.restore();
   }
   if (termPopup) drawTermPopup();
@@ -2370,6 +2228,12 @@ function onClick() {
     }
     return mouse.x >= r.x && mouse.x <= r.x + r.w && mouse.y >= r.y && mouse.y <= r.y + r.h;
   };
+  // P1-3 确认撤销：确认层打开时只响应确认/取消按钮，屏蔽其余交互
+  if (confirmAsk) {
+    const _cfm = buttons.find(b => !b.disabled && hit(b) && (b.id === 'cfmYes' || b.id === 'cfmNo'));
+    if (_cfm) { btnFlash[_cfm.id] = 1; haptic(12); handleButton(_cfm.id); return; }
+    return;
+  }
   // 按钮优先于弹窗关闭
   const btn = buttons.find(b => !b.disabled && hit(b));
   if (btn) {
@@ -2466,6 +2330,8 @@ document.addEventListener('keydown', (e) => {
 
 function handleButton(id) {
   const g = view;
+  // P2-2 战报库面板打开时：屏蔽其他按钮（只响应关闭）
+  if (reportLib && id !== 'reportLibClose' && id !== 'reportLib') return;
   switch (id) {
     case 'help': screen = 'help'; helpPage = 0; hide('menu'); show('game'); break;
     case 'glossary': screen = 'glossary'; GLOSSARY_TAB.tab = 'terms'; GLOSSARY_TAB.page = 0; hide('menu'); show('game'); break;
@@ -2482,17 +2348,23 @@ function handleButton(id) {
     case 'refresh': {
       const me2 = mySeatObj();
       if (me2) {
-        const slots = marketSlotRects(me2);
-        slots.forEach(r => addFx({ type: 'shred', x: r.x, y: r.y, w: r.w, h: r.h, dur: 680, delay: (r.x % 60) }));
+        // P0.4 降量：换证不再碎纸，新卡以 cardIn 入场
         sfx('shatter');
       }
       doAction({ type: 'refreshMarket' });
       break;
     }
-    case 'endBuy': sfx('click'); doAction({ type: 'endBuy' }); break;
+    case 'endBuy': {
+      // P1-3 确认撤销：仍有可购证物时先确认再结束取证
+      const _m2 = mySeatObj();
+      const _hasLeft = _m2 && _m2.money >= 2 && (_m2.market || []).some(c => c.cost <= _m2.money);
+      if (_hasLeft && !confirmAsk) { confirmAsk = { act: 'endBuy', title: '结束取证？', body: '你还有 ⊙' + _m2.money + ' 未花，市场仍有可传唤的证据。' }; sfx('click'); break; }
+      confirmAsk = null; sfx('click'); doAction({ type: 'endBuy' });
+      break;
+    }
     case 'toggleBuyMode': {
       buyMode = buyMode === 'buy' ? 'lock' : 'buy';
-      toast(buyMode === 'lock' ? '🔒 留证模式：点击证物架牌可留证' : '🛒 传唤模式：点击证物架牌直接传唤');
+      toast(buyMode === 'lock' ? '留证模式：点击证物架牌可留证' : '传唤模式：点击证物架牌直接传唤');
       sfx('click');
       break;
     }
@@ -2506,8 +2378,24 @@ function handleButton(id) {
         });
       }
       break;
-    case 'finishPlay': sfx('click'); doAction({ type: 'finishPlay' }); selected = []; break;
-    case 'passEvent': sfx('click'); doAction({ type: 'passEvent' }); eventPick = null; break;
+    case 'finishPlay': {
+      // P1-3 确认撤销：还有手牌未出时先确认（最后一人放弃除外——有 playDone 语义时自动放行）
+      const _m3 = mySeatObj();
+      const _hasHand = _m3 && _m3.hand && _m3.hand.length && view.phase === 'play' && view.turn === mySeat && !_m3.playDone;
+      if (_hasHand && !confirmAsk) { confirmAsk = { act: 'finishPlay', title: '结束举证？', body: '你还有 ' + _m3.hand.length + ' 张手牌未出，确认结束？' }; sfx('click'); break; }
+      confirmAsk = null; sfx('click'); doAction({ type: 'finishPlay' }); selected = [];
+      break;
+    }
+    case 'passEvent': {
+      // P1-3 确认撤销：还有可用事件牌时先确认
+      const _m4 = mySeatObj();
+      const _hasEv = _m4 && (_m4.events || []).some(ev => isEventUsable(ev));
+      if (_hasEv && !confirmAsk) { confirmAsk = { act: 'passEvent', title: '不打出事件？', body: '你还有可用的事件牌，跳过将保留至后续回合。' }; sfx('click'); break; }
+      confirmAsk = null; sfx('click'); doAction({ type: 'passEvent' }); eventPick = null;
+      break;
+    }
+    case 'cfmYes': if (confirmAsk) { const _a = confirmAsk.act; confirmAsk = null; handleButton(_a); } break;
+    case 'cfmNo': confirmAsk = null; sfx('click'); break;
     case 'playEventSel':
       if (eventPick && eventPick.seat === mySeat && eventPick.target >= 0) {
         doAction({ type: 'playEvent', uid: eventPick.ev.uid, targetSeat: eventPick.target }, ack => {
@@ -2553,9 +2441,15 @@ function handleButton(id) {
     case 'backMenu':
       if (confirm('确定要离开当前对局吗？进度将丢失。')) location.reload();
       break;
+    case 'reportLib':
+      reportLib = !reportLib; sfx('click');
+      break;
+    case 'reportLibClose':
+      reportLib = false; sfx('click');
+      break;
     case 'copyReport': {
       // #13 分享战绩：生成纯文本快照并复制到剪贴板（显示用户原串 seedRaw，留空显示随机数字）
-      if (view) copyText(buildReport(view.seats, (view.seedRaw != null ? view.seedRaw : view.seed), view.winType), '✅ 战绩已复制，可粘贴分享');
+      if (view) copyText(buildReport(view.seats, (view.seedRaw != null ? view.seedRaw : view.seed), view.winType), '战绩已复制，可粘贴分享');
       break;
     }
     case 'wait': break;
@@ -2576,15 +2470,13 @@ function handleCard(hc) {
       if (buyMode === 'lock') {
         if (slot) {
           const locked = (me.lockedUids || []).indexOf(hc.data.uid) >= 0;
-          if (locked) addFx({ type: 'float', x: slot.x + slot.w / 2, y: slot.y, text: '解锁', col: '#FFD400', size: 16, dur: 700 });
-          else addFx({ type: 'chain', x: slot.x, y: slot.y, w: slot.w, h: slot.h, dur: 800 });
+          if (locked) addFx({ type: 'float', x: slot.x + slot.w / 2, y: slot.y, text: '解锁', col: PAL.gold, size: 16, dur: 700 });
+          // P0.4 降量：留证不再播锁链，锁定状态由卡面角标表达
         }
         sfx('click');
         doAction({ type: 'lockCard', uid: hc.data.uid });
       } else {
-        const hl = handLayout();
-        const last = hl[hl.length - 1];
-        if (slot && last) addFx({ type: 'flyTo', x0: slot.x, y0: slot.y, w0: slot.w, h0: slot.h, x1: last.x, y1: last.y, w1: last.w, h1: last.h, dur: 520, card: slot.card });
+        // P0.4 降量：购买飞牌取消，新卡以市场 cardIn 入场
         doAction({ type: 'buyCard', uid: hc.data.uid });
       }
       break;
@@ -2675,28 +2567,24 @@ function checkFxDiffs() {
   if (view.phase !== lastPhase) {
     const prev = lastPhase;
     lastPhase = view.phase;
-    if (view.phase === 'buy') { addFx({ type: 'phase', dur: 1100, label: '取证阶段', icon: '📜' }); sfx('swoosh'); }
-    else if (view.phase === 'play') { addFx({ type: 'phase', dur: 1100, label: '举证阶段', icon: '📄' }); sfx('swoosh'); }
+    if (view.phase === 'buy') { addFx({ type: 'phase', dur: 1100, label: '取证阶段' }); sfx('swoosh'); }
+    else if (view.phase === 'play') { addFx({ type: 'phase', dur: 1100, label: '举证阶段' }); sfx('swoosh'); }
     else if (view.phase === 'reveal') {
-      addFx({ type: 'phase', dur: 1000, label: '亮出证据', icon: '📄' }); sfx('swoosh');
-      const lay = rowLayout();
-      addFx({ type: 'spotlight', x0: 8, y0: lay.cy - 24, w0: W - 16, h0: lay.rh + 34, dur: 900 });
+      addFx({ type: 'phase', dur: 1000, label: '亮出证据' }); sfx('swoosh');
     }
-    else if (view.phase === 'preEvent') { addFx({ type: 'phase', dur: 1100, label: '庭审前 · 事件', icon: '📰' }); sfx('swoosh'); }
-    else if (view.phase === 'postEvent') { addFx({ type: 'phase', dur: 1100, label: '庭审后 · 事件', icon: '📰' }); sfx('swoosh'); }
+    else if (view.phase === 'preEvent') { addFx({ type: 'phase', dur: 1100, label: '庭审前 · 事件' }); sfx('swoosh'); }
+    else if (view.phase === 'postEvent') { addFx({ type: 'phase', dur: 1100, label: '庭审后 · 事件' }); sfx('swoosh'); }
     else if (view.phase === 'discard') {
-      addFx({ type: 'phase', dur: 1100, label: '整理阶段', icon: '🗂' }); sfx('swoosh');
-      const hl = handLayout();
-      hl.forEach((it, i) => addFx({ type: 'recycle', x0: it.x + it.w / 2, y0: it.y + it.h / 2, x1: W - 120 + i * 26, y1: H - 46, w: 40, h: 56, dur: 700, delay: i * 130 }));
+      addFx({ type: 'phase', dur: 1100, label: '整理阶段' }); sfx('swoosh');
     }
-    else if (view.phase === 'income') { addFx({ type: 'phase', dur: 1100, label: '发放酬金', icon: '💵' }); sfx('coin'); }
+    else if (view.phase === 'income') { addFx({ type: 'phase', dur: 1100, label: '发放酬金' }); sfx('coin'); }
     else if (view.phase === 'chooseStarter') {
-      addFx({ type: 'phase', dur: 1200, label: '选择起始玩家', icon: '🎯' });
+      addFx({ type: 'phase', dur: 1200, label: '选择起始玩家' });
       sfx('click');
     }
     else if (view.phase === 'gameover') { /* 结算屏 */ }
     else if (prev !== '' && view.phase !== 'drawVoter' && view.phase !== 'drawEvent' && view.phase !== 'count' && view.phase !== 'rank' && view.phase !== 'settle') {   // M6：瞬时自动阶段有专属 FX，避免双播
-      addFx({ type: 'phase', dur: 1100, label: view.phaseLabel || view.phase, icon: '📌' });
+      addFx({ type: 'phase', dur: 1100, label: view.phaseLabel || view.phase });
       sfx('swoosh');
     }
   }
@@ -2706,8 +2594,7 @@ function checkFxDiffs() {
   else if (view.startingSeat !== lastStarterSeat && view.phase !== 'pickChar') {
     lastStarterSeat = view.startingSeat;
     if (view.round >= 1) {
-      const seats = view.seats.map(s2 => ({ name: s2.name, col: campColor(s2.seat) }));
-      addFx({ type: 'wheel', dur: 2100, cx: W / 2, cy: H * 0.25, r: 70, seats, winner: view.startingSeat });
+      addFx({ type: 'phase', dur: 1200, label: view.seats[view.startingSeat].name + ' 起始' });
       sfx('click');
     }
   }
@@ -2731,25 +2618,12 @@ function checkFxDiffs() {
       const it = rowLay.items[ri];
       if (!it) return;
       if (!ps && view.phase === 'play') {
-        if (uid != null) {
-          // 出牌：从手牌抛物线飞向辩论台（0.4s）+ 落台金色高亮
-          const hl = handLayout();
-          const sit = hl.find(x2 => x2.card.uid === uid);
-          if (sit) {
-            addFx({ type: 'flyTo', x0: sit.x + sit.w / 2 - 44, y0: sit.y + sit.h / 2 - 30, w0: 88, h0: 60, x1: it.x, y1: it.y, w1: it.w, h1: it.h, card: r.seat === mySeat ? r.card : null, landGlow: true, dur: 430 });
-            sfx('swoosh');
-          } else {
-            addFx({ type: 'cardIn', x: it.x, y: it.y, w: it.w, h: it.h, dur: 380 });
-          }
-        } else {
-          // 对手暗置：背面浮现
-          addFx({ type: 'cardIn', x: it.x, y: it.y, w: it.w, h: it.h, dur: 380 });
-        }
+        // P0.4 降量：出牌飞牌取消，统一就地 cardIn 入场
+        addFx({ type: 'cardIn', x: it.x, y: it.y, w: it.w, h: it.h, dur: 380 });
+        sfx('swoosh');
       }
       if (r.removed && ps && !ps.includes(':R')) {
-        addFx({ type: 'boom', x: it.x, y: it.y, w: it.w, h: it.h });
-        addFx({ type: 'confetti', x: it.x + it.w / 2, y: it.y, dur: 1300, col: '#E6392F', seed: (uid != null ? uid : ri) % 97 });
-        addFx({ type: 'tombstone', x: it.x, y: it.y, w: it.w, h: it.h, dur: 1400, delay: 400 });
+        // P0.4 降量：移除不再爆炸/墓碑，保留震屏与音效
         shakeAmp = Math.max(shakeAmp, 12);
         sfx('boom');
       }
@@ -2768,19 +2642,14 @@ function checkFxDiffs() {
       const it = lay.items.find(x => x.card.uid === r.card.uid);
       if (!it) return;
       const fx = SKILL_FX[r.card.skill];
-      addFx({ type: 'pulse', uid: r.card.uid, x: it.x, y: it.y, w: it.w, h: it.h, col: fx.col, dur: 500, delay: i * 220 });
       addFx({ type: 'float', x: it.x + it.w / 2, y: it.y + 6, text: fx.txt, col: fx.col, size: 14, dur: 900, delay: i * 220 });
     });
     if (skRows.length) sfx('star');
   }
-  // 排名
+  // 排名（P0.4 降量：领奖台/纸屑取消，排名由 count 动画承载）
   const rs2 = (view.roundRank || []).join(',');
   if (rs2 !== lastRankSig && rs2 !== '') {
     lastRankSig = rs2;
-    const order = view.roundRank.map((s2, i) => ({ seat: s2, name: view.seats[s2].name, col: campColor(s2) }));
-    addFx({ type: 'podium', dur: 1800, order });
-    const pr = panelRect(view.roundRank[0]);
-    addFx({ type: 'confetti', x: pr.x + pr.w / 2, y: pr.y + 20, dur: 1600, seed: 5, n: 50 });
     sfx('star');
   }
   // 金币变化
@@ -2788,7 +2657,7 @@ function checkFxDiffs() {
     if (lastMoney[i] !== undefined && lastMoney[i] !== s.money) {
       const pr = panelRect(i);
       const d = s.money - lastMoney[i];
-      addFx({ type: 'coin', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 - 8, text: (d >= 0 ? '+' : '') + d + '⊙', dur: 900 });
+      addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 - 8, text: (d >= 0 ? '+' : '') + d + '⊙', col: '#FFB020', size: 16, dur: 800 });
     }
     lastMoney[i] = s.money;
   });
@@ -2798,8 +2667,7 @@ function checkFxDiffs() {
       const pr = panelRect(i);
       const d = s.support - lastSupport[i];
       if (d > 0) {
-        addFx({ type: 'star', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 + 4, text: '+' + d, size: 22, dur: 1100 });
-        addFx({ type: 'flow', x: pr.x + 10, y: pr.y + pr.h - 13, w: pr.w - 20, h: 8, dur: 800, col: campColor(i) });
+        addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 + 4, text: '+' + d, col: PAL.green, size: 18, dur: 800 });
       }
     }
     lastSupport[i] = s.support;
@@ -2853,10 +2721,9 @@ function checkFxDiffs() {
       if (m) {
         const nm = m[1];
         const evT = (ElectionCore.data.EVENT_TEMPLATES || []).find(t => t.name === nm);
-        addFx({ type: 'news', dur: 2000, title: nm, sub: evT ? evT.desc : '' });
-        // 法庭高潮：事件生效瞬间全屏 OBJECTION!（法槌音效 + 冲击感）
-        addFx({ type: 'objection', dur: 1500, sub: '事件牌生效' });
-        shakeAmp = Math.max(shakeAmp, 14);
+        // P0.4 降量：事件生效改为横幅揭示（不再 BREAKING NEWS / OBJECTION 全屏）
+        addFx({ type: 'phase', dur: 1100, label: nm });
+        shakeAmp = Math.max(shakeAmp, 8);
         sfx('gavel');
       }
     }
@@ -2868,11 +2735,46 @@ function checkFxDiffs() {
     sfx('win');
     const ws = view.seats[view.winner];
     const wside = ws && ws.side ? (ws.side === 'prosecutor' ? '检方' : '辩护方') : '';
-    let winTitle = '🏆 胜诉！', winSub = ws.name + (wside ? '（' + wside + '）' : '');
-    if (view.winType === 'precedent') winSub = '⚖️ 先例胜利 · ' + ws.name + (wside ? '（' + wside + '）' : '');
-    else if (view.winType === 'juryNull') winSub = '🕊️ 陪审团否决 · ' + ws.name + (wside ? '（' + wside + '）' : '');
-    addFx({ type: 'news', dur: 2400, title: winTitle, sub: winSub });
-    addFx({ type: 'confetti', x: W / 2, y: 60, dur: 2000, seed: 9, n: 90 });
+    let winTitle = '胜诉！', winSub = ws.name + (wside ? '（' + wside + '）' : '');
+    if (view.winType === 'precedent') winSub = '先例胜利 · ' + ws.name + (wside ? '（' + wside + '）' : '');
+    else if (view.winType === 'juryNull') winSub = '陪审团否决 · ' + ws.name + (wside ? '（' + wside + '）' : '');
+    addFx({ type: 'phase', dur: 1200, label: winTitle + ' · ' + winSub });
+    // P2-2 战报库：对局结束自动归档最近 6 局（含胜者/种子/各席位倾向）
+    try {
+      const rep = {
+        t: Date.now(),
+        win: (ws ? ws.name : '?') + (wside ? '（' + wside + '）' : ''),
+        wt: view.winType || 'default',
+        seed: view.seedRaw != null ? String(view.seedRaw) : String(view.seed),
+        rounds: view.round || 0,
+        names: (view.seats || []).map(s => s.name),
+        supports: (view.seats || []).map(s => s.support || 0)
+      };
+      const lib = [];
+      try { const raw = localStorage.getItem('elec_report_lib'); if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr)) arr.forEach(x => lib.push(x)); } } catch (e) { /* 忽略 */ }
+      lib.unshift(rep);
+      while (lib.length > 6) lib.pop();
+      try { localStorage.setItem('elec_report_lib', JSON.stringify(lib)); } catch (e) { /* 忽略 */ }
+    } catch (e) { /* 归档失败不影响对局 */ }
+    // P2-1 局外成长：对局结算经验 + 成就检测
+    try {
+      const me = mySeatObj();
+      const won = view.winner === mySeat;
+      const xp = 20 + Math.round(8 * (view.round || 1)) + (won ? 30 : 0);
+      profile.gainXp(xp);
+      profile.giveAch('firstBlood');
+      if (won) {
+        profile.recordWin();
+        profile.giveAch('firstWin');
+        const mode = localStorage.getItem('elec_mode');
+        if (mode === 'solo') profile.giveAch('soloWin');
+        if (profile.wins >= 3) profile.giveAch('cleanSweep');
+      }
+      if (profile.games >= 10) profile.giveAch('vet');
+      renderProfileCard();
+      // P1-1 首局教学完成标记
+      if (!tutDone) { tutDone = true; try { localStorage.setItem('elec_tut_done', '1'); } catch (e) { /* 忽略 */ } }
+    } catch (e) { /* 档案失败不影响对局 */ }
   }
 }
 function SKILLS_LV(skill) {
