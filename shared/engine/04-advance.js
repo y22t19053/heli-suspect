@@ -1,17 +1,42 @@
 /* ===== engine/04-advance.js（game-core.js 行 491-586）===== */
+    const aiMask = Array.isArray(opts.aiMask) ? opts.aiMask : [];
+    const seats = [];
+    for (let i = 0; i < seatCount; i++) {
+      const isAI = !!aiMask[i];
+      const rawName = names[i];
+      const name = (typeof rawName === 'string' && rawName.trim())
+        ? String(rawName).slice(0, 12)
+        : ('玩家' + (i + 1));
+      const seat = makeSeat(i, name, isAI, state.rng);
+      if (isAI && AI_PERSONALITIES.length) {
+        seat.personality = AI_PERSONALITIES[Math.floor(state.rng() * AI_PERSONALITIES.length)];
+      }
+      seats.push(seat);
+    }
+    // 庭审角色分配：检方 = ceil(n/2) 人（代表控方），其余为辩护方（代表被告律师）
+    // 随机洗牌分配到座位——玩家每局可能扮演检方，也可能扮演辩护方
+    {
+      const nPros = Math.ceil(seatCount / 2);
+      const sideList = [];
+      for (let i = 0; i < seatCount; i++) sideList.push(i < nPros ? 'prosecutor' : 'defense');
+      const shuffled = shuffle(sideList, state.rng);
+      seats.forEach((s, i) => { s.side = shuffled[i]; });
+    }
+    // 填充游戏字段（rngSeed/rngCalls/uidSeq/rng 已在骨架中，不覆盖）
+    Object.assign(state, {
       version: 1, seatCount,
       roundsLimit: opts.roundsLimit || 5,      // P1-4 快速模式：1 轮试玩 / 默认 5 轮（04-advance income 结算用）
       seed,                             // 种子码（可复现；分享战绩用，超级更新#13）
       seedRaw,                          // 用户输入的原始种子码字符串（无则 null；显示/分享用 #13 修复）
-      rng,                              // 随机源（抽签质证等随机技能用；测试可注入种子）
+      rng: state.rng,                   // 可序列化随机源（rngSeed/rngCalls 支撑；恢复后 restoreRng 重建）
       phase: 'pickChar',
       round: 0,                // 当前轮次（1 起）
       startingSeat: 0,         // 本轮起始角色
       turn: 0,                 // 当前行动座位
       seats,
       draftCandidates: [],     // 每人 3 张候选角色
-      deck: buildDeck(rng),
-      eventDeck: buildEventDeck(rng),
+      deck: buildDeck(state.rng, nextUid),
+      eventDeck: buildEventDeck(state.rng, nextUid),
       used: [],                // 洗回池（行牌/整理/未买证物架牌）
       grave: [],               // 档案（【移除】的牌，不洗入牌堆）
       row: [],                 // 中央亮出行 [{seat, card, revealed}]
@@ -36,11 +61,11 @@
       winType: 'support',      // 胜利类型：support / precedent / juryNull
       winner: null, gameOver: false,
       logs: []
-    };
+    });
     // 每人 3 张候选角色（同时亮出）
-    const pool = shuffle(CHARACTERS.slice(), rng);
+    const pool = shuffle(CHARACTERS.slice(), state.rng);
     for (let i = 0; i < seatCount; i++) {
-      const cand = shuffle(CHARACTERS.slice(), rng);
+      const cand = shuffle(CHARACTERS.slice(), state.rng);
       state.draftCandidates.push(cand.slice(0, 3));
     }
     void pool;
@@ -70,28 +95,3 @@
           beginStarter(state);
         }
       }
-    },
-    chooseStarter: {
-      label: 'chooseStarter',
-      needsInput: (state, seat) => state.starterPicker === seat,
-      update: (state) => {
-        // 第 1 轮：随机；后续：排名最低者选择
-        if (state.starterPicker < 0) {
-          state.startingSeat = Math.floor(state.rng() * state.seatCount);
-          state.logs.push('第 ' + state.round + ' 轮由【' + state.seats[state.startingSeat].name + '】开始');
-          beginRound(state);
-        } else if (state.starterChosen) {
-          // 已选定（人类 apply 或 AI 自行选择）
-          state.logs.push('第 ' + state.round + ' 轮由【' + state.seats[state.startingSeat].name + '】开始');
-          beginRound(state);
-        } else if (!state.seats[state.starterPicker].isAI) {
-          // 等待人类选择
-        } else {
-          // AI：选自己
-          state.startingSeat = state.starterPicker;
-          state.starterChosen = true;
-          state.logs.push('排名最低的【' + state.seats[state.starterPicker].name + '】选择自己开始');
-          beginRound(state);
-        }
-      }
-    },

@@ -1,4 +1,23 @@
 /* ===== engine/03-state.js（game-core.js 行 364-490）===== */
+
+  /* 事件牌模板（lv：① ② ③ 分级；target：self 自己 / enemy 需选对方 / auto 自动） */
+  const EVENT_TEMPLATES = [
+    { id: 'e01', name: '当庭陈词',   lv: 1, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 1 },     desc: '庭审前：本方 +1 票' },
+    { id: 'e02', name: '质疑证词',   lv: 1, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -1 },    desc: '庭审前：指定对方 -1 票' },
+    { id: 'e03', name: '追加陈词',   lv: 2, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 1 },     desc: '庭审前：本方 +1 票' },
+    { id: 'e04', name: '揭发前科',   lv: 2, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -1 },    desc: '庭审前：指定对方 -1 票' },
+    { id: 'e05', name: '关键陈词',   lv: 3, timing: 'pre',  target: 'self',  eff: { type: 'vote', val: 2 },     desc: '庭审前：本方 +2 票' },
+    { id: 'e06', name: '致命污点',   lv: 3, timing: 'pre',  target: 'enemy', eff: { type: 'vote', val: -2 },    desc: '庭审前：指定对方 -2 票' },
+    { id: 'e07', name: '胜诉酬金',   lv: 1, timing: 'post', target: 'self',  eff: { type: 'money', val: 1 },    desc: '庭审后：本方 +1⊙' },
+    { id: 'e08', name: '冻结资产',   lv: 1, timing: 'post', target: 'enemy', eff: { type: 'money', val: -1 },   desc: '庭审后：指定对方 -1⊙' },
+    { id: 'e09', name: '舆论施压',   lv: 2, timing: 'post', target: 'auto',  eff: { type: 'rewardBuff', val: 1 }, desc: '庭审后：若本方本轮第一，倾向奖励 +1' },
+    { id: 'e10', name: '抹黑对手',   lv: 2, timing: 'post', target: 'enemy', eff: { type: 'support', val: -1 }, desc: '庭审后：指定对方倾向 -1' },
+    { id: 'e11', name: '终局陈词',   lv: 3, timing: 'post', target: 'auto',  eff: { type: 'rewardBuff', val: 2 }, desc: '庭审后：若本方本轮第一，倾向奖励 +2' },
+    { id: 'e12', name: '庭外交易',   lv: 3, timing: 'post', target: 'enemy', eff: { type: 'support', val: -2 }, desc: '庭审后：指定对方倾向 -2' },
+    { id: 'e21', name: '环境污染案',    lv: 2, timing: 'pre',  target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审前：所有玩家丑闻值 +1' },
+    { id: 'e34', name: '禁酒令案',      lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
+    { id: 'e36', name: '反恐案',        lv: 2, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
+    { id: 'e37', name: '军售丑闻案',    lv: 2, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
     { id: 'e38', name: '桃色丑闻案',    lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },               desc: '庭审后：所有玩家丑闻值 +1' },
     { id: 'e40', name: '计票争议案',    lv: 1, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
     { id: 'e41', name: '水门案',        lv: 3, timing: 'post', target: 'auto', eff: { type: 'scandalAll', val: 1 },              desc: '庭审后：所有玩家丑闻值 +1' },
@@ -71,24 +90,23 @@
       }
     };
   }
-  function makeVoter(tpl) { return Object.assign({}, tpl, { uid: nextUid(), scandal: tpl.scandal || 0 }); }
-  function makeEvent(tpl) { return Object.assign({}, tpl, { uid: nextUid(), used: false }); }
+  function makeVoter(tpl, uidGen) { return Object.assign({}, tpl, { uid: uidGen(), scandal: tpl.scandal || 0 }); }
+  function makeEvent(tpl, uidGen) { return Object.assign({}, tpl, { uid: uidGen(), used: false }); }
 
   /* 初始牌堆：24 种 × 2 份 = 48 张 */
-  function buildDeck(rng) {
+  function buildDeck(rng, uidGen) {
     const list = [];
-    VOTER_TEMPLATES.forEach(t => { list.push(makeVoter(t)); list.push(makeVoter(t)); });
+    VOTER_TEMPLATES.forEach(t => { list.push(makeVoter(t, uidGen)); list.push(makeVoter(t, uidGen)); });
     return shuffle(list, rng);
   }
-  function buildEventDeck(rng) {
+  function buildEventDeck(rng, uidGen) {
     const list = [];
-    EVENT_TEMPLATES.forEach(t => { list.push(makeEvent(t)); list.push(makeEvent(t)); });
+    EVENT_TEMPLATES.forEach(t => { list.push(makeEvent(t, uidGen)); list.push(makeEvent(t, uidGen)); });
     return shuffle(list, rng);
   }
 
   function createGame(opts) {
     opts = opts || {};
-    uidSeq = 1000;                    // 每局重置 uid（同种子完全可复现，超级更新#14）
     // —— 字段校验（超级更新#13）：seatCount / names / aiMask / seed 容错收敛 ——
     const rawCount = opts.seatCount;
     const seatCount = (typeof rawCount === 'number' && Number.isFinite(rawCount))
@@ -100,29 +118,11 @@
       : (typeof rawSeed === 'string' && rawSeed.trim() !== '' ? hashStr(rawSeed) : (Date.now() % 2147483647));
     // #13 修复：保留用户输入的原始种子码字符串（无则 null），供结算屏/战报显示原串而非 hash 数字
     const seedRaw = (typeof rawSeed === 'string' && rawSeed.trim() !== '') ? rawSeed.trim() : null;
-    const rng = mulberry32(seed);
+    // 评审 P0-BUG / P1-BUG 修复：随机源改为「种子 + 已调用计数」可序列化形态——
+    // rngSeed/rngCalls 是数字字段（可 JSON 序列化），rng 函数读写二者；快照落盘/恢复
+    // 后 restoreRng() 重建到精确调用点（同种子可复现不破）。uid 计数器一并移入 state
+    // （原模块级 uidSeq 会被并发房间的 createGame 互相重置，导致两房间卡牌 uid 重复）。
+    const state = { rngSeed: seed, rngCalls: 0, uidSeq: 1000 };
+    restoreRng(state);                                // 初始化可序列化随机源
+    const nextUid = () => 'c' + (state.uidSeq++);     // 每局独立 uid（同种子完全可复现）
     const names = Array.isArray(opts.names) ? opts.names : [];
-    const aiMask = Array.isArray(opts.aiMask) ? opts.aiMask : [];
-    const seats = [];
-    for (let i = 0; i < seatCount; i++) {
-      const isAI = !!aiMask[i];
-      const rawName = names[i];
-      const name = (typeof rawName === 'string' && rawName.trim())
-        ? String(rawName).slice(0, 12)
-        : ('玩家' + (i + 1));
-      const seat = makeSeat(i, name, isAI, rng);
-      if (isAI && AI_PERSONALITIES.length) {
-        seat.personality = AI_PERSONALITIES[Math.floor(rng() * AI_PERSONALITIES.length)];
-      }
-      seats.push(seat);
-    }
-    // 庭审角色分配：检方 = ceil(n/2) 人（代表控方），其余为辩护方（代表被告律师）
-    // 随机洗牌分配到座位——玩家每局可能扮演检方，也可能扮演辩护方
-    {
-      const nPros = Math.ceil(seatCount / 2);
-      const sideList = [];
-      for (let i = 0; i < seatCount; i++) sideList.push(i < nPros ? 'prosecutor' : 'defense');
-      const shuffled = shuffle(sideList, rng);
-      seats.forEach((s, i) => { s.side = shuffled[i]; });
-    }
-    const state = {

@@ -1,4 +1,29 @@
 /* ===== engine/12-income.js（game-core.js 行 1412-1494）===== */
+            state.juryTokens[owner] = (state.juryTokens[owner] || 0) + 1;
+            state.logs.push('陪审员转向：【' + state.seats[owner].name + '】获得 1 名陪审员支持（' + state.juryTokens[owner] + '/3）');
+            break;
+          }
+          /* —— 纳什均衡互锁系（lv3）：反制事件流 / 连胜滚雪球 —— */
+          case 'veto': {
+            // 一票否决：对方本轮打过事件牌 → 程序反噬（反制事件流）
+            const foeEvent = state.seats.some((x, j) => j !== owner && x.eventCount > 0);
+            if (foeEvent) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
+            break;
+          }
+          case 'momentum': {
+            // 势头：本方此前赢过轮次 → 连胜气势（滚雪球，需要对手反制）
+            if ((state.seats[owner].stats && state.seats[owner].stats.roundsWon) > 0) votes[owner] += 1;
+            break;
+          }
+          /* —— 庭审克制包（⑨：偏见揭露/最后一搏/证据链完整/禁言令/民意分裂） —— */
+          case 'bias': {
+            // 偏见揭露：对方铺场 ≥4 → 对方所有已亮牌各 -1（AOE 反铺场终极手段）
+            const foeN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
+            if (foeN >= 4) {
+              state.row.forEach(x => { if (!x.removed && !x._nullified && x.seat !== owner) votes[x.seat] -= 1; });
+            }
+            break;
+          }
           case 'hailMary': {
             // 最后一搏：落后 ≥2 且本方铺场 ≥3 → +3（绝境+铺场双条件翻盘）
             const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
@@ -57,28 +82,3 @@
   /* 丑闻曝光（舆情事件）：目标玩家声誉腐蚀 +1（上限 5），此后每轮票数 -1 */
   function applyScandalEffects(state, targetSeat) {
     if (targetSeat < 0 || targetSeat >= state.seatCount) return;
-    const s = state.seats[targetSeat];
-    s.scandal = Math.min(5, (s.scandal || 0) + 1);
-    state.logs.push('丑闻曝光！【' + s.name + '】声誉受损，丑闻指数 ' + s.scandal + '/5');
-  }
-  /* 票数最高的对方（平票时随机抽签，避免同一目标被连续针对或可预测）
-   * #13 修复：随机源必须用 state.rng（同种子可复现），不能用 Math.random */
-  function highestEnemy(votes, owner, n, rng) {
-    let bv = -Infinity;
-    for (let i = 0; i < n; i++) {
-      if (i === owner) continue;
-      if (votes[i] > bv) bv = votes[i];
-    }
-    if (bv === -Infinity) return owner;
-    const ties = [];
-    for (let i = 0; i < n; i++) {
-      if (i !== owner && votes[i] === bv) ties.push(i);
-    }
-    return ties.length === 1 ? ties[0] : ties[Math.floor((rng || Math.random)() * ties.length)];
-  }
-
-  /* ---------------- 本轮排名 ---------------- */
-  function doRank(state) {
-    state.phase = 'rank';
-    const n = state.seatCount;
-    const info = state.seats.map((s, i) => {

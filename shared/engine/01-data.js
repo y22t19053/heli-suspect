@@ -1,4 +1,23 @@
 /* ===== engine/01-data.js（game-core.js 行 40-340）===== */
+      state.rngCalls = (state.rngCalls >>> 0) + 1;
+      return mulberryStep((state.rngSeed + state.rngCalls * 0x6D2B79F5) | 0);
+    };
+    return state;
+  }
+  function hashStr(s) {
+    let h = 1779033703 ^ s.length;
+    for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+    return h >>> 0;
+  }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function shuffle(arr, rng) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
   /* ---------------- 阵营与配色 ---------------- */
   /* MVP：每位玩家 = 一个独立阵营（角色牌决定），独立计票、独立排名。
    * 规则中的"本阵营/各阵营/阵营顺序"均按玩家维度实现。 */
@@ -281,22 +300,3 @@
     { id: 'v118', name: '绝境陈词',      cost: 4, votes: 1, skill: 'hailMary', desc: '本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票' },
     { id: 'v119', name: '链条卷宗',      cost: 4, votes: 1, skill: 'fullChain', desc: '本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票' },
     { id: 'v120', name: '禁言动议',      cost: 4, votes: 1, skill: 'gagOrder', desc: '对方本轮打过 ≥3 张时，票数最高的对方 -2 票' },
-    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' },
-    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' }
-  ];
-
-  /* AI 人格（从美式法律/政治文化提取）：
-   * aggression 0~1：进攻性（影响攻击事件偏好/出牌数量）
-   * economy 0~1：经济牌偏好（影响购买/刷新决策）
-   * bonus：人格被动加成（vote=审议+票 / money=每轮+⊙）——让 AI 更像"有性格的对手" */
-  const AI_PERSONALITIES = [
-    { id: 'libertarian',    name: '自由派律师',     aggression: 0.35, economy: 0.8, bonus: { money: 1 } },
-    { id: 'teaParty',       name: '民粹律师',       aggression: 0.7,  economy: 0.45, bonus: { vote: 1 } },
-    { id: 'demSoc',         name: '平权律师',       aggression: 0.55, economy: 0.6 },
-    { id: 'maga',           name: '鹰派律师',       aggression: 0.9,  economy: 0.35, bonus: { vote: 1 } },
-    { id: 'greenNewDeal',   name: '环保律师',       aggression: 0.6,  economy: 0.55, bonus: { money: 1 } },
-    { id: 'establishment',  name: '建制派律师',     aggression: 0.5,  economy: 0.65, bonus: { money: 1 } },
-    { id: 'nevertrump',     name: '温和保守律师',   aggression: 0.3,  economy: 0.6 },
-    { id: 'hollywood',      name: '名人律师',       aggression: 0.65, economy: 0.5, bonus: { vote: 1 } },
-    /* ============ 更多人格扩充包（+4） ============ */
-    { id: 'populist',       name: '民粹大状',       aggression: 0.85, economy: 0.3,  bonus: { vote: 1 } },

@@ -1,4 +1,29 @@
 /* ===== engine/10-rank.js（game-core.js 行 1295-1356）===== */
+            break;
+          }
+          case 'minority': {
+            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
+            if (votes[owner] < maxOther) votes[owner] += (r.card.v || 1);
+            break;
+          }
+          /* —— 位置博弈系（做题：看谁占行首/行尾/左半区） —— */
+          case 'firstSeat': {
+            // 首座质证：行首（最左一张）是对方牌 → 该牌 -1
+            const act = state.row.filter(x => !x.removed && !x._nullified);
+            const lead = act[0];
+            if (lead && lead.seat !== owner) votes[lead.seat] -= (r.card.v || 1);
+            break;
+          }
+          case 'lastSeat': {
+            // 末席质证：行尾（最右一张）是对方牌 → 该牌 -1
+            const act = state.row.filter(x => !x.removed && !x._nullified);
+            const tail = act[act.length - 1];
+            if (tail && tail.seat !== owner) votes[tail.seat] -= (r.card.v || 1);
+            break;
+          }
+          case 'leftWall': {
+            // 左翼壁垒：本方所有位于行左半区的牌各 +1（站位团）
+            const act = state.row.filter(x => !x.removed && !x._nullified);
             act.forEach((x, i) => {
               if (x.seat === owner && i * 2 < act.length) votes[owner] += 1;
             });
@@ -36,28 +61,3 @@
                 votes[nb.seat] -= dmg;
               }
             });
-            break;
-          }
-          case 'objection': {
-            // 反对!：对方本场亮出 ②/③ 级技能牌 → 最高对方 -1
-            const hasHigh = state.row.some(x => !x.removed && !x._nullified && x.seat !== owner
-              && x.card.skill && SKILLS[x.card.skill] && SKILLS[x.card.skill].lv >= 2);
-            if (hasHigh) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
-            break;
-          }
-          case 'reasonableDoubt': {
-            // 合理怀疑：对方场上证据 ≥3 → 最高对方 -2（"戴不上，就无罪"）
-            const enemyN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
-            if (enemyN >= 3) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
-            break;
-          }
-          case 'timelineSnipe': {
-            // 时间线狙击：对方带技能证据 ≥2 → 最高对方 -1（收据时间戳）
-            const skN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner
-              && x.card.skill && SKILLS[x.card.skill]).length;
-            if (skN >= 2) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
-            break;
-          }
-          case 'flipNarrative': {
-            // 翻转叙事：本方落后 ≥2 → 本方 +2（把事实之争翻成原则之争）
-            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));

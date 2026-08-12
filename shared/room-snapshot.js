@@ -12,6 +12,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const Core = require('./game-core.js');   // 评审 P0-BUG：恢复房间时重建可序列化随机源
 
 const SNAPSHOT_FILE = 'rooms-snapshot.json';
 
@@ -69,6 +70,7 @@ function deserializeRooms(list, factory) {
       if (item.state && typeof item.state === 'object') {
         room.state = item.state;
         room.state.hostSeat = room.hostSeat;
+        Core.restoreRng(room.state);   // 重建 rng（rngSeed/rngCalls 支撑；恢复后随机源可用且确定性不破）
       }
       if (Array.isArray(item.snapshots)) {
         for (const sn of item.snapshots) {

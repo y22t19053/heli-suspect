@@ -1,4 +1,29 @@
 /* ===== engine/13-apply.js（game-core.js 行 1495-1591）===== */
+    const s = state.seats[targetSeat];
+    s.scandal = Math.min(5, (s.scandal || 0) + 1);
+    state.logs.push('丑闻曝光！【' + s.name + '】声誉受损，丑闻指数 ' + s.scandal + '/5');
+  }
+  /* 票数最高的对方（平票时随机抽签，避免同一目标被连续针对或可预测）
+   * #13 修复：随机源必须用 state.rng（同种子可复现），不能用 Math.random */
+  function highestEnemy(votes, owner, n, rng) {
+    let bv = -Infinity;
+    for (let i = 0; i < n; i++) {
+      if (i === owner) continue;
+      if (votes[i] > bv) bv = votes[i];
+    }
+    if (bv === -Infinity) return owner;
+    const ties = [];
+    for (let i = 0; i < n; i++) {
+      if (i !== owner && votes[i] === bv) ties.push(i);
+    }
+    return ties.length === 1 ? ties[0] : ties[Math.floor((rng || Math.random)() * ties.length)];
+  }
+
+  /* ---------------- 本轮排名 ---------------- */
+  function doRank(state) {
+    state.phase = 'rank';
+    const n = state.seatCount;
+    const info = state.seats.map((s, i) => {
       const power = state.row.filter(r => !r.removed && r.seat === i).reduce((sum, r) => sum + r.card.cost, 0);
       return { seat: i, votes: state.votes[i], power };
     });
@@ -71,28 +96,3 @@
 
   /* ---------------- 整理（保留本阵营 2 张，其余洗入牌堆） ---------------- */
   function beginDiscard(state) {
-    state.phase = 'discard';
-    state.discardSeat = -1;
-    // 被【移除】的牌已在证据排除结算时进档案；其余洗回牌堆
-    state.row.forEach(r => { if (!r.removed) state.used.push(r.card); });
-    state.row = [];
-    state.seats.forEach(s => { s.keepDone = false; s.played = []; });
-    // 找到第一个手牌>0 且未保留的玩家
-    const next = nextKeepSeat(state);
-    state.discardSeat = next;
-    if (next >= 0) {
-      state.turn = next;
-      state.logs.push('整理阶段：' + state.seats[next].name + ' 请保留最多 ' + keepMaxOf(state.seats[next]) + ' 份证据（其余归档）');
-    }
-  }
-  function keepMaxOf(s) {
-    return 2 + ((s.char && s.char.skill.type === 'keepPlus') ? s.char.skill.v : 0);
-  }
-  function nextKeepSeat(state) {
-    for (let i = 0; i < state.seatCount; i++) {
-      const s = state.seats[i];
-      if (!s.keepDone && s.hand.length > 0) return i;
-    }
-    return -1;
-  }
-  function keepCard(state, s, uid) {

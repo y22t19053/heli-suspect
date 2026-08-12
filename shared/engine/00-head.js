@@ -21,20 +21,20 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  function hashStr(s) {
-    let h = 1779033703 ^ s.length;
-    for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
-    return h >>> 0;
+  /* mulberry32 单步核心（评审 P0-BUG 修复）。
+   * mulberry32 的状态推进是确定性 a += 0x6D2B79F5，故第 n 次调用恒等于
+   * mulberryStep((seed + n * 0x6D2B79F5) | 0)——「种子 + 已调用计数」即可精确序列化。 */
+  function mulberryStep(a) {
+    a |= 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  function shuffle(arr, rng) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      const t = a[i]; a[i] = a[j]; a[j] = t;
-    }
-    return a;
-  }
-  let uidSeq = 1000;
-  const nextUid = () => 'c' + (uidSeq++);
-
+  /* 在 state 上重建可序列化随机源：rngSeed/rngCalls 是数字字段（JSON 可序列化），
+   * rng 函数读写二者——快照落盘/恢复（JSON.stringify 会丢弃函数）后调用本函数
+   * 即重建到精确调用点，同种子可复现不破（评审 P0-BUG：修复前恢复后 state.rng
+   * 为 undefined，chooseStarter/aiPlay 直接 state.rng() 抛 TypeError，randomHit
+   * 静默降级 Math.random）。 */
+  function restoreRng(state) {
+    if (!state || typeof state.rngSeed !== 'number' || typeof state.rngCalls !== 'number') return state;
+    state.rng = function () {

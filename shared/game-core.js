@@ -20,6 +20,28 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
+  /* mulberry32 单步核心（评审 P0-BUG 修复）。
+   * mulberry32 的状态推进是确定性 a += 0x6D2B79F5，故第 n 次调用恒等于
+   * mulberryStep((seed + n * 0x6D2B79F5) | 0)——「种子 + 已调用计数」即可精确序列化。 */
+  function mulberryStep(a) {
+    a |= 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  /* 在 state 上重建可序列化随机源：rngSeed/rngCalls 是数字字段（JSON 可序列化），
+   * rng 函数读写二者——快照落盘/恢复（JSON.stringify 会丢弃函数）后调用本函数
+   * 即重建到精确调用点，同种子可复现不破（评审 P0-BUG：修复前恢复后 state.rng
+   * 为 undefined，chooseStarter/aiPlay 直接 state.rng() 抛 TypeError，randomHit
+   * 静默降级 Math.random）。 */
+  function restoreRng(state) {
+    if (!state || typeof state.rngSeed !== 'number' || typeof state.rngCalls !== 'number') return state;
+    state.rng = function () {
+      state.rngCalls = (state.rngCalls >>> 0) + 1;
+      return mulberryStep((state.rngSeed + state.rngCalls * 0x6D2B79F5) | 0);
+    };
+    return state;
+  }
   function hashStr(s) {
     let h = 1779033703 ^ s.length;
     for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
@@ -34,9 +56,6 @@
     }
     return a;
   }
-  let uidSeq = 1000;
-  const nextUid = () => 'c' + (uidSeq++);
-
   /* ---------------- 阵营与配色 ---------------- */
   /* MVP：每位玩家 = 一个独立阵营（角色牌决定），独立计票、独立排名。
    * 规则中的"本阵营/各阵营/阵营顺序"均按玩家维度实现。 */
@@ -433,24 +452,23 @@
       }
     };
   }
-  function makeVoter(tpl) { return Object.assign({}, tpl, { uid: nextUid(), scandal: tpl.scandal || 0 }); }
-  function makeEvent(tpl) { return Object.assign({}, tpl, { uid: nextUid(), used: false }); }
+  function makeVoter(tpl, uidGen) { return Object.assign({}, tpl, { uid: uidGen(), scandal: tpl.scandal || 0 }); }
+  function makeEvent(tpl, uidGen) { return Object.assign({}, tpl, { uid: uidGen(), used: false }); }
 
   /* 初始牌堆：24 种 × 2 份 = 48 张 */
-  function buildDeck(rng) {
+  function buildDeck(rng, uidGen) {
     const list = [];
-    VOTER_TEMPLATES.forEach(t => { list.push(makeVoter(t)); list.push(makeVoter(t)); });
+    VOTER_TEMPLATES.forEach(t => { list.push(makeVoter(t, uidGen)); list.push(makeVoter(t, uidGen)); });
     return shuffle(list, rng);
   }
-  function buildEventDeck(rng) {
+  function buildEventDeck(rng, uidGen) {
     const list = [];
-    EVENT_TEMPLATES.forEach(t => { list.push(makeEvent(t)); list.push(makeEvent(t)); });
+    EVENT_TEMPLATES.forEach(t => { list.push(makeEvent(t, uidGen)); list.push(makeEvent(t, uidGen)); });
     return shuffle(list, rng);
   }
 
   function createGame(opts) {
     opts = opts || {};
-    uidSeq = 1000;                    // 每局重置 uid（同种子完全可复现，超级更新#14）
     // —— 字段校验（超级更新#13）：seatCount / names / aiMask / seed 容错收敛 ——
     const rawCount = opts.seatCount;
     const seatCount = (typeof rawCount === 'number' && Number.isFinite(rawCount))
@@ -462,7 +480,13 @@
       : (typeof rawSeed === 'string' && rawSeed.trim() !== '' ? hashStr(rawSeed) : (Date.now() % 2147483647));
     // #13 修复：保留用户输入的原始种子码字符串（无则 null），供结算屏/战报显示原串而非 hash 数字
     const seedRaw = (typeof rawSeed === 'string' && rawSeed.trim() !== '') ? rawSeed.trim() : null;
-    const rng = mulberry32(seed);
+    // 评审 P0-BUG / P1-BUG 修复：随机源改为「种子 + 已调用计数」可序列化形态——
+    // rngSeed/rngCalls 是数字字段（可 JSON 序列化），rng 函数读写二者；快照落盘/恢复
+    // 后 restoreRng() 重建到精确调用点（同种子可复现不破）。uid 计数器一并移入 state
+    // （原模块级 uidSeq 会被并发房间的 createGame 互相重置，导致两房间卡牌 uid 重复）。
+    const state = { rngSeed: seed, rngCalls: 0, uidSeq: 1000 };
+    restoreRng(state);                                // 初始化可序列化随机源
+    const nextUid = () => 'c' + (state.uidSeq++);     // 每局独立 uid（同种子完全可复现）
     const names = Array.isArray(opts.names) ? opts.names : [];
     const aiMask = Array.isArray(opts.aiMask) ? opts.aiMask : [];
     const seats = [];
@@ -472,9 +496,9 @@
       const name = (typeof rawName === 'string' && rawName.trim())
         ? String(rawName).slice(0, 12)
         : ('玩家' + (i + 1));
-      const seat = makeSeat(i, name, isAI, rng);
+      const seat = makeSeat(i, name, isAI, state.rng);
       if (isAI && AI_PERSONALITIES.length) {
-        seat.personality = AI_PERSONALITIES[Math.floor(rng() * AI_PERSONALITIES.length)];
+        seat.personality = AI_PERSONALITIES[Math.floor(state.rng() * AI_PERSONALITIES.length)];
       }
       seats.push(seat);
     }
@@ -484,23 +508,24 @@
       const nPros = Math.ceil(seatCount / 2);
       const sideList = [];
       for (let i = 0; i < seatCount; i++) sideList.push(i < nPros ? 'prosecutor' : 'defense');
-      const shuffled = shuffle(sideList, rng);
+      const shuffled = shuffle(sideList, state.rng);
       seats.forEach((s, i) => { s.side = shuffled[i]; });
     }
-    const state = {
+    // 填充游戏字段（rngSeed/rngCalls/uidSeq/rng 已在骨架中，不覆盖）
+    Object.assign(state, {
       version: 1, seatCount,
       roundsLimit: opts.roundsLimit || 5,      // P1-4 快速模式：1 轮试玩 / 默认 5 轮（04-advance income 结算用）
       seed,                             // 种子码（可复现；分享战绩用，超级更新#13）
       seedRaw,                          // 用户输入的原始种子码字符串（无则 null；显示/分享用 #13 修复）
-      rng,                              // 随机源（抽签质证等随机技能用；测试可注入种子）
+      rng: state.rng,                   // 可序列化随机源（rngSeed/rngCalls 支撑；恢复后 restoreRng 重建）
       phase: 'pickChar',
       round: 0,                // 当前轮次（1 起）
       startingSeat: 0,         // 本轮起始角色
       turn: 0,                 // 当前行动座位
       seats,
       draftCandidates: [],     // 每人 3 张候选角色
-      deck: buildDeck(rng),
-      eventDeck: buildEventDeck(rng),
+      deck: buildDeck(state.rng, nextUid),
+      eventDeck: buildEventDeck(state.rng, nextUid),
       used: [],                // 洗回池（行牌/整理/未买证物架牌）
       grave: [],               // 档案（【移除】的牌，不洗入牌堆）
       row: [],                 // 中央亮出行 [{seat, card, revealed}]
@@ -525,11 +550,11 @@
       winType: 'support',      // 胜利类型：support / precedent / juryNull
       winner: null, gameOver: false,
       logs: []
-    };
+    });
     // 每人 3 张候选角色（同时亮出）
-    const pool = shuffle(CHARACTERS.slice(), rng);
+    const pool = shuffle(CHARACTERS.slice(), state.rng);
     for (let i = 0; i < seatCount; i++) {
-      const cand = shuffle(CHARACTERS.slice(), rng);
+      const cand = shuffle(CHARACTERS.slice(), state.rng);
       state.draftCandidates.push(cand.slice(0, 3));
     }
     void pool;
@@ -1884,7 +1909,10 @@
 
   /* AI 购买：买高价值牌，市场差则刷新，好牌买不起则锁定 */
   function aiBuy(state, s) {
-    const val = c => (c.votes || 1) * 1.5 + skillVal(c.skill)
+    // 策略多样性（评审 P3）：economy 高的策略更看重票数（攒钱买大牌），
+    // 修复「攒钱流攒了钱却不买好牌、还承担少出牌的代价」——让经济型策略真正成立。
+    const eco = (s.personality && s.personality.economy != null) ? s.personality.economy : 0.5;
+    const val = c => (c.votes || 1) * (1.5 + eco * 0.7) + skillVal(c.skill)
       - (c.scandal || 0) * 0.6 - buyCostOf(s, c) * 0.4;
     for (let guard = 0; guard < 8; guard++) {
       if (s.money < 1) break;
@@ -1918,7 +1946,10 @@
     const agg = (s.personality && s.personality.aggression !== undefined) ? s.personality.aggression : 0.5;
     const keepChance = (1 - agg) * 0.3; // 温和人格保留战略
     const isLast = state.seats.every(x => x.seat === s.seat || x.playDone || x.hand.length === 0);
-    if (isLast && state.rng() < keepChance && hand.length > 1) { s.playDone = true; return; }
+    // 策略多样性（评审 P3）：保留战略只在「没有高价值牌」时触发——攒钱流买到大牌必出，
+    // 弱手才保留；修复「保留=纯弃权」让保守策略不可行（修复前 2p 激进流 71.7% 碾压攒钱流）。
+    const hasStrong = hand.some(c => (c.votes || 1) >= 3);
+    if (isLast && state.rng() < keepChance && !hasStrong && hand.length > 1) { s.playDone = true; return; }
     const picks = [hand[0].uid];
     // 激进人格且还有额度 → 一次暗置 2 张
     if (agg >= 0.6 && hand.length >= 2 && s.played.length < 1) picks.push(hand[1].uid);
@@ -2084,6 +2115,7 @@
     buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES, ARCH, phaseArchOf },
     mulberry32,
+    restoreRng,   // 评审 P0-BUG：快照恢复后重建可序列化随机源（rngSeed/rngCalls 支撑）
     doCountContinue,   // 测试钩子：仅用于单元测试直调结算（不影响任何运行路径）
     finishGame, beginIncome  // 测试钩子：终局判定 / 收入发放（供单测直调）
   };

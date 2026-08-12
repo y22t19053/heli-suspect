@@ -22,7 +22,10 @@ const BASE = [
   '_smoke_game.js',
   '_test_reconnect.js',
   '_test_snapshot.js',
-  '_test_restart.js'   // 顾问评审 9：服务器重启恢复集成（独立端口 3198 + 独立快照文件）
+  '_test_restart.js',   // 顾问评审 9：服务器重启恢复集成（独立端口 3198 + 独立快照文件）
+  '_test_rng_restore.js',       // 评审 P0-BUG：rng 可序列化恢复
+  '_test_uid_unique.js',        // 评审 P1-BUG：uid 每局独立计数器
+  '_test_strategy_diversity.js' // 评审 P3：策略多样性无垄断
 ];
 const JUNIT = path.join(__dirname, 'junit.xml');
 

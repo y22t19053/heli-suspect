@@ -1,4 +1,29 @@
 /* ===== engine/08-events.js（game-core.js 行 865-998）===== */
+  /* ---------------- 亮出阶段（从左到右逐张亮出，恐怖分子按亮出顺序发动） ---------------- */
+  function beginReveal(state) {
+    state.phase = 'reveal';
+    state.revealIndex = 0;
+    state.revealPending = null;
+    revealNext(state);
+  }
+  /* 亮出下一张（每次调用只亮一张，便于渲染逐张播放动画）；亮完则进入计票前事件阶段 */
+  function revealNext(state) {
+    // 跳过已被恐怖分子炸掉的牌
+    while (state.revealIndex < state.row.length && state.row[state.revealIndex].removed) state.revealIndex++;
+    if (state.revealIndex >= state.row.length) {
+      if (!state.row.length) state.logs.push('无人举证，直接进入事件阶段');
+      beginPreEvent(state);
+      return;
+    }
+    const r = state.row[state.revealIndex];
+    r.revealed = true;
+    state.logs.push('亮出：' + state.seats[r.seat].name + ' 的【' + r.card.name + '】');
+    // 恐怖分子：亮出时立即发动（只能炸已亮出的对方牌）
+    if (r.card.skill === 'terrorist') {
+      const targets = state.row.filter(x => x.revealed && x.seat !== r.seat && !x.removed);
+      if (targets.length) {
+        state.revealPending = { seat: r.seat, cardUid: r.card.uid, owner: r.seat };
+        state.logs.push('【' + state.seats[r.seat].name + '】的【证据排除】发动：请选择 1 份对方已亮出的证据');
         return; // 等待玩家选择目标
       }
       state.logs.push('【' + state.seats[r.seat].name + '】的恐怖分子无目标可炸');
@@ -108,28 +133,3 @@
   /* 轮到下一个可行动者（多轮循环，直至所有角色都选择不继续） */
   function nextEventSeat(state) {
     const n = state.seatCount;
-    for (let k = 1; k <= n; k++) {
-      const seat = (state.eventTurnSeat + k) % n;
-      const s = state.seats[seat];
-      if (!s.eventPassed && s.eventCount < 2 && usableEvents(state, s).length > 0) return seat;
-    }
-    return -1;
-  }
-  function playEvent(state, s, uid, targetSeat) {
-    const ev = s.events.find(e => e.uid === uid);
-    if (!ev || ev.used) return { ok: false, msg: '事件牌不存在或已使用' };
-    if (!usableEvents(state, s).some(e => e.uid === uid)) return { ok: false, msg: '该事件牌当前不可用（分级/数量限制）' };
-    if (ev.timing !== (state.phase === 'preEvent' ? 'pre' : 'post')) return { ok: false, msg: '时机不符' };
-    // enemy 类需指定目标
-    if (ev.target === 'enemy') {
-      if (targetSeat === undefined || targetSeat === null || targetSeat === s.seat) return { ok: false, msg: '请选择事件目标' };
-      if (targetSeat < 0 || targetSeat >= state.seatCount || targetSeat === s.seat) return { ok: false, msg: '非法目标' };
-    }
-    if (state.eventTargetPending) return { ok: false, msg: '请先处理待选目标' };
-    if (state.eventTurnSeat !== s.seat) return { ok: false, msg: '还没轮到你' };
-    // 硅谷地区：事件牌费用 ⊙2（文化地域印记）
-    ev.used = true;
-    s.events = s.events.filter(e => e !== ev);
-    state.grave.push(ev);   // 已打出的事件牌进档案（cardInGlobal 已查 grave，快照恢复时不会复活）
-    s.eventCount++;
-    s.stats.eventsPlayed++;

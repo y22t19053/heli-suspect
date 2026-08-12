@@ -1,4 +1,29 @@
 /* ===== engine/09-count.js（game-core.js 行 999-1294）===== */
+    for (let k = 1; k <= n; k++) {
+      const seat = (state.eventTurnSeat + k) % n;
+      const s = state.seats[seat];
+      if (!s.eventPassed && s.eventCount < 2 && usableEvents(state, s).length > 0) return seat;
+    }
+    return -1;
+  }
+  function playEvent(state, s, uid, targetSeat) {
+    const ev = s.events.find(e => e.uid === uid);
+    if (!ev || ev.used) return { ok: false, msg: '事件牌不存在或已使用' };
+    if (!usableEvents(state, s).some(e => e.uid === uid)) return { ok: false, msg: '该事件牌当前不可用（分级/数量限制）' };
+    if (ev.timing !== (state.phase === 'preEvent' ? 'pre' : 'post')) return { ok: false, msg: '时机不符' };
+    // enemy 类需指定目标
+    if (ev.target === 'enemy') {
+      if (targetSeat === undefined || targetSeat === null || targetSeat === s.seat) return { ok: false, msg: '请选择事件目标' };
+      if (targetSeat < 0 || targetSeat >= state.seatCount || targetSeat === s.seat) return { ok: false, msg: '非法目标' };
+    }
+    if (state.eventTargetPending) return { ok: false, msg: '请先处理待选目标' };
+    if (state.eventTurnSeat !== s.seat) return { ok: false, msg: '还没轮到你' };
+    // 硅谷地区：事件牌费用 ⊙2（文化地域印记）
+    ev.used = true;
+    s.events = s.events.filter(e => e !== ev);
+    state.grave.push(ev);   // 已打出的事件牌进档案（cardInGlobal 已查 grave，快照恢复时不会复活）
+    s.eventCount++;
+    s.stats.eventsPlayed++;
     const tgt = ev.target === 'enemy' ? targetSeat : (ev.target === 'self' ? s.seat : -1);
     if (ev.target === 'enemy') {
       state.logs.push(s.name + ' 打出事件【' + ev.name + '】→ ' + state.seats[tgt].name);
@@ -270,28 +295,3 @@
           case 'majority': {
             const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
             if (votes[owner] >= maxOther) votes[owner] += (r.card.v || 1);
-            break;
-          }
-          case 'minority': {
-            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
-            if (votes[owner] < maxOther) votes[owner] += (r.card.v || 1);
-            break;
-          }
-          /* —— 位置博弈系（做题：看谁占行首/行尾/左半区） —— */
-          case 'firstSeat': {
-            // 首座质证：行首（最左一张）是对方牌 → 该牌 -1
-            const act = state.row.filter(x => !x.removed && !x._nullified);
-            const lead = act[0];
-            if (lead && lead.seat !== owner) votes[lead.seat] -= (r.card.v || 1);
-            break;
-          }
-          case 'lastSeat': {
-            // 末席质证：行尾（最右一张）是对方牌 → 该牌 -1
-            const act = state.row.filter(x => !x.removed && !x._nullified);
-            const tail = act[act.length - 1];
-            if (tail && tail.seat !== owner) votes[tail.seat] -= (r.card.v || 1);
-            break;
-          }
-          case 'leftWall': {
-            // 左翼壁垒：本方所有位于行左半区的牌各 +1（站位团）
-            const act = state.row.filter(x => !x.removed && !x._nullified);

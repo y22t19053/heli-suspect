@@ -1,4 +1,29 @@
-/* ===== engine/99-tail.js（game-core.js 行 1872-2091）===== */
+/* ===== engine/99-tail.js（game-core.js 行 1872-2123）===== */
+        // 政治操盘：选对手票数最高的牌换到自己这张牌旁（改变邻位博弈）
+        if (state.swapPending && state.swapPending.owner === seat) {
+          const cands = state.row.filter(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0 && x.seat !== seat);
+          cands.sort((a, b) => (b.card.votes || 1) - (a.card.votes || 1) || b.card.cost - a.card.cost);
+          let t = cands[0];
+          if (!t) t = state.row.find(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0);
+          if (t) resolveSwap(state, t.card.uid);
+          else state.swapPending = null;
+        }
+        break;
+      }
+      case 'preEvent':
+      case 'postEvent': {
+        if (state.eventTurnSeat === seat) aiEvents(state, s);
+        break;
+      }
+      case 'discard': {
+        if (state.discardSeat === seat && !s.keepDone) {
+          s.keepUids = [];
+          if (s.hand.length) {
+            // 保留契合当前选区文化 + 人格偏好的强牌（最多 keepMax 张）
+            const sorted = s.hand.slice().sort((a, b) => aiCardScore(state, b, s.seat) - aiCardScore(state, a, s.seat));
+            s.keepUids = sorted.slice(0, Math.min(keepMaxOf(s), s.hand.length)).map(c => c.uid);
+          }
+          finishKeep(state, s);
         }
         break;
       }
@@ -14,7 +39,10 @@
 
   /* AI 购买：买高价值牌，市场差则刷新，好牌买不起则锁定 */
   function aiBuy(state, s) {
-    const val = c => (c.votes || 1) * 1.5 + skillVal(c.skill)
+    // 策略多样性（评审 P3）：economy 高的策略更看重票数（攒钱买大牌），
+    // 修复「攒钱流攒了钱却不买好牌、还承担少出牌的代价」——让经济型策略真正成立。
+    const eco = (s.personality && s.personality.economy != null) ? s.personality.economy : 0.5;
+    const val = c => (c.votes || 1) * (1.5 + eco * 0.7) + skillVal(c.skill)
       - (c.scandal || 0) * 0.6 - buyCostOf(s, c) * 0.4;
     for (let guard = 0; guard < 8; guard++) {
       if (s.money < 1) break;
@@ -48,7 +76,10 @@
     const agg = (s.personality && s.personality.aggression !== undefined) ? s.personality.aggression : 0.5;
     const keepChance = (1 - agg) * 0.3; // 温和人格保留战略
     const isLast = state.seats.every(x => x.seat === s.seat || x.playDone || x.hand.length === 0);
-    if (isLast && state.rng() < keepChance && hand.length > 1) { s.playDone = true; return; }
+    // 策略多样性（评审 P3）：保留战略只在「没有高价值牌」时触发——攒钱流买到大牌必出，
+    // 弱手才保留；修复「保留=纯弃权」让保守策略不可行（修复前 2p 激进流 71.7% 碾压攒钱流）。
+    const hasStrong = hand.some(c => (c.votes || 1) >= 3);
+    if (isLast && state.rng() < keepChance && !hasStrong && hand.length > 1) { s.playDone = true; return; }
     const picks = [hand[0].uid];
     // 激进人格且还有额度 → 一次暗置 2 张
     if (agg >= 0.6 && hand.length >= 2 && s.played.length < 1) picks.push(hand[1].uid);
@@ -214,6 +245,7 @@
     buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES, ARCH, phaseArchOf },
     mulberry32,
+    restoreRng,   // 评审 P0-BUG：快照恢复后重建可序列化随机源（rngSeed/rngCalls 支撑）
     doCountContinue,   // 测试钩子：仅用于单元测试直调结算（不影响任何运行路径）
     finishGame, beginIncome  // 测试钩子：终局判定 / 收入发放（供单测直调）
   };

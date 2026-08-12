@@ -1,4 +1,29 @@
 /* ===== engine/15-meta.js（game-core.js 行 1768-1871）===== */
+        break;
+      }
+      case 'playCards': {
+        res = playCards(state, s, action.uids || []);
+        break;
+      }
+      case 'finishPlay': {
+        res = finishPlay(state, s);
+        break;
+      }
+      case 'terroristTarget': {
+        if (state.phase !== 'reveal') return { ok: false, msg: '当前没有待选的恐怖分子目标' };
+        if (state.revealPending && state.revealPending.owner !== seat) return { ok: false, msg: '不由你选择目标' };
+        res = resolveTerrorist(state, action.targetUid);
+        break;
+      }
+      case 'swapTarget': {
+        if (state.phase !== 'count') return { ok: false, msg: '当前没有待选的换位目标' };
+        if (state.swapPending && state.swapPending.owner !== seat) return { ok: false, msg: '不由你选择换位目标' };
+        res = resolveSwap(state, action.targetUid);
+        break;
+      }
+      case 'playEvent': {
+        res = playEvent(state, s, action.uid, action.targetSeat);
+        break;
       }
       case 'passEvent': {
         if (state.phase !== 'preEvent' && state.phase !== 'postEvent') return { ok: false, msg: '当前不是事件阶段' };
@@ -78,28 +103,3 @@
         break;
       }
       case 'count': {
-        // 政治操盘：选对手票数最高的牌换到自己这张牌旁（改变邻位博弈）
-        if (state.swapPending && state.swapPending.owner === seat) {
-          const cands = state.row.filter(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0 && x.seat !== seat);
-          cands.sort((a, b) => (b.card.votes || 1) - (a.card.votes || 1) || b.card.cost - a.card.cost);
-          let t = cands[0];
-          if (!t) t = state.row.find(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0);
-          if (t) resolveSwap(state, t.card.uid);
-          else state.swapPending = null;
-        }
-        break;
-      }
-      case 'preEvent':
-      case 'postEvent': {
-        if (state.eventTurnSeat === seat) aiEvents(state, s);
-        break;
-      }
-      case 'discard': {
-        if (state.discardSeat === seat && !s.keepDone) {
-          s.keepUids = [];
-          if (s.hand.length) {
-            // 保留契合当前选区文化 + 人格偏好的强牌（最多 keepMax 张）
-            const sorted = s.hand.slice().sort((a, b) => aiCardScore(state, b, s.seat) - aiCardScore(state, a, s.seat));
-            s.keepUids = sorted.slice(0, Math.min(keepMaxOf(s), s.hand.length)).map(c => c.uid);
-          }
-          finishKeep(state, s);

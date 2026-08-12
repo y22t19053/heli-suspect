@@ -1,4 +1,29 @@
 /* ===== engine/05-phases.js（game-core.js 行 587-654）===== */
+    },
+    chooseStarter: {
+      label: 'chooseStarter',
+      needsInput: (state, seat) => state.starterPicker === seat,
+      update: (state) => {
+        // 第 1 轮：随机；后续：排名最低者选择
+        if (state.starterPicker < 0) {
+          state.startingSeat = Math.floor(state.rng() * state.seatCount);
+          state.logs.push('第 ' + state.round + ' 轮由【' + state.seats[state.startingSeat].name + '】开始');
+          beginRound(state);
+        } else if (state.starterChosen) {
+          // 已选定（人类 apply 或 AI 自行选择）
+          state.logs.push('第 ' + state.round + ' 轮由【' + state.seats[state.startingSeat].name + '】开始');
+          beginRound(state);
+        } else if (!state.seats[state.starterPicker].isAI) {
+          // 等待人类选择
+        } else {
+          // AI：选自己
+          state.startingSeat = state.starterPicker;
+          state.starterChosen = true;
+          state.logs.push('排名最低的【' + state.seats[state.starterPicker].name + '】选择自己开始');
+          beginRound(state);
+        }
+      }
+    },
     drawEvent: { label: 'drawEvent', needsInput: () => false, update: (state) => beginVoter(state) },
     drawVoter: { label: 'drawVoter', needsInput: () => false, update: (state) => beginBuy(state) },
     buy: {
@@ -42,28 +67,3 @@
     count: {
       label: 'count',
       needsInput: (state, seat) => !!(state.swapPending && state.swapPending.owner === seat),
-      update: (state) => {
-        // 政治操盘（换位）等待玩家选择目标则暂停；全部换位完成后继续计票
-        if (state.swapPending) return;
-        doCountContinue(state);
-      }
-    },
-    postEvent: {
-      label: 'postEvent',
-      needsInput: (state, seat) => state.eventTurnSeat === seat,
-      update: (state) => {
-        if (allEventsDone(state)) doRank(state);
-      }
-    },
-    rank: { label: 'rank', needsInput: () => false, update: (state) => doSettle(state) },
-    settle: { label: 'settle', needsInput: () => false, update: (state) => beginDiscard(state) },
-    discard: {
-      label: 'discard',
-      needsInput: (state, seat) => state.discardSeat === seat && !state.seats[seat].keepDone,
-      update: (state) => {
-        if (state.discardSeat < 0) { beginIncome(state); }
-      }
-    },
-    income: {
-      label: 'income',
-      needsInput: () => false,

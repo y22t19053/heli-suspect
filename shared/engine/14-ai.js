@@ -1,4 +1,29 @@
 /* ===== engine/14-ai.js（game-core.js 行 1592-1767）===== */
+    state.phase = 'discard';
+    state.discardSeat = -1;
+    // 被【移除】的牌已在证据排除结算时进档案；其余洗回牌堆
+    state.row.forEach(r => { if (!r.removed) state.used.push(r.card); });
+    state.row = [];
+    state.seats.forEach(s => { s.keepDone = false; s.played = []; });
+    // 找到第一个手牌>0 且未保留的玩家
+    const next = nextKeepSeat(state);
+    state.discardSeat = next;
+    if (next >= 0) {
+      state.turn = next;
+      state.logs.push('整理阶段：' + state.seats[next].name + ' 请保留最多 ' + keepMaxOf(state.seats[next]) + ' 份证据（其余归档）');
+    }
+  }
+  function keepMaxOf(s) {
+    return 2 + ((s.char && s.char.skill.type === 'keepPlus') ? s.char.skill.v : 0);
+  }
+  function nextKeepSeat(state) {
+    for (let i = 0; i < state.seatCount; i++) {
+      const s = state.seats[i];
+      if (!s.keepDone && s.hand.length > 0) return i;
+    }
+    return -1;
+  }
+  function keepCard(state, s, uid) {
     if (state.phase !== 'discard' || state.discardSeat !== s.seat) return { ok: false, msg: '还没轮到你整理' };
     const card = s.hand.find(c => c.uid === uid);
     if (!card) return { ok: false, msg: '手牌不存在' };
@@ -150,28 +175,3 @@
         if (state.phase !== 'buy' || s.buyDone) return { ok: false, msg: '当前不能结束取证' };
         s.buyDone = true;
         msgs.push(s.name + ' 完成取证');
-        break;
-      }
-      case 'playCards': {
-        res = playCards(state, s, action.uids || []);
-        break;
-      }
-      case 'finishPlay': {
-        res = finishPlay(state, s);
-        break;
-      }
-      case 'terroristTarget': {
-        if (state.phase !== 'reveal') return { ok: false, msg: '当前没有待选的恐怖分子目标' };
-        if (state.revealPending && state.revealPending.owner !== seat) return { ok: false, msg: '不由你选择目标' };
-        res = resolveTerrorist(state, action.targetUid);
-        break;
-      }
-      case 'swapTarget': {
-        if (state.phase !== 'count') return { ok: false, msg: '当前没有待选的换位目标' };
-        if (state.swapPending && state.swapPending.owner !== seat) return { ok: false, msg: '不由你选择换位目标' };
-        res = resolveSwap(state, action.targetUid);
-        break;
-      }
-      case 'playEvent': {
-        res = playEvent(state, s, action.uid, action.targetSeat);
-        break;

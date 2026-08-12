@@ -1,4 +1,29 @@
 /* ===== engine/11-discard.js（game-core.js 行 1357-1411）===== */
+            break;
+          }
+          case 'objection': {
+            // 反对!：对方本场亮出 ②/③ 级技能牌 → 最高对方 -1
+            const hasHigh = state.row.some(x => !x.removed && !x._nullified && x.seat !== owner
+              && x.card.skill && SKILLS[x.card.skill] && SKILLS[x.card.skill].lv >= 2);
+            if (hasHigh) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            break;
+          }
+          case 'reasonableDoubt': {
+            // 合理怀疑：对方场上证据 ≥3 → 最高对方 -2（"戴不上，就无罪"）
+            const enemyN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
+            if (enemyN >= 3) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
+            break;
+          }
+          case 'timelineSnipe': {
+            // 时间线狙击：对方带技能证据 ≥2 → 最高对方 -1（收据时间戳）
+            const skN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner
+              && x.card.skill && SKILLS[x.card.skill]).length;
+            if (skN >= 2) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+            break;
+          }
+          case 'flipNarrative': {
+            // 翻转叙事：本方落后 ≥2 → 本方 +2（把事实之争翻成原则之争）
+            const maxOther = Math.max(...votes.filter((_, j) => j !== owner));
             if (votes[owner] <= maxOther - 2) votes[owner] += 2;
             break;
           }
@@ -29,28 +54,3 @@
             // 陪审团否决：+1 票并获得 1 名陪审员支持（集满 3 名立即胜诉）
             votes[owner] += 1;
             state.juryTokens = state.juryTokens || new Array(state.seatCount).fill(0);
-            state.juryTokens[owner] = (state.juryTokens[owner] || 0) + 1;
-            state.logs.push('陪审员转向：【' + state.seats[owner].name + '】获得 1 名陪审员支持（' + state.juryTokens[owner] + '/3）');
-            break;
-          }
-          /* —— 纳什均衡互锁系（lv3）：反制事件流 / 连胜滚雪球 —— */
-          case 'veto': {
-            // 一票否决：对方本轮打过事件牌 → 程序反噬（反制事件流）
-            const foeEvent = state.seats.some((x, j) => j !== owner && x.eventCount > 0);
-            if (foeEvent) votes[highestEnemy(votes, owner, n, state.rng)] -= 2;
-            break;
-          }
-          case 'momentum': {
-            // 势头：本方此前赢过轮次 → 连胜气势（滚雪球，需要对手反制）
-            if ((state.seats[owner].stats && state.seats[owner].stats.roundsWon) > 0) votes[owner] += 1;
-            break;
-          }
-          /* —— 庭审克制包（⑨：偏见揭露/最后一搏/证据链完整/禁言令/民意分裂） —— */
-          case 'bias': {
-            // 偏见揭露：对方铺场 ≥4 → 对方所有已亮牌各 -1（AOE 反铺场终极手段）
-            const foeN = state.row.filter(x => !x.removed && !x._nullified && x.seat !== owner).length;
-            if (foeN >= 4) {
-              state.row.forEach(x => { if (!x.removed && !x._nullified && x.seat !== owner) votes[x.seat] -= 1; });
-            }
-            break;
-          }
