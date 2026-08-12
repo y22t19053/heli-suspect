@@ -235,7 +235,7 @@
           const nm = skd ? (lvMark(skd.lv) + skd.name) : card.skill;
           const nmBarH = Math.max(12, h * 0.075);
           const nmBarY = y + h * 0.42;
-          pxRect(x + 4, nmBarY, w - 8, nmBarH, card.skill === 'terrorist' ? '#A31B1B' : PAL.black);
+          pxRect(x + 4, nmBarY, w - 8, nmBarH, card.skill === 'terrorist' ? PAL.deepRed : PAL.black);
           pxBorder(x + 4, nmBarY, w - 8, nmBarH, PAL.black, 1);
           if (icon) UIKit.drawSkillIcon(ctx, icon, x + 13, nmBarY + nmBarH / 2, Math.min(14, nmBarH * 0.72), PAL.gold);
           drawPixelText(nm, x + (icon ? 24 : 10), nmBarY + nmBarH / 2, Math.max(8, h * 0.06), PAL.gold, { shadow: false });
@@ -246,13 +246,13 @@
             const fs = clamp(h * 0.07, 7.5, 9.5);
             const flh = Math.max(9, h * 0.07);
             const slim = eff.length > 26 ? eff.slice(0, 26) + '…' : eff;
-            drawWrapText(slim, x + 4, y + h * 0.52, fs, '#4A3100', w - 8, flh, { maxLines: 2, shadow: false });
+            drawWrapText(slim, x + 4, y + h * 0.52, fs, PAL.brownInk, w - 8, flh, { maxLines: 2, shadow: false });
           }
         } else if (h >= 56) {
           // 矮行卡：技能名（矢量图标 + 名称），一行小字
           const nm = skd ? skd.name : card.skill;
-          if (icon) UIKit.drawSkillIcon(ctx, icon, x + 10, y + h * 0.60, Math.min(12, h * 0.16), '#4A3100');
-          drawWrapText(nm, x + (icon ? 18 : 4), y + h * 0.60, Math.max(7, h * 0.09), '#4A3100', w - (icon ? 22 : 8), Math.max(8, h * 0.1), { maxLines: 1, shadow: false });
+          if (icon) UIKit.drawSkillIcon(ctx, icon, x + 10, y + h * 0.60, Math.min(12, h * 0.16), PAL.brownInk);
+          drawWrapText(nm, x + (icon ? 18 : 4), y + h * 0.60, Math.max(7, h * 0.09), PAL.brownInk, w - (icon ? 22 : 8), Math.max(8, h * 0.1), { maxLines: 1, shadow: false });
         }
       }
       const pt = partyOf(seat);
@@ -373,7 +373,7 @@
     }
     // 观战守卫：旁观者跳过玩家侧信息
     if (copy.isSpectator && copy.isSpectator()) {
-      drawPixelText('旁观中', RP.x + RP.w - 10, RP.y + RP.h / 2, 16, '#5AC8FA', { align: 'right', shadow: true });
+      drawPixelText('旁观中', RP.x + RP.w - 10, RP.y + RP.h / 2, 16, PAL.linkBlue, { align: 'right', shadow: true });
       return;
     }
     // 起始玩家（右上角悬浮，右对齐）
@@ -486,7 +486,7 @@
       const inPlay = g.phase === 'play' && g.playLastSeat === i;
       /* 数值流（行2）：钱/支持/丑闻/手牌/锁（状态标签独立绘制，不再挤入文字流防遮挡） */
       const flow = [];
-      flow.push({ txt: '⊙' + s.money, col: '#FFB020' });
+      flow.push({ txt: '⊙' + s.money, col: PAL.coin });
       flow.push({ icon: 'scale', txt: String(s.support), col: PAL.black });
       if (sc > 0 || copy.scandalZero) flow.push({ icon: 'skull', txt: String(sc), col: sc > 0 ? (copy.scandalCol || PAL.red) : '#8A8A8A' });
       if (show.handN && isMe) flow.push({ txt: '手牌' + s.handCount, col: '#333333' });
@@ -501,7 +501,7 @@
         const nmT1 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(64, w * 0.34), Math.max(12, env.UI.fs.name - 0.5));
         const nmR1 = drawPixelText(nmT1.text, nx1, y + 15, nmT1.size, PAL.black, { shadow: false });
         nx1 += nmR1.w + 6;
-        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 7, y + 15, 14, '#FFB020'); nx1 += 18; }
+        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 7, y + 15, 14, PAL.coin); nx1 += 18; }
         if (s.side) {
           const sideTxt = s.side === 'prosecutor' ? '·检方' : '·辩护方';
           drawPixelText(sideTxt, nx1, y + 15, 10.5, s.side === 'prosecutor' ? PAL.red : PAL.blue, { shadow: false });
@@ -531,7 +531,7 @@
         const nmT2 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(72, w * 0.28), Math.min(17, env.UI.fs.name + 2));
         const nmR2 = drawPixelText(nmT2.text, nx1, y + 18, nmT2.size, PAL.black, { shadow: false });
         nx1 += nmR2.w + 8;
-        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 8, y + 18, 16, '#FFB020'); nx1 += 20; }
+        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 8, y + 18, 16, PAL.coin); nx1 += 20; }
         if (s.side) {
           const sideTxt = s.side === 'prosecutor' ? '·检方' : '·辩护方';
           drawPixelText(sideTxt, nx1, y + 18, 12, s.side === 'prosecutor' ? PAL.red : PAL.blue, { shadow: false });
@@ -562,7 +562,7 @@
             pxRect(sbx + 2, y + ph - 15, Math.max(2, 46 * Math.min(1, sc / 5)), 4, scCol);
           }
         }
-        if (inPlay) drawPixelText('结案陈词', x + w - 14, y + ph - 8, 12.5, '#FFB020', { align: 'right', shadow: false });
+        if (inPlay) drawPixelText('结案陈词', x + w - 14, y + ph - 8, 12.5, PAL.coin, { align: 'right', shadow: false });
       }
       // 事件目标选择 / 选择起始玩家（点击头像，命中区=圆+边距）
       const avSz = env.compact ? 20 : 26;
@@ -773,7 +773,7 @@
       else draw();
       if (usable || copy.hoverAll) env.hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'event', data: { ev, uid: ev.uid } });
       if (copy.eventBtn) copy.eventBtn(r.x, r.y, r.w, r.h, ev, usable);
-      if (ev.used) drawPixelText('已使用', r.x + r.w / 2, r.y + r.h - 12, 11, '#5AC8FA', { align: 'center', shadow: false });
+      if (ev.used) drawPixelText('已使用', r.x + r.w / 2, r.y + r.h - 12, 11, PAL.linkBlue, { align: 'center', shadow: false });
     });
     if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60 + actH, 13, copy.emptyCol || '#7E93B0', { shadow: false });
   };
@@ -997,7 +997,7 @@
         ty += drawWrapText(ln, bx2 + padX, ty + lh / 2, 13.5, '#333333', boxW - padX * 2, lh, { shadow: false });
       });
       (info.extra || []).forEach(ln => {
-        drawPixelText('◆ ' + ln, bx2 + padX, ty + 8, 11.5, '#FFB020', { shadow: false });
+        drawPixelText('◆ ' + ln, bx2 + padX, ty + 8, 11.5, PAL.coin, { shadow: false });
         ty += 17;
       });
     }

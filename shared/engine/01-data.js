@@ -3,10 +3,10 @@
   /* MVP：每位玩家 = 一个独立阵营（角色牌决定），独立计票、独立排名。
    * 规则中的"本阵营/各阵营/阵营顺序"均按玩家维度实现。 */
   const CAMPS = [
-    { id: 'red',   name: '红方律师团', color: '#D82E2F' },
+    { id: 'red',   name: '红方律师团', color: '#FF3B30' },
     { id: 'blue',  name: '蓝方律师团', color: '#012696' },
     { id: 'green', name: '绿方律师团', color: '#01847F' },
-    { id: 'gold',  name: '金方律师团', color: '#E8A418' }
+    { id: 'gold',  name: '金方律师团', color: '#FFB020' }
   ];
 
   /* 6 位律师角色（被动技能，3 选 1，同时亮出；起始 ⊙ = 4）

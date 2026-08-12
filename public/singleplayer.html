@@ -112,7 +112,12 @@ const ctx = canvas.getContext('2d');
     textSoft:  '#C9D6EA',   // 柔和正文（深底）
     border:    '#3A4258',   // 深底边框
     white:     '#FFFFFF',
-    black:     '#111111'
+    black:     '#111111',
+    /* —— 高频语义色收口（渲染层高频复用色，颜色纪律最终收口）—— */
+    coin:      '#FFB020',   // 金币/奖励金（⊙ 数字/皇冠/技能标签金）
+    deepRed:   '#A31B1B',   // 档案深红（恐怖分子条/事件牌/负效果）
+    linkBlue:  '#5AC8FA',   // 信息亮蓝（旁观/已使用标记）
+    brownInk:  '#4A3100'    // 浅底深棕墨（卡片浅底正文）
   };
   /* 卡纸底色兜底（旧代码把 PAL.paper 当字符串用：升级后由这里补默认档） */
   const PAPER_FALLBACK = PAL.paper.a;
@@ -1157,38 +1162,38 @@ function drawFx(f){
     orator: { txt: '+1 票', col: PAL.green },
     scandal: { txt: '敌方 -1', col: PAL.red },
     wave: { txt: '+1 / -1', col: PAL.blue },
-    idol: { txt: '+2 票', col: '#FFB020' },
+    idol: { txt: '+2 票', col: PAL.coin },
     megaScandal: { txt: '敌方 -2', col: PAL.red },
-    comeback: { txt: '翻盘 +1', col: '#FFB020' },
-    donor: { txt: '+1 ⊙', col: '#FFB020' },
+    comeback: { txt: '翻盘 +1', col: PAL.coin },
+    donor: { txt: '+1 ⊙', col: PAL.coin },
     buyback: { txt: '敌方 -1⊙', col: PAL.red },
-    terrorist: { txt: '排除证据', col: '#A31B1B' },
+    terrorist: { txt: '排除证据', col: PAL.deepRed },
     swap: { txt: '换位', col: PAL.gold },
     shiftLeft: { txt: '左移', col: PAL.gold },
     shiftRight: { txt: '右移', col: PAL.gold },
     counsel: { txt: '同盟 +1', col: PAL.green },
     flank: { txt: '连坐 -1', col: PAL.red },
-    poach: { txt: '连坐挖票', col: '#FFB020' },
+    poach: { txt: '连坐挖票', col: PAL.coin },
     rally: { txt: '声援 +1', col: PAL.green },
-    chain: { txt: '连横 +N', col: '#FFB020' },
-    pivot: { txt: '反超 +2', col: '#FFB020' },
+    chain: { txt: '连横 +N', col: PAL.coin },
+    pivot: { txt: '反超 +2', col: PAL.coin },
     tagBoost: { txt: '共鸣 +1', col: PAL.blue },
     tagHate: { txt: '压制 -1', col: PAL.red },
-    edge: { txt: '端点 +1', col: '#FFB020' },
+    edge: { txt: '端点 +1', col: PAL.coin },
     rowL: { txt: '左席 +1', col: PAL.blue },
     rowR: { txt: '右席 +1', col: PAL.blue },
     leftFoe: { txt: '左敌 -1', col: PAL.red },
     rightFoe: { txt: '右敌 -1', col: PAL.red },
     majority: { txt: '领先 +1', col: PAL.green },
-    minority: { txt: '反扑 +1', col: '#FFB020' },
-    shame: { txt: '借题 +1', col: '#FFB020' },
+    minority: { txt: '反扑 +1', col: PAL.coin },
+    shame: { txt: '借题 +1', col: PAL.coin },
     threat: { txt: '对垒 -1', col: PAL.red },
     crossExam: { txt: '质证 -1', col: PAL.red },
-    objection: { txt: '反对! -1', col: '#A31B1B' },
-    reasonableDoubt: { txt: '合理怀疑 -2', col: '#FFB020' },
-    timelineSnipe: { txt: '时间线 -1', col: '#FFB020' },
-    flipNarrative: { txt: '翻转 +2', col: '#FFB020' },
-    careerGamble: { txt: '豪赌 +2', col: '#FFB020' },
+    objection: { txt: '反对! -1', col: PAL.deepRed },
+    reasonableDoubt: { txt: '合理怀疑 -2', col: PAL.coin },
+    timelineSnipe: { txt: '时间线 -1', col: PAL.coin },
+    flipNarrative: { txt: '翻转 +2', col: PAL.coin },
+    careerGamble: { txt: '豪赌 +2', col: PAL.coin },
     credCollapse: { txt: '崩塌 -1', col: PAL.red },
     whistleblower: { txt: '吹哨 -1⊙', col: PAL.red },
     precedent: { txt: '先例 +1', col: '#7B4FC9' },
@@ -1196,21 +1201,21 @@ function drawFx(f){
     firstSeat: { txt: '首座 -1', col: PAL.red },
     lastSeat: { txt: '末席 -1', col: PAL.red },
     leftWall: { txt: '左翼 +N', col: PAL.blue },
-    randomHit: { txt: '随机 -1', col: '#FFB020' },
+    randomHit: { txt: '随机 -1', col: PAL.coin },
     audit: { txt: '查账 -1', col: PAL.red },
-    lobby: { txt: '游说 +1', col: '#FFB020' },
+    lobby: { txt: '游说 +1', col: PAL.coin },
     endorse: { txt: '背书 +1', col: PAL.green },
     crossfire: { txt: '火力 -1', col: PAL.red },
     surge: { txt: '浪潮 +1', col: PAL.blue },
-    veto: { txt: '否决 -2', col: '#A31B1B' },
-    momentum: { txt: '势头 +1', col: '#FFB020' },
+    veto: { txt: '否决 -2', col: PAL.deepRed },
+    momentum: { txt: '势头 +1', col: PAL.coin },
     grant: { txt: '+1 ⊙', col: PAL.green },
     /* ⑨ 庭审克制包飘字 + 触发色（条件触发，飘字即触发条件提示） */
     bias: { txt: '偏见 -1', col: '#8A2BE2' },
     hailMary: { txt: '绝境 +3', col: PAL.red },
     fullChain: { txt: '链条 +1', col: '#01847F' },
     gagOrder: { txt: '禁言 -2', col: '#7B2CBF' },
-    split: { txt: '分裂 -1', col: '#FFB020' },
+    split: { txt: '分裂 -1', col: PAL.coin },
     integrity: { txt: '清廉 +1⊙', col: '#80ED99' }
   };
 
@@ -1405,7 +1410,7 @@ function drawFx(f){
     border(x, y, w, h, bc, 2.5);
     // 顶部机密条（红色封条）
     const barH = Math.max(11, h * 0.11);
-    rect(x + 3, y + 3, w - 6, barH, '#A31B1B');
+    rect(x + 3, y + 3, w - 6, barH, PAL.deepRed);
     border(x + 3, y + 3, w - 6, barH, PAL.black, 1);
     text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), PAL.white, { align: 'center', shadow: false });
 
@@ -1430,10 +1435,10 @@ function drawFx(f){
     const r = Math.min(w, h) * 0.22;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(232,164,24,0.12)'; ctx.fill();
-    ctx.strokeStyle = '#FFB020'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = PAL.coin; ctx.lineWidth = 2; ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(232,164,24,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-    drawSkillIcon(ctx, 'scale', cx, cy, r * 1.5, '#FFB020');
+    drawSkillIcon(ctx, 'scale', cx, cy, r * 1.5, PAL.coin);
 
     // 主标题：真相，由证据编织
     text('真相', cx, y + h * 0.63, Math.min(w * 0.30, h * 0.15), '#F6E9C8', { align: 'center', shadow: false });
@@ -1581,11 +1586,11 @@ function drawFx(f){
     if (sk) {
       const sn = lay.skillName;
       if (lay.mini) {
-        drawSkillIcon(ctx, icon, x + w * 0.5 - 24, sn.y + sn.h / 2, sn.h * 1.1, '#4A3100');
-        text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), '#4A3100', { align: 'left', shadow: false });
+        drawSkillIcon(ctx, icon, x + w * 0.5 - 24, sn.y + sn.h / 2, sn.h * 1.1, PAL.brownInk);
+        text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), PAL.brownInk, { align: 'left', shadow: false });
       } else {
         // 技能名黑条（normal/small 统一；terrorist 暗红底警示）
-        rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#A31B1B' : PAL.black);
+        rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? PAL.deepRed : PAL.black);
         drawSkillIcon(ctx, icon, x + w * 0.5 - 34, sn.y + sn.h / 2, sn.h * 1.0, PAL.gold);
         text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(9, sn.size), PAL.gold, { align: 'left', shadow: false });
       }
@@ -1605,9 +1610,9 @@ function drawFx(f){
 
     // ④ 底部价格金条
     const cb = lay.cost;
-    rect(cb.x, cb.y, cb.w, cb.h, '#FFB020');
+    rect(cb.x, cb.y, cb.w, cb.h, PAL.coin);
     border(cb.x, cb.y, cb.w, cb.h, PAL.black, 2);
-    text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, '#4A3100', { align: 'center', shadow: false, lineW: 0 });
+    text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, PAL.brownInk, { align: 'center', shadow: false, lineW: 0 });
   }
 
   /* ---------------- 事件牌（报纸头条「号外」，唯一源） ---------------- */
@@ -1628,14 +1633,14 @@ function drawFx(f){
     border(x, y, w, h, used ? '#555555' : (unusable ? '#8A8A94' : PAL.black), 2);
     // 报头条：号外（红） + 报眉：庭审公报（不可用 → 灰头）
     const barH = Math.max(11, h * 0.115);
-    rect(x, y, w, barH, used ? '#666666' : (unusable ? '#7C7C86' : '#A31B1B'));
+    rect(x, y, w, barH, used ? '#666666' : (unusable ? '#7C7C86' : PAL.deepRed));
     text(used ? '归档' : (unusable ? '暂不可用' : '号外'), x + 4, y + barH / 2, Math.max(8.5, h * 0.07), PAL.white, { shadow: false });
     text('庭审公报 · 卷宗' + (ev.id || ''), x + w - 4, y + barH / 2, Math.max(6.5, h * 0.055), 'rgba(255,255,255,0.85)', { align: 'right', shadow: false });
     // 头条大字：事件名（黑体）+ 红双下划线
     const tSize = Math.max(10.5, Math.min(w * 0.082, h * 0.115));
     text(ev.name, x + w / 2, y + h * 0.30, tSize, (used || unusable) ? '#666666' : PAL.black, { align: 'center', shadow: false });
     const ruleY = y + h * 0.38;
-    ctx.fillStyle = (used || unusable) ? '#777777' : '#A31B1B';
+    ctx.fillStyle = (used || unusable) ? '#777777' : PAL.deepRed;
     ctx.fillRect(x + w * 0.12, ruleY, w * 0.76, 2.5);
     ctx.fillRect(x + w * 0.20, ruleY + 4.5, w * 0.60, 1.5);
     // 正文（报道）
@@ -2293,7 +2298,7 @@ function drawFx(f){
           const nm = skd ? (lvMark(skd.lv) + skd.name) : card.skill;
           const nmBarH = Math.max(12, h * 0.075);
           const nmBarY = y + h * 0.42;
-          pxRect(x + 4, nmBarY, w - 8, nmBarH, card.skill === 'terrorist' ? '#A31B1B' : PAL.black);
+          pxRect(x + 4, nmBarY, w - 8, nmBarH, card.skill === 'terrorist' ? PAL.deepRed : PAL.black);
           pxBorder(x + 4, nmBarY, w - 8, nmBarH, PAL.black, 1);
           if (icon) UIKit.drawSkillIcon(ctx, icon, x + 13, nmBarY + nmBarH / 2, Math.min(14, nmBarH * 0.72), PAL.gold);
           drawPixelText(nm, x + (icon ? 24 : 10), nmBarY + nmBarH / 2, Math.max(8, h * 0.06), PAL.gold, { shadow: false });
@@ -2304,13 +2309,13 @@ function drawFx(f){
             const fs = clamp(h * 0.07, 7.5, 9.5);
             const flh = Math.max(9, h * 0.07);
             const slim = eff.length > 26 ? eff.slice(0, 26) + '…' : eff;
-            drawWrapText(slim, x + 4, y + h * 0.52, fs, '#4A3100', w - 8, flh, { maxLines: 2, shadow: false });
+            drawWrapText(slim, x + 4, y + h * 0.52, fs, PAL.brownInk, w - 8, flh, { maxLines: 2, shadow: false });
           }
         } else if (h >= 56) {
           // 矮行卡：技能名（矢量图标 + 名称），一行小字
           const nm = skd ? skd.name : card.skill;
-          if (icon) UIKit.drawSkillIcon(ctx, icon, x + 10, y + h * 0.60, Math.min(12, h * 0.16), '#4A3100');
-          drawWrapText(nm, x + (icon ? 18 : 4), y + h * 0.60, Math.max(7, h * 0.09), '#4A3100', w - (icon ? 22 : 8), Math.max(8, h * 0.1), { maxLines: 1, shadow: false });
+          if (icon) UIKit.drawSkillIcon(ctx, icon, x + 10, y + h * 0.60, Math.min(12, h * 0.16), PAL.brownInk);
+          drawWrapText(nm, x + (icon ? 18 : 4), y + h * 0.60, Math.max(7, h * 0.09), PAL.brownInk, w - (icon ? 22 : 8), Math.max(8, h * 0.1), { maxLines: 1, shadow: false });
         }
       }
       const pt = partyOf(seat);
@@ -2431,7 +2436,7 @@ function drawFx(f){
     }
     // 观战守卫：旁观者跳过玩家侧信息
     if (copy.isSpectator && copy.isSpectator()) {
-      drawPixelText('旁观中', RP.x + RP.w - 10, RP.y + RP.h / 2, 16, '#5AC8FA', { align: 'right', shadow: true });
+      drawPixelText('旁观中', RP.x + RP.w - 10, RP.y + RP.h / 2, 16, PAL.linkBlue, { align: 'right', shadow: true });
       return;
     }
     // 起始玩家（右上角悬浮，右对齐）
@@ -2544,7 +2549,7 @@ function drawFx(f){
       const inPlay = g.phase === 'play' && g.playLastSeat === i;
       /* 数值流（行2）：钱/支持/丑闻/手牌/锁（状态标签独立绘制，不再挤入文字流防遮挡） */
       const flow = [];
-      flow.push({ txt: '⊙' + s.money, col: '#FFB020' });
+      flow.push({ txt: '⊙' + s.money, col: PAL.coin });
       flow.push({ icon: 'scale', txt: String(s.support), col: PAL.black });
       if (sc > 0 || copy.scandalZero) flow.push({ icon: 'skull', txt: String(sc), col: sc > 0 ? (copy.scandalCol || PAL.red) : '#8A8A8A' });
       if (show.handN && isMe) flow.push({ txt: '手牌' + s.handCount, col: '#333333' });
@@ -2559,7 +2564,7 @@ function drawFx(f){
         const nmT1 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(64, w * 0.34), Math.max(12, env.UI.fs.name - 0.5));
         const nmR1 = drawPixelText(nmT1.text, nx1, y + 15, nmT1.size, PAL.black, { shadow: false });
         nx1 += nmR1.w + 6;
-        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 7, y + 15, 14, '#FFB020'); nx1 += 18; }
+        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 7, y + 15, 14, PAL.coin); nx1 += 18; }
         if (s.side) {
           const sideTxt = s.side === 'prosecutor' ? '·检方' : '·辩护方';
           drawPixelText(sideTxt, nx1, y + 15, 10.5, s.side === 'prosecutor' ? PAL.red : PAL.blue, { shadow: false });
@@ -2589,7 +2594,7 @@ function drawFx(f){
         const nmT2 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(72, w * 0.28), Math.min(17, env.UI.fs.name + 2));
         const nmR2 = drawPixelText(nmT2.text, nx1, y + 18, nmT2.size, PAL.black, { shadow: false });
         nx1 += nmR2.w + 8;
-        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 8, y + 18, 16, '#FFB020'); nx1 += 20; }
+        if (crown) { UIKit.drawSkillIcon(ctx, 'crown', nx1 + 8, y + 18, 16, PAL.coin); nx1 += 20; }
         if (s.side) {
           const sideTxt = s.side === 'prosecutor' ? '·检方' : '·辩护方';
           drawPixelText(sideTxt, nx1, y + 18, 12, s.side === 'prosecutor' ? PAL.red : PAL.blue, { shadow: false });
@@ -2620,7 +2625,7 @@ function drawFx(f){
             pxRect(sbx + 2, y + ph - 15, Math.max(2, 46 * Math.min(1, sc / 5)), 4, scCol);
           }
         }
-        if (inPlay) drawPixelText('结案陈词', x + w - 14, y + ph - 8, 12.5, '#FFB020', { align: 'right', shadow: false });
+        if (inPlay) drawPixelText('结案陈词', x + w - 14, y + ph - 8, 12.5, PAL.coin, { align: 'right', shadow: false });
       }
       // 事件目标选择 / 选择起始玩家（点击头像，命中区=圆+边距）
       const avSz = env.compact ? 20 : 26;
@@ -2831,7 +2836,7 @@ function drawFx(f){
       else draw();
       if (usable || copy.hoverAll) env.hoverCards.push({ x: r.x, y: r.y, w: r.w, h: r.h, kind: 'event', data: { ev, uid: ev.uid } });
       if (copy.eventBtn) copy.eventBtn(r.x, r.y, r.w, r.h, ev, usable);
-      if (ev.used) drawPixelText('已使用', r.x + r.w / 2, r.y + r.h - 12, 11, '#5AC8FA', { align: 'center', shadow: false });
+      if (ev.used) drawPixelText('已使用', r.x + r.w / 2, r.y + r.h - 12, 11, PAL.linkBlue, { align: 'center', shadow: false });
     });
     if (!evs.length) drawPixelText('（暂无事件牌）', 10, y0 + 60 + actH, 13, copy.emptyCol || '#7E93B0', { shadow: false });
   };
@@ -3055,7 +3060,7 @@ function drawFx(f){
         ty += drawWrapText(ln, bx2 + padX, ty + lh / 2, 13.5, '#333333', boxW - padX * 2, lh, { shadow: false });
       });
       (info.extra || []).forEach(ln => {
-        drawPixelText('◆ ' + ln, bx2 + padX, ty + 8, 11.5, '#FFB020', { shadow: false });
+        drawPixelText('◆ ' + ln, bx2 + padX, ty + 8, 11.5, PAL.coin, { shadow: false });
         ty += 17;
       });
     }
@@ -3613,7 +3618,7 @@ function renderAbout(){
   pxBorder(W*0.16, H*0.13, W*0.68, H*0.72, PAL.black, 4);
   const cx = W / 2;
   drawPixelText('合理怀疑 · 世纪审判（单机）', cx, H*0.20, 24, PAL.goldSoft, { align: 'center' });
-  drawPixelText('版本 v1.2.0', cx, H*0.20 + 34, 15, '#5AC8FA', { align: 'center', shadow: false });
+  drawPixelText('版本 v1.2.0', cx, H*0.20 + 34, 15, PAL.linkBlue, { align: 'center', shadow: false });
   const lines = [
     '虚构「米合众国」联邦巡回法庭体系，四方法律团队对抗。',
     '每轮 16 步：选律师 → 定次序 → 抽议题 → 抽证据 → 调查取证',
@@ -4796,7 +4801,7 @@ function checkFxDiffs(){
       const pr = panelRect(i);
       const d = s.money - lastMoney[i];
       const txt = (d >= 0 ? '+' : '') + d + '⊙';
-      addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h/2 - 8, text: txt, col: '#FFB020', size: 16, dur: 800 });
+      addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h/2 - 8, text: txt, col: PAL.coin, size: 16, dur: 800 });
     }
     lastMoney[i] = s.money;
   });
@@ -5016,12 +5021,12 @@ function tooltipInfo(h){
     const ch = h.data.ch;
     const sk = ch.skill ? ElectionCore.data.SKILLS[ch.skill] : null;
     if (!sk) return null;
-    return { title: ch.name + ' · ' + sk.name, catCol: '#FFB020', lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
+    return { title: ch.name + ' · ' + sk.name, catCol: PAL.coin, lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
   }
   if (k === 'event' && h.data && h.data.ev){
     const ev = h.data.ev;
     const effTxt = ev.eff ? (ev.eff.type === 'vote' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' 票' : ev.eff.type === 'money' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' ⊙' : ev.eff.type === 'support' ? '倾向 ' + (ev.eff.val > 0 ? '+' : '') + ev.eff.val : '全体加成') : '';
-    return { title: ev.name, catCol: '#A31B1B', lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
+    return { title: ev.name, catCol: PAL.deepRed, lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
   }
   const card = h.card || (h.data && (h.data.card || h.data.ev));
   if (card && card.votes !== undefined){

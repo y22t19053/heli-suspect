@@ -2089,12 +2089,12 @@ function tooltipInfo(h) {
     const ch = h.data.ch;
     const sk = ch.skill ? ElectionCore.data.SKILLS[ch.skill] : null;
     if (!sk) return null;
-    return { title: ch.name + ' · ' + sk.name, catCol: '#FFB020', lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
+    return { title: ch.name + ' · ' + sk.name, catCol: PAL.coin, lines: [sk.desc], extra: ['技能等级 ' + lvMark(sk.lv)] };
   }
   if (k === 'event' && h.data && h.data.ev) {
     const ev = h.data.ev;
     const effTxt = ev.eff ? (ev.eff.type === 'vote' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' 票' : ev.eff.type === 'money' ? (ev.eff.val > 0 ? '+' : '−') + Math.abs(ev.eff.val) + ' ⊙' : ev.eff.type === 'support' ? '倾向 ' + (ev.eff.val > 0 ? '+' : '') + ev.eff.val : '全体加成') : '';
-    return { title: ev.name, catCol: '#A31B1B', lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
+    return { title: ev.name, catCol: PAL.deepRed, lines: [ev.desc], extra: [(ev.timing === 'pre' ? '庭审前' : '庭审后') + ' · ' + lvMark(ev.lv) + (effTxt ? ' · 效果 ' + effTxt : '')] };
   }
   const card = h.card || (h.data && (h.data.card || h.data.ev));
   if (card && card.votes !== undefined) {
@@ -2657,7 +2657,7 @@ function checkFxDiffs() {
     if (lastMoney[i] !== undefined && lastMoney[i] !== s.money) {
       const pr = panelRect(i);
       const d = s.money - lastMoney[i];
-      addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 - 8, text: (d >= 0 ? '+' : '') + d + '⊙', col: '#FFB020', size: 16, dur: 800 });
+      addFx({ type: 'float', x: pr.x + pr.w * 0.18, y: pr.y + pr.h / 2 - 8, text: (d >= 0 ? '+' : '') + d + '⊙', col: PAL.coin, size: 16, dur: 800 });
     }
     lastMoney[i] = s.money;
   });

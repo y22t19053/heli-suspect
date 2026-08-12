@@ -50,7 +50,12 @@
     textSoft:  '#C9D6EA',   // 柔和正文（深底）
     border:    '#3A4258',   // 深底边框
     white:     '#FFFFFF',
-    black:     '#111111'
+    black:     '#111111',
+    /* —— 高频语义色收口（渲染层高频复用色，颜色纪律最终收口）—— */
+    coin:      '#FFB020',   // 金币/奖励金（⊙ 数字/皇冠/技能标签金）
+    deepRed:   '#A31B1B',   // 档案深红（恐怖分子条/事件牌/负效果）
+    linkBlue:  '#5AC8FA',   // 信息亮蓝（旁观/已使用标记）
+    brownInk:  '#4A3100'    // 浅底深棕墨（卡片浅底正文）
   };
   /* 卡纸底色兜底（旧代码把 PAL.paper 当字符串用：升级后由这里补默认档） */
   const PAPER_FALLBACK = PAL.paper.a;

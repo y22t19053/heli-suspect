@@ -411,5 +411,5 @@ select { cursor: pointer; }
   white-space: nowrap;
   animation: fadein 0.25s ease;
 }
-.toast.warn { border-color: #E8A418; color: var(--gold); }
+.toast.warn { border-color: var(--gold-lo); color: var(--gold); }
 @keyframes fadein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; } }

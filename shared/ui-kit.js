@@ -514,38 +514,38 @@
     orator: { txt: '+1 票', col: PAL.green },
     scandal: { txt: '敌方 -1', col: PAL.red },
     wave: { txt: '+1 / -1', col: PAL.blue },
-    idol: { txt: '+2 票', col: '#FFB020' },
+    idol: { txt: '+2 票', col: PAL.coin },
     megaScandal: { txt: '敌方 -2', col: PAL.red },
-    comeback: { txt: '翻盘 +1', col: '#FFB020' },
-    donor: { txt: '+1 ⊙', col: '#FFB020' },
+    comeback: { txt: '翻盘 +1', col: PAL.coin },
+    donor: { txt: '+1 ⊙', col: PAL.coin },
     buyback: { txt: '敌方 -1⊙', col: PAL.red },
-    terrorist: { txt: '排除证据', col: '#A31B1B' },
+    terrorist: { txt: '排除证据', col: PAL.deepRed },
     swap: { txt: '换位', col: PAL.gold },
     shiftLeft: { txt: '左移', col: PAL.gold },
     shiftRight: { txt: '右移', col: PAL.gold },
     counsel: { txt: '同盟 +1', col: PAL.green },
     flank: { txt: '连坐 -1', col: PAL.red },
-    poach: { txt: '连坐挖票', col: '#FFB020' },
+    poach: { txt: '连坐挖票', col: PAL.coin },
     rally: { txt: '声援 +1', col: PAL.green },
-    chain: { txt: '连横 +N', col: '#FFB020' },
-    pivot: { txt: '反超 +2', col: '#FFB020' },
+    chain: { txt: '连横 +N', col: PAL.coin },
+    pivot: { txt: '反超 +2', col: PAL.coin },
     tagBoost: { txt: '共鸣 +1', col: PAL.blue },
     tagHate: { txt: '压制 -1', col: PAL.red },
-    edge: { txt: '端点 +1', col: '#FFB020' },
+    edge: { txt: '端点 +1', col: PAL.coin },
     rowL: { txt: '左席 +1', col: PAL.blue },
     rowR: { txt: '右席 +1', col: PAL.blue },
     leftFoe: { txt: '左敌 -1', col: PAL.red },
     rightFoe: { txt: '右敌 -1', col: PAL.red },
     majority: { txt: '领先 +1', col: PAL.green },
-    minority: { txt: '反扑 +1', col: '#FFB020' },
-    shame: { txt: '借题 +1', col: '#FFB020' },
+    minority: { txt: '反扑 +1', col: PAL.coin },
+    shame: { txt: '借题 +1', col: PAL.coin },
     threat: { txt: '对垒 -1', col: PAL.red },
     crossExam: { txt: '质证 -1', col: PAL.red },
-    objection: { txt: '反对! -1', col: '#A31B1B' },
-    reasonableDoubt: { txt: '合理怀疑 -2', col: '#FFB020' },
-    timelineSnipe: { txt: '时间线 -1', col: '#FFB020' },
-    flipNarrative: { txt: '翻转 +2', col: '#FFB020' },
-    careerGamble: { txt: '豪赌 +2', col: '#FFB020' },
+    objection: { txt: '反对! -1', col: PAL.deepRed },
+    reasonableDoubt: { txt: '合理怀疑 -2', col: PAL.coin },
+    timelineSnipe: { txt: '时间线 -1', col: PAL.coin },
+    flipNarrative: { txt: '翻转 +2', col: PAL.coin },
+    careerGamble: { txt: '豪赌 +2', col: PAL.coin },
     credCollapse: { txt: '崩塌 -1', col: PAL.red },
     whistleblower: { txt: '吹哨 -1⊙', col: PAL.red },
     precedent: { txt: '先例 +1', col: '#7B4FC9' },
@@ -553,21 +553,21 @@
     firstSeat: { txt: '首座 -1', col: PAL.red },
     lastSeat: { txt: '末席 -1', col: PAL.red },
     leftWall: { txt: '左翼 +N', col: PAL.blue },
-    randomHit: { txt: '随机 -1', col: '#FFB020' },
+    randomHit: { txt: '随机 -1', col: PAL.coin },
     audit: { txt: '查账 -1', col: PAL.red },
-    lobby: { txt: '游说 +1', col: '#FFB020' },
+    lobby: { txt: '游说 +1', col: PAL.coin },
     endorse: { txt: '背书 +1', col: PAL.green },
     crossfire: { txt: '火力 -1', col: PAL.red },
     surge: { txt: '浪潮 +1', col: PAL.blue },
-    veto: { txt: '否决 -2', col: '#A31B1B' },
-    momentum: { txt: '势头 +1', col: '#FFB020' },
+    veto: { txt: '否决 -2', col: PAL.deepRed },
+    momentum: { txt: '势头 +1', col: PAL.coin },
     grant: { txt: '+1 ⊙', col: PAL.green },
     /* ⑨ 庭审克制包飘字 + 触发色（条件触发，飘字即触发条件提示） */
     bias: { txt: '偏见 -1', col: '#8A2BE2' },
     hailMary: { txt: '绝境 +3', col: PAL.red },
     fullChain: { txt: '链条 +1', col: '#01847F' },
     gagOrder: { txt: '禁言 -2', col: '#7B2CBF' },
-    split: { txt: '分裂 -1', col: '#FFB020' },
+    split: { txt: '分裂 -1', col: PAL.coin },
     integrity: { txt: '清廉 +1⊙', col: '#80ED99' }
   };
 
@@ -762,7 +762,7 @@
     border(x, y, w, h, bc, 2.5);
     // 顶部机密条（红色封条）
     const barH = Math.max(11, h * 0.11);
-    rect(x + 3, y + 3, w - 6, barH, '#A31B1B');
+    rect(x + 3, y + 3, w - 6, barH, PAL.deepRed);
     border(x + 3, y + 3, w - 6, barH, PAL.black, 1);
     text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), PAL.white, { align: 'center', shadow: false });
 
@@ -787,10 +787,10 @@
     const r = Math.min(w, h) * 0.22;
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(232,164,24,0.12)'; ctx.fill();
-    ctx.strokeStyle = '#FFB020'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = PAL.coin; ctx.lineWidth = 2; ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(232,164,24,0.5)'; ctx.lineWidth = 1; ctx.stroke();
-    drawSkillIcon(ctx, 'scale', cx, cy, r * 1.5, '#FFB020');
+    drawSkillIcon(ctx, 'scale', cx, cy, r * 1.5, PAL.coin);
 
     // 主标题：真相，由证据编织
     text('真相', cx, y + h * 0.63, Math.min(w * 0.30, h * 0.15), '#F6E9C8', { align: 'center', shadow: false });
@@ -938,11 +938,11 @@
     if (sk) {
       const sn = lay.skillName;
       if (lay.mini) {
-        drawSkillIcon(ctx, icon, x + w * 0.5 - 24, sn.y + sn.h / 2, sn.h * 1.1, '#4A3100');
-        text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), '#4A3100', { align: 'left', shadow: false });
+        drawSkillIcon(ctx, icon, x + w * 0.5 - 24, sn.y + sn.h / 2, sn.h * 1.1, PAL.brownInk);
+        text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(7.5, sn.size), PAL.brownInk, { align: 'left', shadow: false });
       } else {
         // 技能名黑条（normal/small 统一；terrorist 暗红底警示）
-        rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? '#A31B1B' : PAL.black);
+        rect(x + 4, sn.y, w - 8, sn.h, card.skill === 'terrorist' ? PAL.deepRed : PAL.black);
         drawSkillIcon(ctx, icon, x + w * 0.5 - 34, sn.y + sn.h / 2, sn.h * 1.0, PAL.gold);
         text(lv(sk.lv) + sk.name, x + w * 0.5 + 2, sn.y + sn.h / 2, Math.max(9, sn.size), PAL.gold, { align: 'left', shadow: false });
       }
@@ -962,9 +962,9 @@
 
     // ④ 底部价格金条
     const cb = lay.cost;
-    rect(cb.x, cb.y, cb.w, cb.h, '#FFB020');
+    rect(cb.x, cb.y, cb.w, cb.h, PAL.coin);
     border(cb.x, cb.y, cb.w, cb.h, PAL.black, 2);
-    text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, '#4A3100', { align: 'center', shadow: false, lineW: 0 });
+    text('⊙' + card.cost, cb.x + cb.w / 2, cb.y + cb.h / 2, cb.size, PAL.brownInk, { align: 'center', shadow: false, lineW: 0 });
   }
 
   /* ---------------- 事件牌（报纸头条「号外」，唯一源） ---------------- */
@@ -985,14 +985,14 @@
     border(x, y, w, h, used ? '#555555' : (unusable ? '#8A8A94' : PAL.black), 2);
     // 报头条：号外（红） + 报眉：庭审公报（不可用 → 灰头）
     const barH = Math.max(11, h * 0.115);
-    rect(x, y, w, barH, used ? '#666666' : (unusable ? '#7C7C86' : '#A31B1B'));
+    rect(x, y, w, barH, used ? '#666666' : (unusable ? '#7C7C86' : PAL.deepRed));
     text(used ? '归档' : (unusable ? '暂不可用' : '号外'), x + 4, y + barH / 2, Math.max(8.5, h * 0.07), PAL.white, { shadow: false });
     text('庭审公报 · 卷宗' + (ev.id || ''), x + w - 4, y + barH / 2, Math.max(6.5, h * 0.055), 'rgba(255,255,255,0.85)', { align: 'right', shadow: false });
     // 头条大字：事件名（黑体）+ 红双下划线
     const tSize = Math.max(10.5, Math.min(w * 0.082, h * 0.115));
     text(ev.name, x + w / 2, y + h * 0.30, tSize, (used || unusable) ? '#666666' : PAL.black, { align: 'center', shadow: false });
     const ruleY = y + h * 0.38;
-    ctx.fillStyle = (used || unusable) ? '#777777' : '#A31B1B';
+    ctx.fillStyle = (used || unusable) ? '#777777' : PAL.deepRed;
     ctx.fillRect(x + w * 0.12, ruleY, w * 0.76, 2.5);
     ctx.fillRect(x + w * 0.20, ruleY + 4.5, w * 0.60, 1.5);
     // 正文（报道）
