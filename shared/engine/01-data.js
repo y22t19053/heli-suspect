@@ -1,4 +1,4 @@
-/* ===== engine/01-data.js（game-core.js 行 40-340）===== */
+/* ===== engine/01-data.js（game-core.js 行 40-287）===== */
       state.rngCalls = (state.rngCalls >>> 0) + 1;
       return mulberryStep((state.rngSeed + state.rngCalls * 0x6D2B79F5) | 0);
     };

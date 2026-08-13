@@ -1,4 +1,4 @@
-/* ===== engine/10-rank.js（game-core.js 行 1295-1356）===== */
+/* ===== engine/10-rank.js（game-core.js 行 1374-1440）===== */
             break;
           }
           case 'minority': {

@@ -1,4 +1,4 @@
-/* ===== engine/03-state.js（game-core.js 行 364-490）===== */
+/* ===== engine/03-state.js（game-core.js 行 309-433）===== */
 
   /* 事件牌模板（lv：① ② ③ 分级；target：self 自己 / enemy 需选对方 / auto 自动） */
   const EVENT_TEMPLATES = [

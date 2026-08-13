@@ -1,4 +1,4 @@
-/* ===== engine/07-reveal.js（game-core.js 行 762-864）===== */
+/* ===== engine/07-reveal.js（game-core.js 行 716-818）===== */
     const cost = buyCostOf(s, card);
     if (s.money < cost) return { ok: false, msg: '⊙ 不足' };
     if (s.buyDone) return { ok: false, msg: '已结束取证' };

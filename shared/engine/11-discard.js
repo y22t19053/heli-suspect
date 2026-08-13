@@ -1,4 +1,4 @@
-/* ===== engine/11-discard.js（game-core.js 行 1357-1411）===== */
+/* ===== engine/11-discard.js（game-core.js 行 1441-1495）===== */
             break;
           }
           case 'objection': {

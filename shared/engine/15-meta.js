@@ -1,4 +1,4 @@
-/* ===== engine/15-meta.js（game-core.js 行 1768-1871）===== */
+/* ===== engine/15-meta.js（game-core.js 行 1845-1967）===== */
         break;
       }
       case 'playCards': {

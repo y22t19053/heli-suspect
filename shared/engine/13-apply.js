@@ -1,4 +1,4 @@
-/* ===== engine/13-apply.js（game-core.js 行 1495-1591）===== */
+/* ===== engine/13-apply.js（game-core.js 行 1579-1674）===== */
     const s = state.seats[targetSeat];
     s.scandal = Math.min(5, (s.scandal || 0) + 1);
     state.logs.push('丑闻曝光！【' + s.name + '】声誉受损，丑闻指数 ' + s.scandal + '/5');

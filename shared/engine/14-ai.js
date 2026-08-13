@@ -1,4 +1,4 @@
-/* ===== engine/14-ai.js（game-core.js 行 1592-1767）===== */
+/* ===== engine/14-ai.js（game-core.js 行 1675-1844）===== */
     state.phase = 'discard';
     state.discardSeat = -1;
     // 被【移除】的牌已在证据排除结算时进档案；其余洗回牌堆

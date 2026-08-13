@@ -23,21 +23,21 @@ const total = lines.length; // 末行若带 \n 则 split 后有尾部空串
 const segs = [
   ['00-head.js', 1],      // UMD 外壳 + 工具函数
   ['01-data.js', 40],     // CAMPS/CHARACTERS/SKILLS/SK_VAL/VOTER_TEMPLATES/AI_PERSONALITIES/EVENT_TEMPLATES
-  ['02-numeric.js', 341], // 数值函数（eventLvMax…lockMax）
-  ['03-state.js', 364],   // makeSeat/makeVoter/makeEvent/buildDeck/buildEventDeck/createGame
-  ['04-advance.js', 491], // advance（阶段推进状态机）
-  ['05-phases.js', 587],  // beginStarter + beginRound/beginVoter/beginBuy
-  ['06-actions.js', 655], // buyCard/lockCard/refreshMarket/reshuffle + beginPlay/nextPlaySeat/playCards/finishPlay
-  ['07-reveal.js', 762],  // beginReveal/revealNext/resolveTerrorist + rowNeighbor/swapRow/applyMoves/resolveSwap
-  ['08-events.js', 865],  // 事件阶段全套
-  ['09-count.js', 999],   // doCount/doCountContinue/applyScandalEffects/highestEnemy
-  ['10-rank.js', 1295],   // doRank/doSettle
-  ['11-discard.js', 1357],// beginDiscard/keepMaxOf/nextKeepSeat/keepCard/finishKeep
-  ['12-income.js', 1412], // beginIncome + finishGame
-  ['13-apply.js', 1495],  // apply（玩家动作分发）
-  ['14-ai.js', 1592],     // aiAct/aiCardScore/aiBuy/aiPlay/aiAutoValue/aiEvents
-  ['15-meta.js', 1768],   // needsAIAction/humanActing/PHASE_STEPS/PHASE_STEPS_VISIBLE/phaseLabel/myClickable
-  ['99-tail.js', 1872],   // return 导出
+  ['02-numeric.js', 288], // 数值函数（eventLvMax…lockMax）
+  ['03-state.js', 309],   // makeSeat/makeVoter/makeEvent/buildDeck/buildEventDeck/createGame
+  ['04-advance.js', 434], // advance（阶段推进状态机）
+  ['05-phases.js', 533],  // beginStarter + beginRound/beginVoter/beginBuy
+  ['06-actions.js', 609], // buyCard/lockCard/refreshMarket/reshuffle + beginPlay/nextPlaySeat/playCards/finishPlay
+  ['07-reveal.js', 716],  // beginReveal/revealNext/resolveTerrorist + rowNeighbor/swapRow/applyMoves/resolveSwap
+  ['08-events.js', 819],  // 事件阶段全套
+  ['09-count.js', 1044],  // doCount/doCountContinue/applyScandalEffects/highestEnemy
+  ['10-rank.js', 1374],   // doRank/doSettle
+  ['11-discard.js', 1441],// beginDiscard/keepMaxOf/nextKeepSeat/keepCard/finishKeep
+  ['12-income.js', 1496], // beginIncome + finishGame
+  ['13-apply.js', 1579],  // apply（玩家动作分发）
+  ['14-ai.js', 1675],     // aiAct/aiCardScore/aiBuy/aiPlay/aiAutoValue/aiEvents
+  ['15-meta.js', 1845],   // needsAIAction/humanActing/PHASE_STEPS/PHASE_STEPS_VISIBLE/phaseLabel/myClickable
+  ['99-tail.js', 1968],   // return 导出
 ];
 
 if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });

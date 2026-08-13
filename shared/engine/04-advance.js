@@ -1,4 +1,4 @@
-/* ===== engine/04-advance.js（game-core.js 行 491-586）===== */
+/* ===== engine/04-advance.js（game-core.js 行 434-532）===== */
     const aiMask = Array.isArray(opts.aiMask) ? opts.aiMask : [];
     const seats = [];
     for (let i = 0; i < seatCount; i++) {

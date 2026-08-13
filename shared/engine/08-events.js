@@ -1,4 +1,4 @@
-/* ===== engine/08-events.js（game-core.js 行 865-998）===== */
+/* ===== engine/08-events.js（game-core.js 行 819-1043）===== */
   /* ---------------- 亮出阶段（从左到右逐张亮出，恐怖分子按亮出顺序发动） ---------------- */
   function beginReveal(state) {
     state.phase = 'reveal';

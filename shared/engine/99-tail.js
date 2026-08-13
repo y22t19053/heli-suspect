@@ -1,4 +1,4 @@
-/* ===== engine/99-tail.js（game-core.js 行 1872-2123）===== */
+/* ===== engine/99-tail.js（game-core.js 行 1968-2276）===== */
         // 政治操盘：选对手票数最高的牌换到自己这张牌旁（改变邻位博弈）
         if (state.swapPending && state.swapPending.owner === seat) {
           const cands = state.row.filter(x => state.swapPending.candidates.indexOf(x.card.uid) >= 0 && x.seat !== seat);

@@ -1,4 +1,4 @@
-/* ===== engine/05-phases.js（game-core.js 行 587-654）===== */
+/* ===== engine/05-phases.js（game-core.js 行 533-608）===== */
     },
     chooseStarter: {
       label: 'chooseStarter',

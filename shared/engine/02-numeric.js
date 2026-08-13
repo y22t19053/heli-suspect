@@ -1,4 +1,4 @@
-/* ===== engine/02-numeric.js（game-core.js 行 341-363）===== */
+/* ===== engine/02-numeric.js（game-core.js 行 288-308）===== */
   /* 卡池精简（评审 P0-5）：v121/v122 已并入 engine/01-data.js 的 VOTER_TEMPLATES */
 
   /* AI 人格（从美式法律/政治文化提取）：

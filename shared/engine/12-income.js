@@ -1,4 +1,4 @@
-/* ===== engine/12-income.js（game-core.js 行 1412-1494）===== */
+/* ===== engine/12-income.js（game-core.js 行 1496-1578）===== */
             state.juryTokens[owner] = (state.juryTokens[owner] || 0) + 1;
             state.logs.push('陪审员转向：【' + state.seats[owner].name + '】获得 1 名陪审员支持（' + state.juryTokens[owner] + '/3）');
             break;

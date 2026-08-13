@@ -1,4 +1,4 @@
-/* ===== engine/09-count.js（game-core.js 行 999-1294）===== */
+/* ===== engine/09-count.js（game-core.js 行 1044-1373）===== */
     for (let k = 1; k <= n; k++) {
       const seat = (state.eventTurnSeat + k) % n;
       const s = state.seats[seat];

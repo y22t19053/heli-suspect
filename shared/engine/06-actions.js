@@ -1,4 +1,4 @@
-/* ===== engine/06-actions.js（game-core.js 行 655-761）===== */
+/* ===== engine/06-actions.js（game-core.js 行 609-715）===== */
       update: (state) => {
         // 政治操盘（换位）等待玩家选择目标则暂停；全部换位完成后继续计票
         if (state.swapPending) return;
