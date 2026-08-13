@@ -37,17 +37,16 @@
   function doSettle(state) {
     state.phase = 'settle';
     const first = state.roundRank[0];
-    const reward = rewardOf(state.round);
-    // 差额计分（防滚雪球）：第一名 +reward，之后每名 -1（最低 +1）→ 落后方不白卷
+    // 赢家通吃（评审 P0-2）：第一名 +4，其余 +1（无论几人局、无论票差）→ 争冠激励
     state.rankInfo.forEach((info, idx) => {
       const s = state.seats[info.seat];
-      let r = Math.max(1, reward - idx);
+      let r = idx === 0 ? 4 : 1;
       if (idx === 0 && state.supportBuff[first]) r += state.supportBuff[first];
       s.support += r;
       if (idx === 0) s.stats.roundsWon++;
       state.logs.push('【' + s.name + '】排名第 ' + (idx + 1) + '，陪审团倾向 +' + r + '（累计 ' + s.support + '）');
     });
-    state.supportReward = reward + (state.supportBuff[first] || 0);
+    state.supportReward = 4 + (state.supportBuff[first] || 0);
     // 连任计数（恐惧税：连续 2 轮第一，下轮刷新成本 +1）
     if (state.prevFirst === first) state.leaderStreak = (state.leaderStreak || 0) + 1;
     else state.leaderStreak = 1;

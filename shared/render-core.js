@@ -72,6 +72,7 @@
       case 'buy': return !g.seats[me].buyDone;
       case 'play': return g.turn === me && !g.seats[me].playDone;
       case 'reveal': return !!(g.revealPending && g.revealPending.owner === me);
+      case 'crossEx': return g.crossExTurn === me;
       case 'count': return !!(g.swapPending && g.swapPending.owner === me);
       case 'preEvent': case 'postEvent': return g.eventTurnSeat === me;
       case 'discard': return g.discardSeat === me && !g.seats[me].keepDone;
@@ -89,6 +90,7 @@
       case 'preEvent': case 'postEvent': return g.eventTurnSeat;
       case 'discard': return g.discardSeat;
       case 'reveal': return g.revealPending ? g.revealPending.owner : -1;
+      case 'crossEx': return g.crossExTurn != null ? g.crossExTurn : -1;
       case 'count': return g.swapPending ? g.swapPending.owner : -1;
       case 'chooseStarter': return g.starterPicker;
       default: return -1;
@@ -293,7 +295,9 @@
       env.hoverCards.push({ x, y, w, h, kind: 'target', data: { targetUid: card.uid } });
     }
     // 已亮出的行卡：悬停查看完整详情（悬浮信息卡）
-    if (revealed && !removed && !(g.revealPending && g.revealPending.owner === env.mySeat && seat !== env.mySeat)) {
+    // 质证·压制模式下的可压牌不再叠加 'row'（避免点击命中 row 而吞掉 crossPress）
+    const pressMode = g.phase === 'crossEx' && env.crossExPick === 'press' && seat !== env.mySeat && (it.press || 0) < 2;
+    if (revealed && !removed && !(g.revealPending && g.revealPending.owner === env.mySeat && seat !== env.mySeat) && !pressMode) {
       env.hoverCards.push({ x, y, w, h, kind: 'row', card });
     }
     if (g.phase === 'count' && g.swapPending && g.swapPending.owner === env.mySeat && !removed
@@ -305,6 +309,16 @@
       ctx.restore();
       if (env.registerTarget) env.registerTarget(it, card, 'swap');
       env.hoverCards.push({ x, y, w, h, kind: 'swapTarget', data: { targetUid: card.uid } });
+    }
+    // 质证·压制：选对手已亮证据压制 -1 票（红脉冲框，命中区=整张行卡）
+    if (g.phase === 'crossEx' && env.crossExPick === 'press' && revealed && !removed && seat !== env.mySeat && (it.press || 0) < 2) {
+      const on = Math.sin(performance.now() / 120) > 0 ? 1 : 0.4;
+      ctx.save();
+      ctx.globalAlpha = on;
+      pxBorder(x - 5, y - 5, w + 10, h + 10, PAL.red, 4);
+      ctx.restore();
+      if (env.registerTarget) env.registerTarget(it, card, 'crossPress');
+      env.hoverCards.push({ x, y, w, h, kind: 'crossPress', data: { targetUid: card.uid } });
     }
   };
 
@@ -385,7 +399,8 @@
     if (copy.countdown) copy.countdown(RP);
     // 阶段进度条（薄条，左缘起，横跨顶部下方；窄屏自动收缩）
     const steps = env.PHASE_STEPS || [];
-    const idx = steps.findIndex(s => s[0] === g.phase);
+    const group = (env.phaseGroupOf ? env.phaseGroupOf(g.phase) : g.phase);
+    const idx = steps.findIndex(s => s[0] === group);
     if (idx >= 0) {
       const sb = copy.stepBar || {};
       const maxW = sb.maxW || 30, baseW = sb.baseW || 320;
@@ -576,6 +591,12 @@
         pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, PAL.gold, 4);
         env.hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'starter', data: { starterSeat: i } });
         if (copy.pickBtn) copy.pickBtn(x + avX, avY2, avSz, avSz, 'starter', i);
+      }
+      // 质证·翻看：选对手座位翻看其手牌（金框，命中区=头像）
+      if (g.phase === 'crossEx' && env.crossExPick === 'view' && i !== env.mySeat) {
+        pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, PAL.gold, 4);
+        env.hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'crossView', data: { targetSeat: i } });
+        if (copy.pickBtn) copy.pickBtn(x + avX, avY2, avSz, avSz, 'crossView', i);
       }
       if (focusDim) ctx.restore();
     }
@@ -1032,8 +1053,8 @@
       mySeat: cfg.mySeat, HAND_AREA_H: cfg.HAND_AREA_H != null ? cfg.HAND_AREA_H : 230,
       HUD_H: cfg.HUD_H,                       // 顶部信息条高（两端必须一致传递）
       actH: cfg.actH || 0,                    // Task 5 竖屏固定操作栏高（联机桌面 0）
-      UI: cfg.UI, PHASE_STEPS: cfg.PHASE_STEPS, fontBase: cfg.fontBase,
-      selected: cfg.selected, eventPick: cfg.eventPick, buyMode: cfg.buyMode,
+      UI: cfg.UI, PHASE_STEPS: cfg.PHASE_STEPS, phaseGroupOf: cfg.phaseGroupOf, fontBase: cfg.fontBase,
+      selected: cfg.selected, eventPick: cfg.eventPick, buyMode: cfg.buyMode, crossExPick: cfg.crossExPick,
       portraitMode: cfg.portraitMode, compact: cfg.compact, isMobile: cfg.isMobile,
       eventPage: cfg.eventPage, setEventPage: cfg.setEventPage,
       handScroll: cfg.handScroll, setHandScroll: cfg.setHandScroll,

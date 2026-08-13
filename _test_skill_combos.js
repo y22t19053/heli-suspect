@@ -39,18 +39,20 @@ function findTemplate(id) {
  * seats 数组表示每张牌所属座位；缺省时按 0,1,2... 顺序分配。
  * 清空 char/personality，避免角色/AI 被动加成干扰技能结算。
  */
-function makeCountState(cardIds, seats) {
+function makeCountState(cardIds, seats, seatCount) {
+  seatCount = seatCount || 2;
+  const names = ['A', 'B', 'C', 'D'].slice(0, seatCount);
   const st = Core.createGame({
-    seatCount: 2,
-    names: ['A', 'B'],
-    aiMask: [false, true],
+    seatCount: seatCount,
+    names: names,
+    aiMask: names.map(() => false),
     seed: 20260817
   });
 
   st.phase = 'count';
   st.round = 1;
-  st.votes = [0, 0];
-  st.voteMod = [0, 0];
+  st.votes = new Array(seatCount).fill(0);
+  st.voteMod = new Array(seatCount).fill(0);
   st.tagEvents = [];
 
   st.row = (cardIds || []).map((id, i) => {
@@ -73,8 +75,8 @@ function makeCountState(cardIds, seats) {
 }
 
 /** 创建 count 状态 → 执行 doCountContinue → 返回结算后 state */
-function runCount(cardIds, seats) {
-  const st = makeCountState(cardIds, seats);
+function runCount(cardIds, seats, seatCount) {
+  const st = makeCountState(cardIds, seats, seatCount);
   Core.doCountContinue(st);
   return st;
 }
@@ -210,14 +212,46 @@ test('组合 I2：末席质证 v102', () => {
   assert.deepEqual(st2.votes, [0, 1], '行尾=A：A=0 B=1');
 });
 
-test('组合 I3：左翼壁垒 v103 叠加', () => {
+test('组合 I3：左翼壁垒 v103 叠加（3 人局左半区逻辑）', () => {
   // 左翼壁垒：每张 v103 各结算一次（左半区本方牌各 +1）——两张叠加
-  const st1 = runCount(['v103', 'v103', 'v103'], [0, 0, 1]);
+  const st1 = runCount(['v103', 'v103', 'v103'], [0, 0, 1], 3);
   // 第 1 张 A 卡：A 左半 2 张 → +2；第 2 张 A 卡：再 +2 → A=2+4=6
-  assert.deepEqual(st1.votes, [6, 1], 'A 两张左半区（各触发一次）→ A=6 B=1');
-  const st2 = runCount(['v103', 'v103', 'v103'], [1, 0, 0]);
+  assert.deepEqual(st1.votes, [6, 1, 0], 'A 两张左半区（各触发一次）→ A=6 B=1 C=0');
+  const st2 = runCount(['v103', 'v103', 'v103'], [1, 0, 0], 3);
   // A 卡 i=1 左半：两次触发各 +1 → A=2+2=4；B 卡 i=0 左半：+1 → B=2
-  assert.deepEqual(st2.votes, [4, 2], 'A 仅 i=1 左半（两次 +1）；B i=0 左半（+1）→ A=4 B=2');
+  assert.deepEqual(st2.votes, [4, 2, 0], 'A 仅 i=1 左半（两次 +1）；B i=0 左半（+1）→ A=4 B=2 C=0');
+});
+
+test('组合 I3b：左翼壁垒 v103（2 人局铺场条件：本方已亮 ≥3 → +1）', () => {
+  // 2 人局：位置技能退化为铺场条件（本方已亮 ≥3 → +1）
+  const st = runCount(['v103', 'v103', 'v103', 'v103'], [0, 0, 0, 1]);
+  // A 已亮 3 张 ≥3 → 每张 A 各 +1（3 张 → +3）；B 已亮 1 张不触发
+  assert.deepEqual(st.votes, [6, 1], 'A 已亮 3 触发（3 张各 +1）→ A=6 B=1');
+});
+
+test('组合 I5：2 人局位置技能铺场条件（flank/rally/counsel/pivot）', () => {
+  // 评审 P0-4：2 人局位置技能退化为「已亮牌数」条件，不再永哑
+  // 陪衬牌 v23=donor（evidence 流派，round=1 emotion 阶段无加成，count 阶段不触发）
+  // flank v69（attack，round=1 无加成）：本方已亮 ≥2 → 最高敌 -1
+  const fl1 = runCount(['v69', 'v69', 'v23'], [0, 0, 1]);
+  // B 基础 1 - 1 - 1 = -1，但 votes 末尾 Math.max(0,·) 钳为非负 → 0
+  assert.deepEqual(fl1.votes, [2, 0], 'flank 触发：A 已亮 2 → B-1×2（负数钳 0）→ A=2 B=0');
+  const fl2 = runCount(['v69', 'v23', 'v23'], [0, 1, 1]);
+  assert.deepEqual(fl2.votes, [1, 2], 'flank 不触发：A 已亮 1<2 → A=1 B=2');
+  // rally v68（emotion，round=1 +1 阶段加成）：本方已亮 ≥2 → 本方 +1
+  const ra1 = runCount(['v68', 'v68', 'v23'], [0, 0, 1]);
+  // 基础 A=2 B=1；阶段加成 v68 emotion ×2 → A+2=4；rally 触发 ×2 → A+2=6
+  assert.deepEqual(ra1.votes, [6, 1], 'rally 触发：A 已亮 2（阶段 +2 再 +2）→ A=6 B=1');
+  // counsel v89（logic，无加成）：本方已亮 ≥3 → +2 / ≥1 → +1
+  const co1 = runCount(['v89', 'v89', 'v89', 'v23'], [0, 0, 0, 1]);
+  assert.deepEqual(co1.votes, [9, 1], 'counsel +2：A 已亮 3 → 每张 +2（×3）→ A=9 B=1');
+  const co2 = runCount(['v89', 'v23'], [0, 1]);
+  assert.deepEqual(co2.votes, [2, 1], 'counsel +1：A 已亮 1 → +1 → A=2 B=1');
+  // pivot v70（logic，无加成）：敌方已亮 ≥2 → +2
+  const pi1 = runCount(['v70', 'v23', 'v23'], [0, 1, 1]);
+  assert.deepEqual(pi1.votes, [3, 2], 'pivot 触发：敌方已亮 2 → +2 → A=3 B=2');
+  const pi2 = runCount(['v70', 'v23'], [0, 1]);
+  assert.deepEqual(pi2.votes, [1, 1], 'pivot 不触发：敌方已亮 1<2 → A=1 B=1');
 });
 
 test('组合 I4：抽签质证 v104', () => {
@@ -249,19 +283,18 @@ test('组合 L3：连横合纵 v105 单侧邻友不触发（对照）', () => {
 });
 
 /* ============================================================
- * 组合 J：收入分发（榜首 -1 / 末位 +1 / 保底 +1，逐人日志）
+ * 组合 J：收入分发（赢家通吃后固定律师费：第 1-3 轮 2⊙/人，逐人日志）
  * ============================================================ */
 test('组合 J：收入分发 + 逐人日志', () => {
   const st = makeCountState([], []);
   st.round = 3;
-  st.rankInfo = [{ seat: 0, support: 5 }, { seat: 1, support: 2 }];  // A 榜首 / B 末位
+  st.rankInfo = [{ seat: 0, support: 5 }, { seat: 1, support: 2 }];
   st.seats[0].money = 3;
   st.seats[1].money = 3;
   Core.beginIncome(st);
-  // A：2 - 榜首1 = 1 → 3+1=4；B：2 + 末位1 = 3 → 3+3=6
-  assert.deepEqual(st.seats.map(s => s.money), [4, 6], 'A 榜首 -1（3→4）、B 末位 +1（3→6）');
-  assert.ok(st.logs.some(l => l.indexOf('发放律师费 +1⊙') >= 0), '逐人收入日志（含保底 +1⊙），logs=' + JSON.stringify(st.logs));
-  assert.ok(st.logs.some(l => l.indexOf('发放律师费 +3⊙') >= 0), '逐人收入日志（含末位 +3⊙）');
+  // 固定律师费 incomeOf(3)=2 → 每人 +2（无榜首税/末位保底）
+  assert.deepEqual(st.seats.map(s => s.money), [5, 5], '固定律师费 2⊙/人（3→5）');
+  assert.ok(st.logs.filter(l => l.indexOf('发放律师费 +2⊙') >= 0).length === 2, '两名玩家各一条 +2⊙ 日志，logs=' + JSON.stringify(st.logs));
 });
 
 /* ============================================================

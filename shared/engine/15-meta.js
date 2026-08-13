@@ -21,6 +21,21 @@
         res = resolveSwap(state, action.targetUid);
         break;
       }
+      case 'crossExView': {
+        res = crossExView(state, s, action.targetSeat);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
+      case 'crossExPress': {
+        res = crossExPress(state, s, action.targetUid);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
+      case 'crossExPass': {
+        res = crossExPass(state, s);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
       case 'playEvent': {
         res = playEvent(state, s, action.uid, action.targetSeat);
         break;
@@ -100,6 +115,10 @@
             state.revealPending = null;
           }
         }
+        break;
+      }
+      case 'crossEx': {
+        if (state.crossExTurn === seat) aiCrossEx(state, s);
         break;
       }
       case 'count': {

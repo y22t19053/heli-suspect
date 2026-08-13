@@ -38,28 +38,25 @@
   'use strict';
 
   /* 阶段流转常量：唯一源在 shared/game-core.js（超级更新#2），此处仅引用。
-   * 浏览器端 game-core 先行加载必命中；node 自检环境无 ElectionCore 时兜底为空数组。 */
-  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS) || [];
+   * 展示层引用 8 个可见宏阶段（PHASE_STEPS_VISIBLE）；node 自检环境无 ElectionCore 时兜底为空数组。 */
+  const PHASE_STEPS = (global.ElectionCore && global.ElectionCore.PHASE_STEPS_VISIBLE) || [];
+  const phaseGroupOf = (global.ElectionCore && global.ElectionCore.phaseGroupOf) || ((p) => p);
 
   const UIPresenter = {
     PHASE_STEPS,
 
-    /* 阶段进度条当前下标（-1 = 不在流程内） */
+    /* 阶段进度条当前下标（-1 = 不在流程内；庭审回合子阶段归并到 'trial' 宏阶段） */
     phaseIndex(view) {
       if (!view || !view.phase) return -1;
-      const i = PHASE_STEPS.findIndex(s => s[0] === view.phase);
+      const i = PHASE_STEPS.findIndex(s => s[0] === phaseGroupOf(view.phase));
       return i;
     },
 
-    /* 当前阶段之后的下一个用户可见阶段（跳过瞬时自动阶段） */
+    /* 当前阶段之后的下一个用户可见阶段（PHASE_STEPS 已是 8 个可见节拍，无需再跳过瞬时阶段） */
     nextStep(view) {
       const i = this.phaseIndex(view);
-      if (i < 0) return null;
-      const skip = new Set(['drawEvent', 'drawVoter', 'count', 'rank', 'settle']);
-      for (let k = i + 1; k < PHASE_STEPS.length; k++) {
-        if (!skip.has(PHASE_STEPS[k][0])) return PHASE_STEPS[k];
-      }
-      return null;
+      if (i < 0 || i + 1 >= PHASE_STEPS.length) return null;
+      return PHASE_STEPS[i + 1];
     },
 
     /* 是否轮到我（抽取两端 myTurnSP 逻辑为单一事实源）
@@ -71,6 +68,7 @@
         case 'buy': return !view.seats[me].buyDone;
         case 'play': return view.turn === me && !view.seats[me].playDone;
         case 'reveal': return !!(view.revealPending && view.revealPending.owner === me);
+        case 'crossEx': return view.crossExTurn === me;
         case 'count': return !!(view.swapPending && view.swapPending.owner === me);
         case 'preEvent': case 'postEvent': return view.eventTurnSeat === me;
         case 'discard': return view.discardSeat === me && !view.seats[me].keepDone;
@@ -94,6 +92,7 @@
           view.phase === 'discard' ? (view.discardSeat === i && !s.keepDone) :
           view.phase === 'preEvent' || view.phase === 'postEvent' ? view.eventTurnSeat === i :
           view.phase === 'chooseStarter' ? (view.starterPicker === i && !view.starterChosen) :
+          view.phase === 'crossEx' ? (view.crossExTurn === i) :
           false;
         return {
           seat: i,
@@ -217,7 +216,7 @@
       const total = row.length * (rw + 10) - 10;
       let cx = (W - total) / 2;
       const rowItems = row.map(r => {
-        const it = { seat: r.seat, card: r.card, revealed: r.revealed, removed: r.removed, x: cx, y: cy, w: rw, h: rh };
+        const it = { seat: r.seat, card: r.card, revealed: r.revealed, removed: r.removed, press: r._press || 0, x: cx, y: cy, w: rw, h: rh };
         cx += rw + 10;
         return it;
       });

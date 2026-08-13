@@ -619,6 +619,7 @@ let lastTickSec = -1;       // 倒计时上次滴答的秒数（防重复发声�
 let selected = [];          // 出牌/弃牌阶段已选卡 uid
 let buyMode = 'buy';        // buy | lock
 let eventPick = null;       // {seat, ev, target} 事件目标选择
+let crossExPick = null;     // 'view'（质证翻看，选座位）| 'press'（质证压制，选行卡）
 let screen = 'menu';        // menu | lobby | help | glossary | draft | game | over
 let lastRoomCode = null;
 let lastPlayerName = null;
@@ -678,6 +679,7 @@ socket.on('state', (st) => {
   deadline = null;
   selected = [];
   eventPick = null;
+  crossExPick = null;
   // 注意：不再在此处同步 lastStarterSeat（曾无条件对齐导致轮盘 FX 永不触发）——
   // 改为 checkFxDiffs 的新局/重连分支对齐，正常轮次由 diff 检测触发轮盘
   hide('menu');
@@ -1304,8 +1306,9 @@ function renderEnv() {
     mySeat, HAND_AREA_H, HUD_H,
     actH: portraitMode ? PORTRAIT_ACT_H : 0,   // Task 5 竖屏固定操作栏高：内容区下移让位
     UI, PHASE_STEPS,
+    phaseGroupOf: (p) => (typeof ElectionCore !== 'undefined' && ElectionCore.phaseGroupOf) ? ElectionCore.phaseGroupOf(p) : p,
     fontBase: _FONT_BASE,
-    selected, eventPick, buyMode,
+    selected, eventPick, buyMode, crossExPick,
     portraitMode, compact, isMobile,
     eventPage: () => eventPage, setEventPage: (v) => { eventPage = v; },
     handScroll: () => handScroll, setHandScroll: (v) => { handScroll = v; },
@@ -1561,6 +1564,14 @@ function renderActionButtons(me) {
       case 'reveal':
         if (g.revealPending && g.revealPending.owner === mySeat) hint('点击对手已亮出的证据', PAL.red);
         break;
+      case 'crossEx':
+        if (g.crossExTurn === mySeat) {
+          mk('翻看 ⊙1', 'crossExView', me.money >= 1, PAL.white);
+          mk('压制 ⊙1', 'crossExPress', me.money >= 1, PAL.white);
+          mk('过', 'crossExPass', true, PAL.accent.a);
+          hint('翻看对手手牌 / 压制已亮牌 · 每次 1⊙', PAL.textSoft);
+        }
+        break;
       case 'chooseStarter':
         if (g.starterPicker === mySeat && !g.starterChosen) hint('点击选择本轮起始玩家', PAL.gold);
         break;
@@ -1614,6 +1625,14 @@ function renderActionButtons(me) {
       break;
     case 'reveal':
       if (g.revealPending && g.revealPending.owner === mySeat) tipTxt = '点击对手已亮出的证据';
+      break;
+    case 'crossEx':
+      if (g.crossExTurn === mySeat) {
+        mk('翻看 ⊙1 ［V］', 'crossExView', me.money >= 1, PAL.white);
+        mk('压制 ⊙1 ［X］', 'crossExPress', me.money >= 1, PAL.white);
+        mk('过 ［Enter］', 'crossExPass', true, PAL.accent.a);
+        tipTxt = '翻看/压制各 1⊙ · 每轮最多 3 次';
+      }
       break;
     case 'chooseStarter':
       if (g.starterPicker === mySeat && !g.starterChosen) tipTxt = '点击选择本轮起始玩家';
@@ -2106,7 +2125,7 @@ function tooltipInfo(h) {
     if (fv) lines.push('— ' + fv + ' —');
     return { title: card.name, catCol: PAL.green, lines, extra: ['×' + card.votes + ' 票' + (card.cost != null ? ' · 传唤 ⊙' + card.cost : '')] };
   }
-  if (k === 'eventTarget' || k === 'starter' || k === 'target' || k === 'swapTarget') {
+  if (k === 'eventTarget' || k === 'starter' || k === 'target' || k === 'swapTarget' || k === 'crossView' || k === 'crossPress') {
     let seat = -1;
     if (h.data && h.data.targetSeat != null) seat = h.data.targetSeat;
     else if (h.data && h.data.starterSeat != null) seat = h.data.starterSeat;
@@ -2116,7 +2135,12 @@ function tooltipInfo(h) {
     }
     if (seat < 0 || !view.seats[seat]) return null;
     const s = view.seats[seat];
-    const tip = k === 'eventTarget' ? '选择事件的目标玩家' : k === 'starter' ? '选择本轮起始玩家' : k === 'swapTarget' ? '点击与目标互换位置（换位技能）' : '证据排除将作废该玩家的证据';
+    const tip = k === 'eventTarget' ? '选择事件的目标玩家'
+      : k === 'starter' ? '选择本轮起始玩家'
+      : k === 'swapTarget' ? '点击与目标互换位置（换位技能）'
+      : k === 'crossView' ? '花 1⊙ 翻看其手牌（信息公开，牌仍留其手牌）'
+      : k === 'crossPress' ? '花 1⊙ 压制该证据 -1 票（每张最多压 2 次）'
+      : '证据排除将作废该玩家的证据';
     return { title: s.name, catCol: campColor(seat), lines: ['倾向 ' + s.support + ' · ⊙' + s.money, tip], extra: [] };
   }
   return null;
@@ -2260,7 +2284,7 @@ document.addEventListener('keydown', (e) => {
     const aboutEl = $('about');
     if (aboutEl && !aboutEl.classList.contains('hidden')) { hide('about'); return; }
     if (screen === 'help' || screen === 'glossary') { handleButton('back'); return; }
-    if (screen === 'game') { selected = []; eventPick = null; toast('已取消选择'); }
+    if (screen === 'game') { selected = []; eventPick = null; crossExPick = null; toast('已取消选择'); }
     return;
   }
   // 教程 / 术语百科：← → 翻页
@@ -2318,6 +2342,16 @@ document.addEventListener('keydown', (e) => {
       const cands = (g.row || []).filter(r => r.revealed && !r.removed && r.seat !== mySeat);
       const t = cands[parseInt(e.key, 10) - 1];
       if (t) doAction({ type: 'terroristTarget', targetUid: t.card.uid });
+      e.preventDefault();
+    }
+  } else if (g.phase === 'crossEx' && g.crossExTurn === mySeat) {
+    if (e.key === 'Enter' || e.key === ' ') { handleButton('crossExPass'); e.preventDefault(); }
+    else if (e.key === 'v' || e.key === 'V') { handleButton('crossExView'); e.preventDefault(); }
+    else if (e.key === 'x' || e.key === 'X') { handleButton('crossExPress'); e.preventDefault(); }
+    else if (e.key >= '1' && e.key <= '9' && crossExPick === 'press') {
+      const cands = (g.row || []).filter(r => r.revealed && !r.removed && r.seat !== mySeat && (r._press || 0) < 2);
+      const t = cands[parseInt(e.key, 10) - 1];
+      if (t) { doAction({ type: 'crossExPress', targetUid: t.card.uid }); crossExPick = null; }
       e.preventDefault();
     }
   } else if (g.phase === 'discard' && g.discardSeat === mySeat && !me.keepDone) {
@@ -2394,6 +2428,17 @@ function handleButton(id) {
       confirmAsk = null; sfx('click'); doAction({ type: 'passEvent' }); eventPick = null;
       break;
     }
+    case 'crossExView':
+      crossExPick = crossExPick === 'view' ? null : 'view';
+      if (crossExPick) { toast('点击对手头像翻看其手牌（花 1⊙）'); sfx('click'); }
+      break;
+    case 'crossExPress':
+      crossExPick = crossExPick === 'press' ? null : 'press';
+      if (crossExPick) { toast('点击对方已亮证据，压制 -1 票（花 1⊙）'); sfx('click'); }
+      break;
+    case 'crossExPass':
+      crossExPick = null; sfx('click'); doAction({ type: 'crossExPass' });
+      break;
     case 'cfmYes': if (confirmAsk) { const _a = confirmAsk.act; confirmAsk = null; handleButton(_a); } break;
     case 'cfmNo': confirmAsk = null; sfx('click'); break;
     case 'playEventSel':
@@ -2484,6 +2529,8 @@ function handleCard(hc) {
     case 'hand': onHandClick(hc.data.uid); break;
     case 'event': onEventClick(hc.data.ev); break;
     case 'eventTarget': if (eventPick) eventPick.target = hc.data.targetSeat; break;
+    case 'crossView': doAction({ type: 'crossExView', targetSeat: hc.data.targetSeat }); crossExPick = null; break;
+    case 'crossPress': doAction({ type: 'crossExPress', targetUid: hc.data.targetUid }); crossExPick = null; break;
   }
 }
 function onHandClick(uid) {

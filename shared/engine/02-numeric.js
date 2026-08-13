@@ -1,7 +1,5 @@
 /* ===== engine/02-numeric.js（game-core.js 行 341-363）===== */
-    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' },
-    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' }
-  ];
+  /* 卡池精简（评审 P0-5）：v121/v122 已并入 engine/01-data.js 的 VOTER_TEMPLATES */
 
   /* AI 人格（从美式法律/政治文化提取）：
    * aggression 0~1：进攻性（影响攻击事件偏好/出牌数量）

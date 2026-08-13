@@ -53,6 +53,7 @@
       revealIndex: 0,          // 逐张亮出进度（当前亮出到 row 第几张）
       revealPending: null,     // {seat, cardUid} 等待恐怖分子选目标
       swapPending: null,       // {owner, cardUid, candidates} 等待选换位目标（政治操盘）
+      crossExTurn: -1,         // 质证阶段当前轮到（亮牌后、事件前）
       eventTurnSeat: -1,       // 事件阶段当前轮到
       eventTargetPending: null,// {seat, eventUid} 等待选事件目标
       discardSeat: -1,         // 整理阶段当前轮到
@@ -72,6 +73,8 @@
     state.votes = new Array(seatCount).fill(0);
     state.voteMod = new Array(seatCount).fill(0);
     state.supportBuff = new Array(seatCount).fill(0);
+    state.crossExUsed = new Array(seatCount).fill(0);
+    state.crossExPassed = new Array(seatCount).fill(false);
     return state;
   }
 

@@ -40,10 +40,8 @@
     return { arch: 'emotion', label: '结案陈词', tip: '情感型证据 +1 票' };
   }
   /* 每轮结束发放的 ⊙（卡牌降价后同步加钱，保证买得起更多牌）
-   * 阶段 C 改造：收入随轮次递增——第 1~3 轮 2⊙（前期克制），第 4 轮起 3⊙（后期资金加速，弱势方有翻盘机会） */
-  function incomeOf(round) { return round >= 4 ? 3 : 2; }
-  /* 支持度奖励 */
-  function rewardOf(round) { return round <= 3 ? 2 : (round === 4 ? 3 : 4); }
+   * 评审 P0-2 赢家通吃：固定律师费——第 1-3 轮 2⊙、第 4 轮 3⊙、第 5 轮 4⊙（无榜首税/末位保底） */
+  function incomeOf(round) { return round <= 3 ? 2 : (round === 4 ? 3 : 4); }
   /* 市场槽位数（初始 4，组织能手 +1） */
   function marketSize(s) { return 4 + ((s.char && s.char.skill.type === 'drawPlus') ? s.char.skill.v : 0); }
   /* 购买价（全局 -1 降价；铁腕大状再 -1）

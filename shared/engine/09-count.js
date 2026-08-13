@@ -97,6 +97,10 @@
     return { ok: true };
   }
 
+  /* —— 2 人局铺场条件（评审 P0-4）：位置技能退化为座位无关的「已亮牌数」条件 —— */
+  function shownOf(state, seat) {
+    return state.row.filter(x => !x.removed && !x._nullified && x.seat === seat).length;
+  }
   /* ---------------- 计票中（换位 → 丑闻惩罚 → 技能 ①→②→③） ---------------- */
   function doCount(state) {
     state.phase = 'count';
@@ -116,6 +120,13 @@
       base = Math.max(0, base);
       votes[r.seat] += base;
       ledger.push({ kind: 'base', seat: r.seat, delta: base, cardUid: r.card.uid, desc: '【' + r.card.name + '】基础票' });
+    });
+    // 1b. 质证压制扣票（评审 P0-2：每被压 1 次 -1 票，同一张牌最多压 2 次）
+    state.row.forEach(r => {
+      if (r.removed || r._nullified || !(r._press > 0)) return;
+      const press = r._press;
+      votes[r.seat] -= press;
+      ledger.push({ kind: 'crossExPress', seat: r.seat, delta: -press, cardUid: r.card.uid, desc: '【' + r.card.name + '】被质证压制 -' + press + ' 票' });
     });
     // 2. 计票前事件修正
     for (let i = 0; i < n; i++) {
@@ -177,6 +188,13 @@
             break;
           }
           case 'counsel': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥3 → +2 / ≥1 → +1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              const own = shownOf(state, owner);
+              if (own >= 3) votes[owner] += 2;
+              else if (own >= 1) votes[owner] += 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyL = nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner;
@@ -190,6 +208,11 @@
           case 'wave': votes[owner] += 1; votes[highestEnemy(votes, owner, n, state.rng)] -= 1; break;
           // —— 左右博弈技能：相邻有本方牌才发动（想触发就得多牌连坐 / 用换位凑阵） ——
           case 'flank': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥2 → 最高敌 -1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 2) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyNear = (nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner)
@@ -206,6 +229,11 @@
             break;
           }
           case 'rally': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥2 → 本方 +1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 2) votes[owner] += 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyNear = (nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner)
@@ -229,6 +257,12 @@
             break;
           }
           case 'pivot': {
+            // 2 人局（评审 P0-4）：敌方已亮 ≥2 → +2；3-4 人局保持左右皆敌 +2
+            if (state.seatCount === 2) {
+              const foeSeat = 1 - owner;
+              if (shownOf(state, foeSeat) >= 2) votes[owner] += 2;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             if (nbL && nbR && !nbL.removed && !nbR.removed && nbL.seat !== owner && nbR.seat !== owner) votes[owner] += 2;

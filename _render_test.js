@@ -525,6 +525,10 @@ test('评审9.3：同种子同操作序列 → 双端 buy 阶段像素级一致'
 
   // —— 联机 ——
   const mp = await newPage();
+  await mp.page.addInitScript(() => {
+    // 跳过联机新手教程横幅（renderTutorialBanner 只联机端有、覆盖顶部中央，单机无 → 排除此设计差异）
+    try { localStorage.setItem('elec_tut_done', '1'); } catch (e) { /* 忽略 */ }
+  });
   await mp.page.goto(BASE + '/');
   await mp.page.waitForTimeout(1200);
   const mpState = await driveMpToBuy(mp.page);

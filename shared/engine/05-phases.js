@@ -24,8 +24,8 @@
         }
       }
     },
-    drawEvent: { label: 'drawEvent', needsInput: () => false, update: (state) => beginVoter(state) },
-    drawVoter: { label: 'drawVoter', needsInput: () => false, update: (state) => beginBuy(state) },
+    drawEvent: { label: 'drawEvent', hidden: true, needsInput: () => false, update: (state) => beginVoter(state) },
+    drawVoter: { label: 'drawVoter', hidden: true, needsInput: () => false, update: (state) => beginBuy(state) },
     buy: {
       label: 'buy',
       needsInput: (state, seat) => !state.seats[seat].buyDone,
@@ -55,6 +55,14 @@
       update: (state) => {
         // 逐张亮出：无待选目标时继续亮出下一张（恐怖分子按亮出顺序发动）
         if (!state.revealPending) revealNext(state);
+      }
+    },
+    crossEx: {
+      label: 'crossEx',
+      needsInput: (state, seat) => state.crossExTurn === seat,
+      update: (state) => {
+        // 亮牌后、事件前的质证回合：所有人过完 → 进入事件阶段
+        if (state.crossExTurn < 0 || crossExDone(state)) beginPreEvent(state);
       }
     },
     preEvent: {

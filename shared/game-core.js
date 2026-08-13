@@ -202,107 +202,59 @@
    * 站位系（edge 端点 / rowL / rowR / leftFoe / rightFoe / majority / minority）、
    * 经典系（fan / troll / orator / scandal / wave / idol / megaScandal / comeback / pivot …）。 */
   const VOTER_TEMPLATES = [
-    /* 基础牌（① 级数值/站位技能） */
+    /* ============ 卡池精简（评审 P0-5）：122 → 62 张 ============
+     * 换皮卡全清：tagBoost 原 30+ 张 → 3 张梯度（cost1/2/4）；
+     * tagHate 原 16 张 → 2 张梯度（cost2/3）；
+     * rowL/rowR/swap 重复卡各并 1 张（v106/v107/v108 删除）；
+     * 全部独特技能卡保留（位置/封神/纳什/克制包 = 真实组合关系）。
+     * 事件牌（EVENTS）独立保留。 */
+    /* 议题共鸣（tagBoost）梯度 */
     { id: 'v01', name: '学生证言',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v02', name: '老兵证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v05', name: '教友证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v36', name: '幕后金主供词',   cost: 4, votes: 2, skill: 'tagBoost', desc: '本方 +1 票' },
+    /* 舆论压制（tagHate）梯度 */
+    { id: 'v33', name: '伤残军人证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    { id: 'v28', name: '地产大亨供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    /* 站位/位置系 */
     { id: 'v03', name: '骑手证言',       cost: 1, votes: 1, skill: 'leftFoe', v: 1, desc: '若左邻为对方牌，该牌 -1 票' },
     { id: 'v04', name: '主妇证词',       cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '若本牌位于亮出行右半区，本方 +1 票' },
-    { id: 'v05', name: '教友证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v25', name: '乡村证人',       cost: 1, votes: 1, skill: 'rightFoe', v: 1, desc: '若右邻为对方牌，该牌 -1 票' },
+    { id: 'v27', name: '工会领袖证词',   cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '若本牌位于亮出行左半区，本方 +1 票' },
+    { id: 'v60', name: '保守派证词',     cost: 2, votes: 1, skill: 'majority', v: 1, desc: '若本方当前票数领先（含并列），本方 +1 票' },
     { id: 'v06', name: '失业工人证词',   cost: 2, votes: 1, skill: 'minority', v: 1, desc: '若本方当前票数落后对方，本方 +1 票' },
-    { id: 'v07', name: '码农证言',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v08', name: '教授证词',       cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v09', name: '创投人证言',     cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v10', name: '维权者证词',     cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    /* 多票基础（少数高票牌，附条件技能） */
     { id: 'v11', name: '沉默旁证',       cost: 3, votes: 2, skill: 'edge', v: 1, desc: '若本牌位于行首或行尾，本方 +1 票' },
+    /* 多票附条件 */
     { id: 'v12', name: '忠诚证人',       cost: 4, votes: 2, skill: 'shame', v: 2, desc: '若场上有丑闻牌，本方 +1 票' },
     { id: 'v13', name: '王牌证人',       cost: 4, votes: 2, skill: 'threat', v: 2, desc: '若对方有 ③ 级技能牌，票数最高的对方 -1 票' },
-    /* ① 级技能（亮出阶段：证据排除） */
+    /* 程序系（亮出/换位） */
     { id: 'v14', name: '关键反证',       cost: 3, votes: 1, skill: 'terrorist' },
-    /* ① 级技能（审议时） */
-    { id: 'v15', name: '狂热支持者',     cost: 2, votes: 1, skill: 'fan' },
-    { id: 'v16', name: '匿名抹黑者',     cost: 2, votes: 1, skill: 'troll' },
-    /* ② 级技能（审议时） */
-    { id: 'v17', name: '雄辩家',         cost: 3, votes: 1, skill: 'orator' },
-    { id: 'v18', name: '揭短材料',       cost: 3, votes: 1, skill: 'scandal', scandal: 1 },
-    { id: 'v19', name: '舆情报告',       cost: 4, votes: 1, skill: 'wave' },
-    /* ③ 级技能（审议时） */
-    { id: 'v20', name: '明星证人',       cost: 4, votes: 1, skill: 'idol' },
-    { id: 'v21', name: '重磅黑料',       cost: 4, votes: 1, skill: 'megaScandal', scandal: 1 },
-    { id: 'v22', name: '翻盘证词',       cost: 4, votes: 1, skill: 'comeback' },
-    /* 结算后技能 */
-    { id: 'v23', name: '献金记录',       cost: 3, votes: 1, skill: 'donor' },
-    { id: 'v24', name: '买票记录',       cost: 4, votes: 1, skill: 'buyback', scandal: 1 },
-    /* ============ 数据驱动扩充包（v25+，从美式社会人群/职业列表提取） ============ */
-    { id: 'v25', name: '乡村证人',       cost: 1, votes: 1, skill: 'rightFoe', v: 1, desc: '若右邻为对方牌，该牌 -1 票' },
-    { id: 'v26', name: '牧师证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v27', name: '工会领袖证词',   cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '若本牌位于亮出行左半区，本方 +1 票' },
-    { id: 'v28', name: '地产大亨供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v29', name: '主妇旁证',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v30', name: '移民证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v31', name: '执事证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v32', name: '学贷证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v33', name: '伤残军人证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v34', name: '店主证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v35', name: '枪协会员证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v36', name: '幕后金主供词',   cost: 4, votes: 2, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v37', name: '教师代表证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v38', name: '石油寡头供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v39', name: '游说者供词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v40', name: '管道工证词',     cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v41', name: '街头活动家证词', cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v42', name: '租户证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v43', name: '农场主证词',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v44', name: '卡车司机证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v45', name: '巡边员证词',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v46', name: '诊所义工证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v47', name: '单亲妈妈证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v48', name: '电台主持证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v49', name: '阴谋论者证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v50', name: '电视布道家证词', cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v51', name: '教师证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v52', name: '家教家长证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v53', name: '反疫苗者证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v54', name: '跨性别者证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v55', name: '权益律师证词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v56', name: '检察官证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v57', name: '强硬警长证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v58', name: '质疑证人',       cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v59', name: '民粹商家证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v60', name: '保守派证词',     cost: 2, votes: 1, skill: 'majority', v: 1, desc: '若本方当前票数领先（含并列），本方 +1 票' },
-    { id: 'v61', name: '社运者证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v62', name: '自由派证人',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v63', name: '民粹元老证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v64', name: '环保青年证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    /* ============ 左右博弈扩充包（v65+，换位/相邻技能） ============ */
     { id: 'v65', name: '掮客证词',       cost: 3, votes: 1, skill: 'swap' },
     { id: 'v66', name: '街头鼓动家证词', cost: 2, votes: 1, skill: 'shiftLeft' },
     { id: 'v67', name: '华尔街证人',     cost: 2, votes: 1, skill: 'shiftRight' },
+    /* 数值系 */
+    { id: 'v15', name: '狂热支持者',     cost: 2, votes: 1, skill: 'fan' },
+    { id: 'v16', name: '匿名抹黑者',     cost: 2, votes: 1, skill: 'troll' },
+    { id: 'v17', name: '雄辩家',         cost: 3, votes: 1, skill: 'orator' },
+    { id: 'v18', name: '揭短材料',       cost: 3, votes: 1, skill: 'scandal', scandal: 1 },
+    { id: 'v19', name: '舆情报告',       cost: 4, votes: 1, skill: 'wave' },
+    { id: 'v20', name: '明星证人',       cost: 4, votes: 1, skill: 'idol' },
+    { id: 'v21', name: '重磅黑料',       cost: 4, votes: 1, skill: 'megaScandal', scandal: 1 },
+    { id: 'v22', name: '翻盘证词',       cost: 4, votes: 1, skill: 'comeback' },
+    { id: 'v70', name: '摇摆证人',       cost: 4, votes: 1, skill: 'pivot' },
+    /* 左右博弈 */
     { id: 'v68', name: '社区证人',       cost: 3, votes: 1, skill: 'rally' },
     { id: 'v69', name: '顽固证人',       cost: 3, votes: 1, skill: 'flank' },
-    { id: 'v70', name: '摇摆证人',       cost: 4, votes: 1, skill: 'pivot' },
-    /* ============ 左右互动新技能（v89+：攻守同盟 / 当庭挖票） ============ */
     { id: 'v89', name: '并肩证人',       cost: 3, votes: 1, skill: 'counsel', desc: '左右都本方+2票；否则相邻本方+1票' },
     { id: 'v90', name: '反水线人',       cost: 3, votes: 1, skill: 'poach' },
-    /* ============ 社会百态扩充包（v71+，更多美式人群/职业） ============ */
-    { id: 'v71', name: '流浪者倡导证词', cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v72', name: '交易员证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v73', name: '医护证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v74', name: '主播证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v75', name: '书店老板证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v76', name: '咖啡店员证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v77', name: '房产经纪证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v78', name: '军商证词',       cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v79', name: '乡村歌手证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v80', name: '素食者证词',     cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v81', name: '健身教练证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v82', name: '数据科学家证词', cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v83', name: '快递站长证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v84', name: '橄榄球教练证词', cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v85', name: '币圈矿工证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v86', name: '诊所护士证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v87', name: '古董商证词',     cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v88', name: '算法工程师证词', cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
+    /* 结算后技能（经济/名誉） */
+    { id: 'v23', name: '献金记录',       cost: 3, votes: 1, skill: 'donor' },
+    { id: 'v24', name: '买票记录',       cost: 4, votes: 1, skill: 'buyback', scandal: 1 },
+    { id: 'v98', name: '吹哨人档案',     cost: 3, votes: 1, skill: 'whistleblower', desc: '结算后：丑闻最高的对方 -1⊙ 且丑闻 +1' },
+    { id: 'v116', name: '法援申请书',    cost: 2, votes: 1, skill: 'grant', desc: '结算后：本方金钱最少时，+1⊙' },
+    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' },
+    /* ============ 卡池精简：原数据驱动扩充包（v25-v64 换皮卡）保留卡已并入上表 ============ */
+    /* ============ 卡池精简：左右博弈/社会百态包（v65-v90 换皮）保留卡已并入上表 ============ */
     /* ============ 封神技扩充包（v91+，真实传奇律师招牌战术） ============ */
     { id: 'v91', name: '质证记录',       cost: 3, votes: 1, skill: 'crossExam', desc: '相邻敌方证人 -1 票；若其带丑闻，额外 -1 票' },
     { id: 'v92', name: '反对理由书',     cost: 2, votes: 1, skill: 'objection', desc: '对方亮出 ②/③ 级技能牌时，票数最高的对方 -1 票' },
@@ -311,7 +263,6 @@
     { id: 'v95', name: '原则陈词',       cost: 4, votes: 1, skill: 'flipNarrative', desc: '本方落后 ≥2 票时，本方 +2 票' },
     { id: 'v96', name: '世纪豪赌',       cost: 4, votes: 1, skill: 'careerGamble', desc: '本方 +2 票；若本方未领先，则本方丑闻 +1' },
     { id: 'v97', name: '伪证前科档案',   cost: 4, votes: 1, skill: 'credCollapse', desc: '对方有丑闻牌时，票数最高的对方 -1 票' },
-    { id: 'v98', name: '吹哨人档案',     cost: 3, votes: 1, skill: 'whistleblower', desc: '结算后：丑闻最高的对方 -1⊙ 且丑闻 +1' },
     { id: 'v99', name: '先例判词',       cost: 4, votes: 1, skill: 'precedent', desc: '本方 +1 票，并记录"先例"标记（终局先例胜利）' },
     { id: 'v100', name: '人民之诉',      cost: 4, votes: 1, skill: 'juryNull', desc: '本方 +1 票并获得 1 名陪审员支持（集满 3 名立即胜诉）' },
     /* 位置博弈系（v101+）：首座/末席/左翼壁垒/抽签质证 */
@@ -319,11 +270,6 @@
     { id: 'v102', name: '末席证词',      cost: 2, votes: 1, skill: 'lastSeat', v: 1, desc: '若行尾（最右）是对方牌，该牌 -1 票' },
     { id: 'v103', name: '左翼方阵',      cost: 3, votes: 1, skill: 'leftWall', v: 1, desc: '本方所有位于行左半区的牌各 +1 票' },
     { id: 'v104', name: '抽签质证',      cost: 2, votes: 1, skill: 'randomHit', v: 1, desc: '随机 1 张对方牌 -1 票' },
-    /* ============ 左右/换位博弈扩充包（v105+：连横合纵/左右旗手/对调策划） ============ */
-    { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
-    { id: 'v106', name: '左席旗手',      cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '位于亮出行左半区时，本方 +1 票' },
-    { id: 'v107', name: '右席旗手',      cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '位于亮出行右半区时，本方 +1 票' },
-    { id: 'v108', name: '对调策划',      cost: 4, votes: 1, skill: 'swap', v: 1, desc: '与场上任意一张其他牌互换位置' },
     /* ============ 纳什均衡扩充包（v109+：互锁技能） ============ */
     { id: 'v109', name: '审计员证词',    cost: 2, votes: 1, skill: 'audit', desc: '对方金钱 ≥5⊙ 时，票数最高的对方 -1 票' },
     { id: 'v110', name: '游说账单',      cost: 3, votes: 1, skill: 'lobby', desc: '本方金钱 ≥5⊙ 时，本方 +1 票' },
@@ -332,15 +278,14 @@
     { id: 'v113', name: '造势集会报告',  cost: 3, votes: 1, skill: 'surge', desc: '本方已亮 ≥3 张时，本方 +1 票' },
     { id: 'v114', name: '否决动议书',    cost: 4, votes: 1, skill: 'veto', desc: '对方本轮打出过事件牌时，票数最高的对方 -2 票' },
     { id: 'v115', name: '连胜战报',      cost: 4, votes: 1, skill: 'momentum', desc: '本方此前赢得过轮次时，本方 +1 票' },
-    { id: 'v116', name: '法援申请书',    cost: 2, votes: 1, skill: 'grant', desc: '结算后：本方金钱最少时，+1⊙' },
-    /* ============ 庭审克制包（v117+：偏见揭露/最后一搏/证据链/禁言令/民意分裂/清廉档案） ============ */
+    /* ============ 庭审克制包（v117+：偏见揭露/最后一搏/证据链/禁言令/民意分裂） ============ */
     { id: 'v117', name: '揭底档案',      cost: 4, votes: 1, skill: 'bias', desc: '对方已亮 ≥4 张时，对方所有已亮牌各 -1 票' },
     { id: 'v118', name: '绝境陈词',      cost: 4, votes: 1, skill: 'hailMary', desc: '本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票' },
     { id: 'v119', name: '链条卷宗',      cost: 4, votes: 1, skill: 'fullChain', desc: '本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票' },
     { id: 'v120', name: '禁言动议',      cost: 4, votes: 1, skill: 'gagOrder', desc: '对方本轮打过 ≥3 张时，票数最高的对方 -2 票' },
-    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' },
-    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' }
+    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' }
   ];
+  /* 卡池精简（评审 P0-5）：v121/v122 已并入 engine/01-data.js 的 VOTER_TEMPLATES */
 
   /* AI 人格（从美式法律/政治文化提取）：
    * aggression 0~1：进攻性（影响攻击事件偏好/出牌数量）
@@ -402,10 +347,8 @@
     return { arch: 'emotion', label: '结案陈词', tip: '情感型证据 +1 票' };
   }
   /* 每轮结束发放的 ⊙（卡牌降价后同步加钱，保证买得起更多牌）
-   * 阶段 C 改造：收入随轮次递增——第 1~3 轮 2⊙（前期克制），第 4 轮起 3⊙（后期资金加速，弱势方有翻盘机会） */
-  function incomeOf(round) { return round >= 4 ? 3 : 2; }
-  /* 支持度奖励 */
-  function rewardOf(round) { return round <= 3 ? 2 : (round === 4 ? 3 : 4); }
+   * 评审 P0-2 赢家通吃：固定律师费——第 1-3 轮 2⊙、第 4 轮 3⊙、第 5 轮 4⊙（无榜首税/末位保底） */
+  function incomeOf(round) { return round <= 3 ? 2 : (round === 4 ? 3 : 4); }
   /* 市场槽位数（初始 4，组织能手 +1） */
   function marketSize(s) { return 4 + ((s.char && s.char.skill.type === 'drawPlus') ? s.char.skill.v : 0); }
   /* 购买价（全局 -1 降价；铁腕大状再 -1）
@@ -542,6 +485,7 @@
       revealIndex: 0,          // 逐张亮出进度（当前亮出到 row 第几张）
       revealPending: null,     // {seat, cardUid} 等待恐怖分子选目标
       swapPending: null,       // {owner, cardUid, candidates} 等待选换位目标（政治操盘）
+      crossExTurn: -1,         // 质证阶段当前轮到（亮牌后、事件前）
       eventTurnSeat: -1,       // 事件阶段当前轮到
       eventTargetPending: null,// {seat, eventUid} 等待选事件目标
       discardSeat: -1,         // 整理阶段当前轮到
@@ -561,6 +505,8 @@
     state.votes = new Array(seatCount).fill(0);
     state.voteMod = new Array(seatCount).fill(0);
     state.supportBuff = new Array(seatCount).fill(0);
+    state.crossExUsed = new Array(seatCount).fill(0);
+    state.crossExPassed = new Array(seatCount).fill(false);
     return state;
   }
 
@@ -609,8 +555,8 @@
         }
       }
     },
-    drawEvent: { label: 'drawEvent', needsInput: () => false, update: (state) => beginVoter(state) },
-    drawVoter: { label: 'drawVoter', needsInput: () => false, update: (state) => beginBuy(state) },
+    drawEvent: { label: 'drawEvent', hidden: true, needsInput: () => false, update: (state) => beginVoter(state) },
+    drawVoter: { label: 'drawVoter', hidden: true, needsInput: () => false, update: (state) => beginBuy(state) },
     buy: {
       label: 'buy',
       needsInput: (state, seat) => !state.seats[seat].buyDone,
@@ -640,6 +586,14 @@
       update: (state) => {
         // 逐张亮出：无待选目标时继续亮出下一张（恐怖分子按亮出顺序发动）
         if (!state.revealPending) revealNext(state);
+      }
+    },
+    crossEx: {
+      label: 'crossEx',
+      needsInput: (state, seat) => state.crossExTurn === seat,
+      update: (state) => {
+        // 亮牌后、事件前的质证回合：所有人过完 → 进入事件阶段
+        if (state.crossExTurn < 0 || crossExDone(state)) beginPreEvent(state);
       }
     },
     preEvent: {
@@ -875,7 +829,7 @@
     while (state.revealIndex < state.row.length && state.row[state.revealIndex].removed) state.revealIndex++;
     if (state.revealIndex >= state.row.length) {
       if (!state.row.length) state.logs.push('无人举证，直接进入事件阶段');
-      beginPreEvent(state);
+      beginCrossEx(state);
       return;
     }
     const r = state.row[state.revealIndex];
@@ -906,6 +860,97 @@
     state.revealPending = null;
     state.revealIndex++; // 跳过恐怖分子这张，由 advance('reveal') 继续亮下一张
     return { ok: true };
+  }
+
+  /* ---------------- 质证阶段（评审 P0-2：亮牌后、事件前，花 ⊙ 翻看手牌 / 压制已亮牌） ---------------- */
+  /* 每轮每人最多 3 次质证，每次 1⊙；座位序轮询「质证 or 过」，全部过完 → 进入事件/计票 */
+  function beginCrossEx(state) {
+    state.phase = 'crossEx';
+    state.crossExTurn = state.startingSeat;
+    state.crossExUsed = new Array(state.seatCount).fill(0);
+    state.crossExPassed = new Array(state.seatCount).fill(false);
+    state.turn = state.crossExTurn;
+    state.logs.push('质证阶段开始：' + state.seats[state.crossExTurn].name + ' 是否质证？（每次 1⊙，每轮最多 3 次，翻看/压制）');
+  }
+  function crossExCanAct(state, s) {
+    if (state.phase !== 'crossEx') return { ok: false, msg: '当前不是质证阶段' };
+    if (state.crossExTurn !== s.seat) return { ok: false, msg: '还没轮到你' };
+    if (state.crossExPassed[s.seat]) return { ok: false, msg: '你已放弃质证' };
+    if ((state.crossExUsed[s.seat] || 0) >= 3) return { ok: false, msg: '本轮质证次数已用完' };
+    if (s.money < 1) return { ok: false, msg: '⊙ 不足（质证需 1⊙）' };
+    return { ok: true };
+  }
+  /* 质证动作 A：花 1⊙ 翻看对手 1 张手牌（信息获取，牌仍留在对手手牌、不计入本轮票数）
+   * targetSeat 可省：省略时自动翻看全场最贵的一张未翻看对手手牌 */
+  function crossExView(state, s, targetSeat) {
+    const chk = crossExCanAct(state, s);
+    if (!chk.ok) return chk;
+    let foe, t;
+    if (targetSeat != null) {
+      if (targetSeat === s.seat) return { ok: false, msg: '只能翻看对手手牌' };
+      foe = state.seats[targetSeat];
+      if (!foe) return { ok: false, msg: '对手不存在' };
+      t = (foe.hand || []).filter(c => !c._viewed).sort((a, b) => b.cost - a.cost)[0];
+    } else {
+      const cands = state.seats.flatMap((x, j) => j === s.seat ? [] : (x.hand || []).map(c => ({ c, owner: x })))
+        .filter(o => !o.c._viewed)
+        .sort((a, b) => b.c.cost - a.c.cost);
+      if (!cands.length) return { ok: false, msg: '对手没有可翻看的手牌' };
+      t = cands[0].c; foe = cands[0].owner;
+    }
+    if (!t) return { ok: false, msg: '目标手牌不存在或已翻看' };
+    if (t._viewed) return { ok: false, msg: '该手牌已被翻看过' };
+    t._viewed = true;
+    s.money -= 1;
+    state.crossExUsed[s.seat] = (state.crossExUsed[s.seat] || 0) + 1;
+    state.logs.push(s.name + ' 花 1⊙ 翻看了【' + foe.name + '】的手牌【' + t.name + '】（信息公开，仍留在其手牌）');
+    return { ok: true, msg: '翻看成功' };
+  }
+  /* 质证动作 B：花 1⊙ 压制对手 1 张已亮牌，令其 -1 票（同一张牌最多被压 2 次） */
+  function crossExPress(state, s, targetUid) {
+    const chk = crossExCanAct(state, s);
+    if (!chk.ok) return chk;
+    const t = state.row.find(r => r.card.uid === targetUid);
+    if (!t || t.removed) return { ok: false, msg: '目标不存在' };
+    if (t.seat === s.seat) return { ok: false, msg: '只能质证对方的证据' };
+    if (!t.revealed) return { ok: false, msg: '该牌未亮出' };
+    if ((t._press || 0) >= 2) return { ok: false, msg: '该牌已被压制 2 次，不能再压' };
+    t._press = (t._press || 0) + 1;
+    s.money -= 1;
+    state.crossExUsed[s.seat] = (state.crossExUsed[s.seat] || 0) + 1;
+    state.logs.push(s.name + ' 花 1⊙ 压制了【' + state.seats[t.seat].name + '】的【' + t.card.name + '】（-1 票，已压 ' + t._press + '/2 次）');
+    return { ok: true, msg: '压制成功' };
+  }
+  /* 质证：放弃（本轮不再质证） */
+  function crossExPass(state, s) {
+    if (state.phase !== 'crossEx') return { ok: false, msg: '当前不是质证阶段' };
+    if (state.crossExTurn !== s.seat) return { ok: false, msg: '还没轮到你' };
+    state.crossExPassed[s.seat] = true;
+    state.logs.push(s.name + ' 放弃质证');
+    return { ok: true };
+  }
+  /* 质证阶段结束条件：所有座位都已过 或 次数用完 */
+  function crossExDone(state) {
+    return state.seats.every((x, i) => state.crossExPassed[i] || (state.crossExUsed[i] || 0) >= 3);
+  }
+  /* 轮转到下一个还能质证的座位（未过且次数未用完） */
+  function crossExNext(state) {
+    const n = state.seatCount;
+    for (let k = 1; k <= n; k++) {
+      const seat = (state.crossExTurn + k) % n;
+      if (!state.crossExPassed[seat] && (state.crossExUsed[seat] || 0) < 3) return seat;
+    }
+    return -1;
+  }
+  /* 质证动作后轮转（若无人可动则交还 update 收尾） */
+  function crossExAdvance(state) {
+    const next = crossExNext(state);
+    if (next >= 0) {
+      state.crossExTurn = next; state.turn = next;
+      state.logs.push('轮到 ' + state.seats[next].name + ' 质证');
+    } else {
+      state.crossExTurn = -1;
+    }
   }
 
   /* ---------------- 环形桌邻位（行首尾相邻：第 0 张的左边 = 最后一张） ---------------- */
@@ -1094,6 +1139,10 @@
     return { ok: true };
   }
 
+  /* —— 2 人局铺场条件（评审 P0-4）：位置技能退化为座位无关的「已亮牌数」条件 —— */
+  function shownOf(state, seat) {
+    return state.row.filter(x => !x.removed && !x._nullified && x.seat === seat).length;
+  }
   /* ---------------- 计票中（换位 → 丑闻惩罚 → 技能 ①→②→③） ---------------- */
   function doCount(state) {
     state.phase = 'count';
@@ -1113,6 +1162,13 @@
       base = Math.max(0, base);
       votes[r.seat] += base;
       ledger.push({ kind: 'base', seat: r.seat, delta: base, cardUid: r.card.uid, desc: '【' + r.card.name + '】基础票' });
+    });
+    // 1b. 质证压制扣票（评审 P0-2：每被压 1 次 -1 票，同一张牌最多压 2 次）
+    state.row.forEach(r => {
+      if (r.removed || r._nullified || !(r._press > 0)) return;
+      const press = r._press;
+      votes[r.seat] -= press;
+      ledger.push({ kind: 'crossExPress', seat: r.seat, delta: -press, cardUid: r.card.uid, desc: '【' + r.card.name + '】被质证压制 -' + press + ' 票' });
     });
     // 2. 计票前事件修正
     for (let i = 0; i < n; i++) {
@@ -1174,6 +1230,13 @@
             break;
           }
           case 'counsel': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥3 → +2 / ≥1 → +1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              const own = shownOf(state, owner);
+              if (own >= 3) votes[owner] += 2;
+              else if (own >= 1) votes[owner] += 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyL = nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner;
@@ -1187,6 +1250,11 @@
           case 'wave': votes[owner] += 1; votes[highestEnemy(votes, owner, n, state.rng)] -= 1; break;
           // —— 左右博弈技能：相邻有本方牌才发动（想触发就得多牌连坐 / 用换位凑阵） ——
           case 'flank': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥2 → 最高敌 -1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 2) votes[highestEnemy(votes, owner, n, state.rng)] -= 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyNear = (nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner)
@@ -1203,6 +1271,11 @@
             break;
           }
           case 'rally': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥2 → 本方 +1；3-4 人局保持相邻联动
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 2) votes[owner] += 1;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             const allyNear = (nbL && !nbL.removed && !nbL._nullified && nbL.seat === owner)
@@ -1226,6 +1299,12 @@
             break;
           }
           case 'pivot': {
+            // 2 人局（评审 P0-4）：敌方已亮 ≥2 → +2；3-4 人局保持左右皆敌 +2
+            if (state.seatCount === 2) {
+              const foeSeat = 1 - owner;
+              if (shownOf(state, foeSeat) >= 2) votes[owner] += 2;
+              break;
+            }
             const nbL = rowNeighbor(state, idx, -1);
             const nbR = rowNeighbor(state, idx, 1);
             if (nbL && nbR && !nbL.removed && !nbR.removed && nbL.seat !== owner && nbR.seat !== owner) votes[owner] += 2;
@@ -1315,6 +1394,11 @@
             break;
           }
           case 'leftWall': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥3 → 本方 +1；3-4 人局保持左半区站位
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 3) votes[owner] += 1;
+              break;
+            }
             // 左翼壁垒：本方所有位于行左半区的牌各 +1（站位团）
             const act = state.row.filter(x => !x.removed && !x._nullified);
             act.forEach((x, i) => {
@@ -1530,17 +1614,16 @@
   function doSettle(state) {
     state.phase = 'settle';
     const first = state.roundRank[0];
-    const reward = rewardOf(state.round);
-    // 差额计分（防滚雪球）：第一名 +reward，之后每名 -1（最低 +1）→ 落后方不白卷
+    // 赢家通吃（评审 P0-2）：第一名 +4，其余 +1（无论几人局、无论票差）→ 争冠激励
     state.rankInfo.forEach((info, idx) => {
       const s = state.seats[info.seat];
-      let r = Math.max(1, reward - idx);
+      let r = idx === 0 ? 4 : 1;
       if (idx === 0 && state.supportBuff[first]) r += state.supportBuff[first];
       s.support += r;
       if (idx === 0) s.stats.roundsWon++;
       state.logs.push('【' + s.name + '】排名第 ' + (idx + 1) + '，陪审团倾向 +' + r + '（累计 ' + s.support + '）');
     });
-    state.supportReward = reward + (state.supportBuff[first] || 0);
+    state.supportReward = 4 + (state.supportBuff[first] || 0);
     // 连任计数（恐惧税：连续 2 轮第一，下轮刷新成本 +1）
     if (state.prevFirst === first) state.leaderStreak = (state.leaderStreak || 0) + 1;
     else state.leaderStreak = 1;
@@ -1649,24 +1732,18 @@
     const prevRank = state.rankInfo;
     const hasPrev = prevRank && prevRank.length > 0;
     const first = hasPrev ? prevRank[0].seat : -1;
-    const last = hasPrev ? prevRank[prevRank.length - 1].seat : -1;
-    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1
-    const base = incomeOf(state.round);                        // 固定 2
+    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1（不影响收入）
+    // 固定律师费（评审 P0-2）：删掉榜首 -1 / 末位 +1 / 保底，每轮 incomeOf(round)
+    const base = incomeOf(state.round);
     state.seats.forEach((s, i) => {
       const pbonus = (s.personality && s.personality.bonus && s.personality.bonus.money) || 0;
       let amt = base + pbonus;
       if (!hasPrev) amt += 2;       // 第 1 轮无排名：全体 +4 启动资金
-      else {
-        if (i === first) amt -= 1;  // 领先税：榜首 -1⊙（政治资本消耗）
-        if (i === last) amt += 1;   // 保底酬金：末位 +1⊙（胜诉基金）
-      }
-      // 收入保底：每轮至少 +1⊙（榜首 -1 时也不会白板回合）
-      const pay = Math.max(1, amt);
-      s.money += pay;
-      state.logs.push('【' + s.name + '】发放律师费 +' + pay + '⊙（累计 ' + s.money + '⊙）');
+      s.money += amt;
+      state.logs.push('【' + s.name + '】发放律师费 +' + amt + '⊙（累计 ' + s.money + '⊙）');
     });
     state.logs.push(hasPrev
-      ? '第 ' + state.round + ' 轮结束，发放律师费（榜首 -1⊙ / 末位 +1⊙）' + (tax ? '，连任榜首更换证物架成本 +1' : '')
+      ? '第 ' + state.round + ' 轮结束，发放固定律师费'
       : '第 ' + state.round + ' 轮结束，发放启动酬金 +4⊙');
     // 轮末：市场未买牌洗回，锁定牌留作下轮
     state.seats.forEach((s, i) => {
@@ -1787,6 +1864,21 @@
         res = resolveSwap(state, action.targetUid);
         break;
       }
+      case 'crossExView': {
+        res = crossExView(state, s, action.targetSeat);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
+      case 'crossExPress': {
+        res = crossExPress(state, s, action.targetUid);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
+      case 'crossExPass': {
+        res = crossExPass(state, s);
+        if (res.ok) crossExAdvance(state);
+        break;
+      }
       case 'playEvent': {
         res = playEvent(state, s, action.uid, action.targetSeat);
         break;
@@ -1866,6 +1958,10 @@
             state.revealPending = null;
           }
         }
+        break;
+      }
+      case 'crossEx': {
+        if (state.crossExTurn === seat) aiCrossEx(state, s);
         break;
       }
       case 'count': {
@@ -2018,6 +2114,37 @@
     if (state.eventTurnSeat === s.seat) passEvent(state, s);
   }
 
+  /* AI 质证：落后时压制对手最重的已亮牌，富余时翻看对手手牌，否则放弃 */
+  function aiCrossEx(state, s) {
+    if ((state.crossExUsed[s.seat] || 0) >= 3 || s.money < 1) {
+      crossExPass(state, s);
+      crossExAdvance(state);
+      return;
+    }
+    // 预估本轮己方 vs 对手证据强度
+    const myPower = state.row.filter(r => r.seat === s.seat && !r.removed)
+      .reduce((a, r) => a + (r.card.votes || r.card.v || 0), 0);
+    let foePower = 0;
+    state.seats.forEach((x, i) => {
+      if (i === s.seat) return;
+      foePower = Math.max(foePower, state.row.filter(r => r.seat === i && !r.removed)
+        .reduce((a, r) => a + (r.card.votes || r.card.v || 0), 0));
+    });
+    const pressable = state.row.filter(r => r.seat !== s.seat && r.revealed && !r.removed && (r._press || 0) < 2)
+      .sort((a, b) => (b.card.votes || b.card.v || 0) - (a.card.votes || a.card.v || 0));
+    const hasUnviewed = state.seats.some((x, i) => i !== s.seat && (x.hand || []).some(c => !c._viewed));
+    if (foePower > myPower && pressable.length) {
+      // 落后：压制对手最重证据
+      crossExPress(state, s, pressable[0].card.uid);
+    } else if (hasUnviewed && s.money >= 3) {
+      // 富余：翻看对手最贵手牌（信息获取）
+      crossExView(state, s);
+    } else {
+      crossExPass(state, s);
+    }
+    crossExAdvance(state);
+  }
+
   /* ---------------- 服务端/渲染器辅助 ---------------- */
   /* 每个阶段"谁需要输入"统一由 PHASES 表（engine/04-advance.js）判定，
    * 本文件只按 AI/人类筛选座位，杜绝双份 switch（评审四/五：单一来源）。 */
@@ -2052,6 +2179,7 @@
     ['buy', '取证'],
     ['play', '举证'],
     ['reveal', '亮出'],
+    ['crossEx', '质证'],
     ['preEvent', '前庭审'],
     ['count', '审议'],
     ['postEvent', '后庭审'],
@@ -2061,20 +2189,38 @@
     ['income', '酬金'],
     ['gameover', '终局']
   ];
-  /* 进度条显示用：过滤瞬时自动阶段（无玩家操作），与历史 10 步展示一致 */
-  const PHASE_STEPS_VISIBLE = PHASE_STEPS.filter(s => !['pickChar', 'drawEvent', 'drawVoter', 'settle', 'income'].includes(s[0]));
+  /* 庭审回合 = 亮牌+质证+事件+计票+排名+结算 的连续审议（评审 P0：流程 16→8 合并展示）。
+   * 前端把这段渲染成同一屏的连续交互，玩家视角是一次连贯审议。 */
+  const TRIAL_PHASES = ['reveal', 'crossEx', 'preEvent', 'count', 'postEvent', 'rank', 'settle'];
+  /* 进度条显示用：8 个对玩家可见的回合节拍（评审 P0：流程 16→8）。
+   * 选角 → 开局 → 购买回合 → 举证回合 → 庭审回合 → 整理 → 收入 → 终局
+   * drawEvent/drawVoter 为 hidden（抽牌瞬时阶段，PHASES 表已标 hidden，不显示、不播放动画，逻辑照走）。 */
+  const PHASE_STEPS_VISIBLE = [
+    ['pickChar', '选角'],
+    ['chooseStarter', '开局'],
+    ['buy', '购买回合'],
+    ['play', '举证回合'],
+    ['trial', '庭审回合'],
+    ['discard', '整理'],
+    ['income', '收入'],
+    ['gameover', '终局']
+  ];
+  /* 子阶段 → 可见宏阶段（阶段条/标题用；'trial' 为庭审回合合并展示的虚拟宏阶段） */
+  function phaseGroupOf(phase) {
+    return (phase && TRIAL_PHASES.indexOf(phase) >= 0) ? 'trial' : phase;
+  }
   function phaseLabel(state) {
     const map = {
       pickChar: '抽取角色', chooseStarter: '决定起始玩家', drawEvent: '抽取事件牌', drawVoter: '抽取证据',
-      buy: '调查取证', play: '暗置举证', reveal: '亮出证据', preEvent: '庭审前·事件', count: '审议中',
-      postEvent: '庭审后·事件', rank: '本轮排名', settle: '本轮结算', discard: '整理', income: '发放酬金', gameover: '游戏结束'
+      buy: '调查取证', play: '暗置举证', reveal: '庭审回合', crossEx: '庭审回合', preEvent: '庭审回合', count: '庭审回合',
+      postEvent: '庭审回合', rank: '庭审回合', settle: '庭审回合', discard: '整理', income: '发放酬金', gameover: '游戏结束'
     };
     return map[state.phase] || state.phase;
   }
   /* 可点击卡牌（供渲染器高亮） */
   function myClickable(state, seat) {
     const s = state.seats[seat];
-    const out = { market: [], hand: [], events: [], targets: [], chars: [] };
+    const out = { market: [], hand: [], events: [], targets: [], chars: [], crossView: [], crossPress: [] };
     if (!s) return out;
     switch (state.phase) {
       case 'pickChar':
@@ -2089,6 +2235,13 @@
       case 'reveal':
         if (state.revealPending && state.revealPending.owner === seat) {
           out.targets = state.row.filter(r => r.revealed && r.seat !== seat && !r.removed).map(r => r.card.uid);
+        }
+        break;
+      case 'crossEx':
+        if (state.crossExTurn === seat && !state.crossExPassed[seat] && (state.crossExUsed[seat] || 0) < 3 && s.money >= 1) {
+          // 翻看目标：对手未翻看的手牌；压制目标：对手已亮且未满 2 压的牌
+          out.crossView = state.seats.flatMap((x, i) => i !== seat ? x.hand.filter(c => !c._viewed).map(c => c.uid) : []);
+          out.crossPress = state.row.filter(r => r.seat !== seat && r.revealed && !r.removed && (r._press || 0) < 2).map(r => r.card.uid);
         }
         break;
       case 'count':
@@ -2109,10 +2262,10 @@
 
   return {
     createGame, apply, aiAct, advance,
-    needsAIAction, humanActing, phaseLabel, myClickable,
-    PHASE_STEPS, PHASE_STEPS_VISIBLE,
+    needsAIAction, humanActing, phaseLabel, phaseGroupOf, myClickable,
+    PHASE_STEPS, PHASE_STEPS_VISIBLE, TRIAL_PHASES,
     PHASES,   // 状态描述表（评审四：每个阶段自包含 label/needsInput/update）
-    buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
+    buyCostOf, refreshCostOf, eventLvMax, incomeOf, marketSize,
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES, ARCH, phaseArchOf },
     mulberry32,
     restoreRng,   // 评审 P0-BUG：快照恢复后重建可序列化随机源（rngSeed/rngCalls 支撑）

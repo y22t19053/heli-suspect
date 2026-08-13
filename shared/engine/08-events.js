@@ -12,7 +12,7 @@
     while (state.revealIndex < state.row.length && state.row[state.revealIndex].removed) state.revealIndex++;
     if (state.revealIndex >= state.row.length) {
       if (!state.row.length) state.logs.push('无人举证，直接进入事件阶段');
-      beginPreEvent(state);
+      beginCrossEx(state);
       return;
     }
     const r = state.row[state.revealIndex];
@@ -43,6 +43,97 @@
     state.revealPending = null;
     state.revealIndex++; // 跳过恐怖分子这张，由 advance('reveal') 继续亮下一张
     return { ok: true };
+  }
+
+  /* ---------------- 质证阶段（评审 P0-2：亮牌后、事件前，花 ⊙ 翻看手牌 / 压制已亮牌） ---------------- */
+  /* 每轮每人最多 3 次质证，每次 1⊙；座位序轮询「质证 or 过」，全部过完 → 进入事件/计票 */
+  function beginCrossEx(state) {
+    state.phase = 'crossEx';
+    state.crossExTurn = state.startingSeat;
+    state.crossExUsed = new Array(state.seatCount).fill(0);
+    state.crossExPassed = new Array(state.seatCount).fill(false);
+    state.turn = state.crossExTurn;
+    state.logs.push('质证阶段开始：' + state.seats[state.crossExTurn].name + ' 是否质证？（每次 1⊙，每轮最多 3 次，翻看/压制）');
+  }
+  function crossExCanAct(state, s) {
+    if (state.phase !== 'crossEx') return { ok: false, msg: '当前不是质证阶段' };
+    if (state.crossExTurn !== s.seat) return { ok: false, msg: '还没轮到你' };
+    if (state.crossExPassed[s.seat]) return { ok: false, msg: '你已放弃质证' };
+    if ((state.crossExUsed[s.seat] || 0) >= 3) return { ok: false, msg: '本轮质证次数已用完' };
+    if (s.money < 1) return { ok: false, msg: '⊙ 不足（质证需 1⊙）' };
+    return { ok: true };
+  }
+  /* 质证动作 A：花 1⊙ 翻看对手 1 张手牌（信息获取，牌仍留在对手手牌、不计入本轮票数）
+   * targetSeat 可省：省略时自动翻看全场最贵的一张未翻看对手手牌 */
+  function crossExView(state, s, targetSeat) {
+    const chk = crossExCanAct(state, s);
+    if (!chk.ok) return chk;
+    let foe, t;
+    if (targetSeat != null) {
+      if (targetSeat === s.seat) return { ok: false, msg: '只能翻看对手手牌' };
+      foe = state.seats[targetSeat];
+      if (!foe) return { ok: false, msg: '对手不存在' };
+      t = (foe.hand || []).filter(c => !c._viewed).sort((a, b) => b.cost - a.cost)[0];
+    } else {
+      const cands = state.seats.flatMap((x, j) => j === s.seat ? [] : (x.hand || []).map(c => ({ c, owner: x })))
+        .filter(o => !o.c._viewed)
+        .sort((a, b) => b.c.cost - a.c.cost);
+      if (!cands.length) return { ok: false, msg: '对手没有可翻看的手牌' };
+      t = cands[0].c; foe = cands[0].owner;
+    }
+    if (!t) return { ok: false, msg: '目标手牌不存在或已翻看' };
+    if (t._viewed) return { ok: false, msg: '该手牌已被翻看过' };
+    t._viewed = true;
+    s.money -= 1;
+    state.crossExUsed[s.seat] = (state.crossExUsed[s.seat] || 0) + 1;
+    state.logs.push(s.name + ' 花 1⊙ 翻看了【' + foe.name + '】的手牌【' + t.name + '】（信息公开，仍留在其手牌）');
+    return { ok: true, msg: '翻看成功' };
+  }
+  /* 质证动作 B：花 1⊙ 压制对手 1 张已亮牌，令其 -1 票（同一张牌最多被压 2 次） */
+  function crossExPress(state, s, targetUid) {
+    const chk = crossExCanAct(state, s);
+    if (!chk.ok) return chk;
+    const t = state.row.find(r => r.card.uid === targetUid);
+    if (!t || t.removed) return { ok: false, msg: '目标不存在' };
+    if (t.seat === s.seat) return { ok: false, msg: '只能质证对方的证据' };
+    if (!t.revealed) return { ok: false, msg: '该牌未亮出' };
+    if ((t._press || 0) >= 2) return { ok: false, msg: '该牌已被压制 2 次，不能再压' };
+    t._press = (t._press || 0) + 1;
+    s.money -= 1;
+    state.crossExUsed[s.seat] = (state.crossExUsed[s.seat] || 0) + 1;
+    state.logs.push(s.name + ' 花 1⊙ 压制了【' + state.seats[t.seat].name + '】的【' + t.card.name + '】（-1 票，已压 ' + t._press + '/2 次）');
+    return { ok: true, msg: '压制成功' };
+  }
+  /* 质证：放弃（本轮不再质证） */
+  function crossExPass(state, s) {
+    if (state.phase !== 'crossEx') return { ok: false, msg: '当前不是质证阶段' };
+    if (state.crossExTurn !== s.seat) return { ok: false, msg: '还没轮到你' };
+    state.crossExPassed[s.seat] = true;
+    state.logs.push(s.name + ' 放弃质证');
+    return { ok: true };
+  }
+  /* 质证阶段结束条件：所有座位都已过 或 次数用完 */
+  function crossExDone(state) {
+    return state.seats.every((x, i) => state.crossExPassed[i] || (state.crossExUsed[i] || 0) >= 3);
+  }
+  /* 轮转到下一个还能质证的座位（未过且次数未用完） */
+  function crossExNext(state) {
+    const n = state.seatCount;
+    for (let k = 1; k <= n; k++) {
+      const seat = (state.crossExTurn + k) % n;
+      if (!state.crossExPassed[seat] && (state.crossExUsed[seat] || 0) < 3) return seat;
+    }
+    return -1;
+  }
+  /* 质证动作后轮转（若无人可动则交还 update 收尾） */
+  function crossExAdvance(state) {
+    const next = crossExNext(state);
+    if (next >= 0) {
+      state.crossExTurn = next; state.turn = next;
+      state.logs.push('轮到 ' + state.seats[next].name + ' 质证');
+    } else {
+      state.crossExTurn = -1;
+    }
   }
 
   /* ---------------- 环形桌邻位（行首尾相邻：第 0 张的左边 = 最后一张） ---------------- */

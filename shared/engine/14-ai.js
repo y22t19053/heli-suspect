@@ -59,24 +59,18 @@
     const prevRank = state.rankInfo;
     const hasPrev = prevRank && prevRank.length > 0;
     const first = hasPrev ? prevRank[0].seat : -1;
-    const last = hasPrev ? prevRank[prevRank.length - 1].seat : -1;
-    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1
-    const base = incomeOf(state.round);                        // 固定 2
+    const tax = hasPrev && state.leaderStreak >= 2 ? 1 : 0;   // 连任恐惧税：下轮刷新起点 +1（不影响收入）
+    // 固定律师费（评审 P0-2）：删掉榜首 -1 / 末位 +1 / 保底，每轮 incomeOf(round)
+    const base = incomeOf(state.round);
     state.seats.forEach((s, i) => {
       const pbonus = (s.personality && s.personality.bonus && s.personality.bonus.money) || 0;
       let amt = base + pbonus;
       if (!hasPrev) amt += 2;       // 第 1 轮无排名：全体 +4 启动资金
-      else {
-        if (i === first) amt -= 1;  // 领先税：榜首 -1⊙（政治资本消耗）
-        if (i === last) amt += 1;   // 保底酬金：末位 +1⊙（胜诉基金）
-      }
-      // 收入保底：每轮至少 +1⊙（榜首 -1 时也不会白板回合）
-      const pay = Math.max(1, amt);
-      s.money += pay;
-      state.logs.push('【' + s.name + '】发放律师费 +' + pay + '⊙（累计 ' + s.money + '⊙）');
+      s.money += amt;
+      state.logs.push('【' + s.name + '】发放律师费 +' + amt + '⊙（累计 ' + s.money + '⊙）');
     });
     state.logs.push(hasPrev
-      ? '第 ' + state.round + ' 轮结束，发放律师费（榜首 -1⊙ / 末位 +1⊙）' + (tax ? '，连任榜首更换证物架成本 +1' : '')
+      ? '第 ' + state.round + ' 轮结束，发放固定律师费'
       : '第 ' + state.round + ' 轮结束，发放启动酬金 +4⊙');
     // 轮末：市场未买牌洗回，锁定牌留作下轮
     state.seats.forEach((s, i) => {

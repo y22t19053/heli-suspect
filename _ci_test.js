@@ -18,6 +18,7 @@ const http = require('http');
 const PORT = process.env.CI_PORT || (process.env.PORT || 3000);
 const BASE = [
   '_test_skill_combos.js',
+  '_test_cross_exam.js',   // 评审 P0-2：质证阶段（翻看/压制/上限/扣票）
   '_balance_test.js',
   '_smoke_game.js',
   '_test_reconnect.js',

@@ -110,6 +110,9 @@ async function driveToDiscard(A, v, max = 40) {
     } else if (v.phase === 'reveal' && v.revealPending && v.revealPending.owner === 0) {
       const tgt = (v.row || []).find(r => r.revealed && r.seat !== 0 && !r.removed);
       v = await myAction(A, v, { type: 'terroristTarget', targetUid: tgt ? tgt.card.uid : v.revealPending.cardUid });
+    } else if (v.phase === 'crossEx' && v.crossExTurn === 0) {
+      // 质证阶段轮到人类 0 号：直接放弃（不花钱、不选目标，最稳）
+      v = await myAction(A, v, { type: 'crossExPass' });
     } else if ((v.phase === 'preEvent' || v.phase === 'postEvent') && v.eventTurnSeat === 0) {
       v = await myAction(A, v, { type: 'passEvent' });
     } else if (v.phase === 'count' && v.swapPending && v.swapPending.owner === 0) {

@@ -148,6 +148,37 @@
     if (state.eventTurnSeat === s.seat) passEvent(state, s);
   }
 
+  /* AI 质证：落后时压制对手最重的已亮牌，富余时翻看对手手牌，否则放弃 */
+  function aiCrossEx(state, s) {
+    if ((state.crossExUsed[s.seat] || 0) >= 3 || s.money < 1) {
+      crossExPass(state, s);
+      crossExAdvance(state);
+      return;
+    }
+    // 预估本轮己方 vs 对手证据强度
+    const myPower = state.row.filter(r => r.seat === s.seat && !r.removed)
+      .reduce((a, r) => a + (r.card.votes || r.card.v || 0), 0);
+    let foePower = 0;
+    state.seats.forEach((x, i) => {
+      if (i === s.seat) return;
+      foePower = Math.max(foePower, state.row.filter(r => r.seat === i && !r.removed)
+        .reduce((a, r) => a + (r.card.votes || r.card.v || 0), 0));
+    });
+    const pressable = state.row.filter(r => r.seat !== s.seat && r.revealed && !r.removed && (r._press || 0) < 2)
+      .sort((a, b) => (b.card.votes || b.card.v || 0) - (a.card.votes || a.card.v || 0));
+    const hasUnviewed = state.seats.some((x, i) => i !== s.seat && (x.hand || []).some(c => !c._viewed));
+    if (foePower > myPower && pressable.length) {
+      // 落后：压制对手最重证据
+      crossExPress(state, s, pressable[0].card.uid);
+    } else if (hasUnviewed && s.money >= 3) {
+      // 富余：翻看对手最贵手牌（信息获取）
+      crossExView(state, s);
+    } else {
+      crossExPass(state, s);
+    }
+    crossExAdvance(state);
+  }
+
   /* ---------------- 服务端/渲染器辅助 ---------------- */
   /* 每个阶段"谁需要输入"统一由 PHASES 表（engine/04-advance.js）判定，
    * 本文件只按 AI/人类筛选座位，杜绝双份 switch（评审四/五：单一来源）。 */
@@ -182,6 +213,7 @@
     ['buy', '取证'],
     ['play', '举证'],
     ['reveal', '亮出'],
+    ['crossEx', '质证'],
     ['preEvent', '前庭审'],
     ['count', '审议'],
     ['postEvent', '后庭审'],
@@ -191,20 +223,38 @@
     ['income', '酬金'],
     ['gameover', '终局']
   ];
-  /* 进度条显示用：过滤瞬时自动阶段（无玩家操作），与历史 10 步展示一致 */
-  const PHASE_STEPS_VISIBLE = PHASE_STEPS.filter(s => !['pickChar', 'drawEvent', 'drawVoter', 'settle', 'income'].includes(s[0]));
+  /* 庭审回合 = 亮牌+质证+事件+计票+排名+结算 的连续审议（评审 P0：流程 16→8 合并展示）。
+   * 前端把这段渲染成同一屏的连续交互，玩家视角是一次连贯审议。 */
+  const TRIAL_PHASES = ['reveal', 'crossEx', 'preEvent', 'count', 'postEvent', 'rank', 'settle'];
+  /* 进度条显示用：8 个对玩家可见的回合节拍（评审 P0：流程 16→8）。
+   * 选角 → 开局 → 购买回合 → 举证回合 → 庭审回合 → 整理 → 收入 → 终局
+   * drawEvent/drawVoter 为 hidden（抽牌瞬时阶段，PHASES 表已标 hidden，不显示、不播放动画，逻辑照走）。 */
+  const PHASE_STEPS_VISIBLE = [
+    ['pickChar', '选角'],
+    ['chooseStarter', '开局'],
+    ['buy', '购买回合'],
+    ['play', '举证回合'],
+    ['trial', '庭审回合'],
+    ['discard', '整理'],
+    ['income', '收入'],
+    ['gameover', '终局']
+  ];
+  /* 子阶段 → 可见宏阶段（阶段条/标题用；'trial' 为庭审回合合并展示的虚拟宏阶段） */
+  function phaseGroupOf(phase) {
+    return (phase && TRIAL_PHASES.indexOf(phase) >= 0) ? 'trial' : phase;
+  }
   function phaseLabel(state) {
     const map = {
       pickChar: '抽取角色', chooseStarter: '决定起始玩家', drawEvent: '抽取事件牌', drawVoter: '抽取证据',
-      buy: '调查取证', play: '暗置举证', reveal: '亮出证据', preEvent: '庭审前·事件', count: '审议中',
-      postEvent: '庭审后·事件', rank: '本轮排名', settle: '本轮结算', discard: '整理', income: '发放酬金', gameover: '游戏结束'
+      buy: '调查取证', play: '暗置举证', reveal: '庭审回合', crossEx: '庭审回合', preEvent: '庭审回合', count: '庭审回合',
+      postEvent: '庭审回合', rank: '庭审回合', settle: '庭审回合', discard: '整理', income: '发放酬金', gameover: '游戏结束'
     };
     return map[state.phase] || state.phase;
   }
   /* 可点击卡牌（供渲染器高亮） */
   function myClickable(state, seat) {
     const s = state.seats[seat];
-    const out = { market: [], hand: [], events: [], targets: [], chars: [] };
+    const out = { market: [], hand: [], events: [], targets: [], chars: [], crossView: [], crossPress: [] };
     if (!s) return out;
     switch (state.phase) {
       case 'pickChar':
@@ -219,6 +269,13 @@
       case 'reveal':
         if (state.revealPending && state.revealPending.owner === seat) {
           out.targets = state.row.filter(r => r.revealed && r.seat !== seat && !r.removed).map(r => r.card.uid);
+        }
+        break;
+      case 'crossEx':
+        if (state.crossExTurn === seat && !state.crossExPassed[seat] && (state.crossExUsed[seat] || 0) < 3 && s.money >= 1) {
+          // 翻看目标：对手未翻看的手牌；压制目标：对手已亮且未满 2 压的牌
+          out.crossView = state.seats.flatMap((x, i) => i !== seat ? x.hand.filter(c => !c._viewed).map(c => c.uid) : []);
+          out.crossPress = state.row.filter(r => r.seat !== seat && r.revealed && !r.removed && (r._press || 0) < 2).map(r => r.card.uid);
         }
         break;
       case 'count':
@@ -239,10 +296,10 @@
 
   return {
     createGame, apply, aiAct, advance,
-    needsAIAction, humanActing, phaseLabel, myClickable,
-    PHASE_STEPS, PHASE_STEPS_VISIBLE,
+    needsAIAction, humanActing, phaseLabel, phaseGroupOf, myClickable,
+    PHASE_STEPS, PHASE_STEPS_VISIBLE, TRIAL_PHASES,
     PHASES,   // 状态描述表（评审四：每个阶段自包含 label/needsInput/update）
-    buyCostOf, refreshCostOf, eventLvMax, incomeOf, rewardOf, marketSize,
+    buyCostOf, refreshCostOf, eventLvMax, incomeOf, marketSize,
     data: { CHARACTERS, VOTER_TEMPLATES, EVENT_TEMPLATES, SKILLS, CAMPS, AI_PERSONALITIES, ARCH, phaseArchOf },
     mulberry32,
     restoreRng,   // 评审 P0-BUG：快照恢复后重建可序列化随机源（rngSeed/rngCalls 支撑）

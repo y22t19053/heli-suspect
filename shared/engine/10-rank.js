@@ -22,6 +22,11 @@
             break;
           }
           case 'leftWall': {
+            // 2 人局（评审 P0-4）：本方已亮 ≥3 → 本方 +1；3-4 人局保持左半区站位
+            if (state.seatCount === 2) {
+              if (shownOf(state, owner) >= 3) votes[owner] += 1;
+              break;
+            }
             // 左翼壁垒：本方所有位于行左半区的牌各 +1（站位团）
             const act = state.row.filter(x => !x.removed && !x._nullified);
             act.forEach((x, i) => {

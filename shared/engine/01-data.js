@@ -164,107 +164,59 @@
    * 站位系（edge 端点 / rowL / rowR / leftFoe / rightFoe / majority / minority）、
    * 经典系（fan / troll / orator / scandal / wave / idol / megaScandal / comeback / pivot …）。 */
   const VOTER_TEMPLATES = [
-    /* 基础牌（① 级数值/站位技能） */
+    /* ============ 卡池精简（评审 P0-5）：122 → 62 张 ============
+     * 换皮卡全清：tagBoost 原 30+ 张 → 3 张梯度（cost1/2/4）；
+     * tagHate 原 16 张 → 2 张梯度（cost2/3）；
+     * rowL/rowR/swap 重复卡各并 1 张（v106/v107/v108 删除）；
+     * 全部独特技能卡保留（位置/封神/纳什/克制包 = 真实组合关系）。
+     * 事件牌（EVENTS）独立保留。 */
+    /* 议题共鸣（tagBoost）梯度 */
     { id: 'v01', name: '学生证言',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v02', name: '老兵证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v05', name: '教友证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v36', name: '幕后金主供词',   cost: 4, votes: 2, skill: 'tagBoost', desc: '本方 +1 票' },
+    /* 舆论压制（tagHate）梯度 */
+    { id: 'v33', name: '伤残军人证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    { id: 'v28', name: '地产大亨供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    /* 站位/位置系 */
     { id: 'v03', name: '骑手证言',       cost: 1, votes: 1, skill: 'leftFoe', v: 1, desc: '若左邻为对方牌，该牌 -1 票' },
     { id: 'v04', name: '主妇证词',       cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '若本牌位于亮出行右半区，本方 +1 票' },
-    { id: 'v05', name: '教友证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v25', name: '乡村证人',       cost: 1, votes: 1, skill: 'rightFoe', v: 1, desc: '若右邻为对方牌，该牌 -1 票' },
+    { id: 'v27', name: '工会领袖证词',   cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '若本牌位于亮出行左半区，本方 +1 票' },
+    { id: 'v60', name: '保守派证词',     cost: 2, votes: 1, skill: 'majority', v: 1, desc: '若本方当前票数领先（含并列），本方 +1 票' },
     { id: 'v06', name: '失业工人证词',   cost: 2, votes: 1, skill: 'minority', v: 1, desc: '若本方当前票数落后对方，本方 +1 票' },
-    { id: 'v07', name: '码农证言',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v08', name: '教授证词',       cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v09', name: '创投人证言',     cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v10', name: '维权者证词',     cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    /* 多票基础（少数高票牌，附条件技能） */
     { id: 'v11', name: '沉默旁证',       cost: 3, votes: 2, skill: 'edge', v: 1, desc: '若本牌位于行首或行尾，本方 +1 票' },
+    /* 多票附条件 */
     { id: 'v12', name: '忠诚证人',       cost: 4, votes: 2, skill: 'shame', v: 2, desc: '若场上有丑闻牌，本方 +1 票' },
     { id: 'v13', name: '王牌证人',       cost: 4, votes: 2, skill: 'threat', v: 2, desc: '若对方有 ③ 级技能牌，票数最高的对方 -1 票' },
-    /* ① 级技能（亮出阶段：证据排除） */
+    /* 程序系（亮出/换位） */
     { id: 'v14', name: '关键反证',       cost: 3, votes: 1, skill: 'terrorist' },
-    /* ① 级技能（审议时） */
-    { id: 'v15', name: '狂热支持者',     cost: 2, votes: 1, skill: 'fan' },
-    { id: 'v16', name: '匿名抹黑者',     cost: 2, votes: 1, skill: 'troll' },
-    /* ② 级技能（审议时） */
-    { id: 'v17', name: '雄辩家',         cost: 3, votes: 1, skill: 'orator' },
-    { id: 'v18', name: '揭短材料',       cost: 3, votes: 1, skill: 'scandal', scandal: 1 },
-    { id: 'v19', name: '舆情报告',       cost: 4, votes: 1, skill: 'wave' },
-    /* ③ 级技能（审议时） */
-    { id: 'v20', name: '明星证人',       cost: 4, votes: 1, skill: 'idol' },
-    { id: 'v21', name: '重磅黑料',       cost: 4, votes: 1, skill: 'megaScandal', scandal: 1 },
-    { id: 'v22', name: '翻盘证词',       cost: 4, votes: 1, skill: 'comeback' },
-    /* 结算后技能 */
-    { id: 'v23', name: '献金记录',       cost: 3, votes: 1, skill: 'donor' },
-    { id: 'v24', name: '买票记录',       cost: 4, votes: 1, skill: 'buyback', scandal: 1 },
-    /* ============ 数据驱动扩充包（v25+，从美式社会人群/职业列表提取） ============ */
-    { id: 'v25', name: '乡村证人',       cost: 1, votes: 1, skill: 'rightFoe', v: 1, desc: '若右邻为对方牌，该牌 -1 票' },
-    { id: 'v26', name: '牧师证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v27', name: '工会领袖证词',   cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '若本牌位于亮出行左半区，本方 +1 票' },
-    { id: 'v28', name: '地产大亨供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v29', name: '主妇旁证',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v30', name: '移民证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v31', name: '执事证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v32', name: '学贷证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v33', name: '伤残军人证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v34', name: '店主证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v35', name: '枪协会员证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v36', name: '幕后金主供词',   cost: 4, votes: 2, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v37', name: '教师代表证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v38', name: '石油寡头供词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v39', name: '游说者供词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v40', name: '管道工证词',     cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v41', name: '街头活动家证词', cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v42', name: '租户证词',       cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v43', name: '农场主证词',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v44', name: '卡车司机证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v45', name: '巡边员证词',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v46', name: '诊所义工证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v47', name: '单亲妈妈证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v48', name: '电台主持证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v49', name: '阴谋论者证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v50', name: '电视布道家证词', cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v51', name: '教师证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v52', name: '家教家长证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v53', name: '反疫苗者证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v54', name: '跨性别者证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v55', name: '权益律师证词',   cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v56', name: '检察官证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v57', name: '强硬警长证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v58', name: '质疑证人',       cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v59', name: '民粹商家证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v60', name: '保守派证词',     cost: 2, votes: 1, skill: 'majority', v: 1, desc: '若本方当前票数领先（含并列），本方 +1 票' },
-    { id: 'v61', name: '社运者证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v62', name: '自由派证人',     cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v63', name: '民粹元老证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v64', name: '环保青年证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    /* ============ 左右博弈扩充包（v65+，换位/相邻技能） ============ */
     { id: 'v65', name: '掮客证词',       cost: 3, votes: 1, skill: 'swap' },
     { id: 'v66', name: '街头鼓动家证词', cost: 2, votes: 1, skill: 'shiftLeft' },
     { id: 'v67', name: '华尔街证人',     cost: 2, votes: 1, skill: 'shiftRight' },
+    /* 数值系 */
+    { id: 'v15', name: '狂热支持者',     cost: 2, votes: 1, skill: 'fan' },
+    { id: 'v16', name: '匿名抹黑者',     cost: 2, votes: 1, skill: 'troll' },
+    { id: 'v17', name: '雄辩家',         cost: 3, votes: 1, skill: 'orator' },
+    { id: 'v18', name: '揭短材料',       cost: 3, votes: 1, skill: 'scandal', scandal: 1 },
+    { id: 'v19', name: '舆情报告',       cost: 4, votes: 1, skill: 'wave' },
+    { id: 'v20', name: '明星证人',       cost: 4, votes: 1, skill: 'idol' },
+    { id: 'v21', name: '重磅黑料',       cost: 4, votes: 1, skill: 'megaScandal', scandal: 1 },
+    { id: 'v22', name: '翻盘证词',       cost: 4, votes: 1, skill: 'comeback' },
+    { id: 'v70', name: '摇摆证人',       cost: 4, votes: 1, skill: 'pivot' },
+    /* 左右博弈 */
     { id: 'v68', name: '社区证人',       cost: 3, votes: 1, skill: 'rally' },
     { id: 'v69', name: '顽固证人',       cost: 3, votes: 1, skill: 'flank' },
-    { id: 'v70', name: '摇摆证人',       cost: 4, votes: 1, skill: 'pivot' },
-    /* ============ 左右互动新技能（v89+：攻守同盟 / 当庭挖票） ============ */
     { id: 'v89', name: '并肩证人',       cost: 3, votes: 1, skill: 'counsel', desc: '左右都本方+2票；否则相邻本方+1票' },
     { id: 'v90', name: '反水线人',       cost: 3, votes: 1, skill: 'poach' },
-    /* ============ 社会百态扩充包（v71+，更多美式人群/职业） ============ */
-    { id: 'v71', name: '流浪者倡导证词', cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v72', name: '交易员证词',     cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v73', name: '医护证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v74', name: '主播证词',       cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v75', name: '书店老板证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v76', name: '咖啡店员证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v77', name: '房产经纪证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v78', name: '军商证词',       cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v79', name: '乡村歌手证词',   cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v80', name: '素食者证词',     cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v81', name: '健身教练证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v82', name: '数据科学家证词', cost: 3, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v83', name: '快递站长证词',   cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v84', name: '橄榄球教练证词', cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v85', name: '币圈矿工证词',   cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票', scandal: 1 },
-    { id: 'v86', name: '诊所护士证词',   cost: 2, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
-    { id: 'v87', name: '古董商证词',     cost: 2, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
-    { id: 'v88', name: '算法工程师证词', cost: 3, votes: 1, skill: 'tagHate', desc: '票数最高的对方 -1 票' },
+    { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
+    /* 结算后技能（经济/名誉） */
+    { id: 'v23', name: '献金记录',       cost: 3, votes: 1, skill: 'donor' },
+    { id: 'v24', name: '买票记录',       cost: 4, votes: 1, skill: 'buyback', scandal: 1 },
+    { id: 'v98', name: '吹哨人档案',     cost: 3, votes: 1, skill: 'whistleblower', desc: '结算后：丑闻最高的对方 -1⊙ 且丑闻 +1' },
+    { id: 'v116', name: '法援申请书',    cost: 2, votes: 1, skill: 'grant', desc: '结算后：本方金钱最少时，+1⊙' },
+    { id: 'v122', name: '清廉档案',      cost: 2, votes: 1, skill: 'integrity', desc: '结算后：本方无丑闻且对方有人有丑闻时，+1⊙' },
+    /* ============ 卡池精简：原数据驱动扩充包（v25-v64 换皮卡）保留卡已并入上表 ============ */
+    /* ============ 卡池精简：左右博弈/社会百态包（v65-v90 换皮）保留卡已并入上表 ============ */
     /* ============ 封神技扩充包（v91+，真实传奇律师招牌战术） ============ */
     { id: 'v91', name: '质证记录',       cost: 3, votes: 1, skill: 'crossExam', desc: '相邻敌方证人 -1 票；若其带丑闻，额外 -1 票' },
     { id: 'v92', name: '反对理由书',     cost: 2, votes: 1, skill: 'objection', desc: '对方亮出 ②/③ 级技能牌时，票数最高的对方 -1 票' },
@@ -273,7 +225,6 @@
     { id: 'v95', name: '原则陈词',       cost: 4, votes: 1, skill: 'flipNarrative', desc: '本方落后 ≥2 票时，本方 +2 票' },
     { id: 'v96', name: '世纪豪赌',       cost: 4, votes: 1, skill: 'careerGamble', desc: '本方 +2 票；若本方未领先，则本方丑闻 +1' },
     { id: 'v97', name: '伪证前科档案',   cost: 4, votes: 1, skill: 'credCollapse', desc: '对方有丑闻牌时，票数最高的对方 -1 票' },
-    { id: 'v98', name: '吹哨人档案',     cost: 3, votes: 1, skill: 'whistleblower', desc: '结算后：丑闻最高的对方 -1⊙ 且丑闻 +1' },
     { id: 'v99', name: '先例判词',       cost: 4, votes: 1, skill: 'precedent', desc: '本方 +1 票，并记录"先例"标记（终局先例胜利）' },
     { id: 'v100', name: '人民之诉',      cost: 4, votes: 1, skill: 'juryNull', desc: '本方 +1 票并获得 1 名陪审员支持（集满 3 名立即胜诉）' },
     /* 位置博弈系（v101+）：首座/末席/左翼壁垒/抽签质证 */
@@ -281,11 +232,6 @@
     { id: 'v102', name: '末席证词',      cost: 2, votes: 1, skill: 'lastSeat', v: 1, desc: '若行尾（最右）是对方牌，该牌 -1 票' },
     { id: 'v103', name: '左翼方阵',      cost: 3, votes: 1, skill: 'leftWall', v: 1, desc: '本方所有位于行左半区的牌各 +1 票' },
     { id: 'v104', name: '抽签质证',      cost: 2, votes: 1, skill: 'randomHit', v: 1, desc: '随机 1 张对方牌 -1 票' },
-    /* ============ 左右/换位博弈扩充包（v105+：连横合纵/左右旗手/对调策划） ============ */
-    { id: 'v105', name: '连横证人',      cost: 3, votes: 1, skill: 'chain', v: 1, desc: '左右都本方：本方所有已亮 +1；左右都敌方：最高敌 -1' },
-    { id: 'v106', name: '左席旗手',      cost: 2, votes: 1, skill: 'rowL', v: 1, desc: '位于亮出行左半区时，本方 +1 票' },
-    { id: 'v107', name: '右席旗手',      cost: 2, votes: 1, skill: 'rowR', v: 1, desc: '位于亮出行右半区时，本方 +1 票' },
-    { id: 'v108', name: '对调策划',      cost: 4, votes: 1, skill: 'swap', v: 1, desc: '与场上任意一张其他牌互换位置' },
     /* ============ 纳什均衡扩充包（v109+：互锁技能） ============ */
     { id: 'v109', name: '审计员证词',    cost: 2, votes: 1, skill: 'audit', desc: '对方金钱 ≥5⊙ 时，票数最高的对方 -1 票' },
     { id: 'v110', name: '游说账单',      cost: 3, votes: 1, skill: 'lobby', desc: '本方金钱 ≥5⊙ 时，本方 +1 票' },
@@ -294,9 +240,10 @@
     { id: 'v113', name: '造势集会报告',  cost: 3, votes: 1, skill: 'surge', desc: '本方已亮 ≥3 张时，本方 +1 票' },
     { id: 'v114', name: '否决动议书',    cost: 4, votes: 1, skill: 'veto', desc: '对方本轮打出过事件牌时，票数最高的对方 -2 票' },
     { id: 'v115', name: '连胜战报',      cost: 4, votes: 1, skill: 'momentum', desc: '本方此前赢得过轮次时，本方 +1 票' },
-    { id: 'v116', name: '法援申请书',    cost: 2, votes: 1, skill: 'grant', desc: '结算后：本方金钱最少时，+1⊙' },
-    /* ============ 庭审克制包（v117+：偏见揭露/最后一搏/证据链/禁言令/民意分裂/清廉档案） ============ */
+    /* ============ 庭审克制包（v117+：偏见揭露/最后一搏/证据链/禁言令/民意分裂） ============ */
     { id: 'v117', name: '揭底档案',      cost: 4, votes: 1, skill: 'bias', desc: '对方已亮 ≥4 张时，对方所有已亮牌各 -1 票' },
     { id: 'v118', name: '绝境陈词',      cost: 4, votes: 1, skill: 'hailMary', desc: '本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票' },
     { id: 'v119', name: '链条卷宗',      cost: 4, votes: 1, skill: 'fullChain', desc: '本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票' },
     { id: 'v120', name: '禁言动议',      cost: 4, votes: 1, skill: 'gagOrder', desc: '对方本轮打过 ≥3 张时，票数最高的对方 -2 票' },
+    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' }
+  ];
