@@ -26,7 +26,12 @@ const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/shared', express.static(path.join(__dirname, 'shared')));
 const server = http.createServer(app);
-const io = new Server(server, { maxHttpBufferSize: 64e3 });   // 单条消息上限 64KB
+ const io = new Server(server, {
+   maxHttpBufferSize: 64e3,
+   // 打包版/APK 从 file:// 或远程页面连接自建服务器时需要跨域轮询回退；
+   // WebSocket 本身不受 CORS 限制，但 Socket.IO 的 polling 需要这个头。
+   cors: { origin: true, methods: ['GET', 'POST'] }
+ });   // 单条消息上限 64KB
 
 /* ---------------- 房间管理 ---------------- */
 const ROOMS = new Map();          // code -> room
@@ -868,11 +873,13 @@ const SNAP_INTERVAL_MS = (Number(process.env.SNAP_INTERVAL_MS) > 0)
   ? Number(process.env.SNAP_INTERVAL_MS) : 10 * 60 * 1000;
 // 快照文件名：默认 rooms-snapshot.json；测试可用 SNAP_FILE 指向独立文件（_test_restart.js 隔离重启验证）
 const SNAP_FILE = process.env.SNAP_FILE || null;
+// 快照目录：默认项目目录；打包版（asar 只读）用 SNAPSHOT_DIR 指到用户数据目录
+const SNAP_DIR = process.env.SNAPSHOT_DIR || __dirname;
 
-function snapshotRooms() { writeSnapshotFile(__dirname, ROOMS, SNAP_FILE); }
+function snapshotRooms() { writeSnapshotFile(SNAP_DIR, ROOMS, SNAP_FILE); }
 
 function restoreRooms() {
-  const list = readSnapshotFile(__dirname, SNAP_FILE);
+  const list = readSnapshotFile(SNAP_DIR, SNAP_FILE);
   if (!list.length) return;
   const now = Date.now();
   const restored = deserializeRooms(list, (code, opts) => createRoom(Object.assign({}, opts, { code })));

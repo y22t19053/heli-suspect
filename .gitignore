@@ -4,6 +4,10 @@ node_modules/
 # 临时测试产物
 _shots/
 *.png
+!electron/icon.png
+
+# 桌面版构建产物
+dist/
 
 # 系统文件
 Thumbs.db

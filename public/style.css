@@ -35,6 +35,27 @@
 @media (max-width: 640px) {
   .ingame-gear { min-width: 76px; min-height: 44px; font-size: 13px; }
 }
+
+/* 服务器地址：打包版/APK 连接自建服务器用 */
+.set-row-server { align-items: center; gap: 8px; }
+.set-server {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(233, 196, 106, 0.35);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font: 13px var(--sans);
+  outline: none;
+}
+.set-server:focus { border-color: var(--gold); }
+.set-hint {
+  margin: -4px 0 8px;
+  color: var(--text-dim);
+  font: 12px/1.5 var(--sans);
+  word-break: break-all;
+}
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);

@@ -1,22 +1,64 @@
 {
   "name": "election-roguelike-online",
-  "version": "1.1.0",
-  "description": "合理怀疑 · 讽刺卡通风 Roguelike 选举卡牌游戏（Socket.IO 联机版）",
-  "main": "server.js",
+  "version": "1.2.0",
+  "description": "合理怀疑 · 世纪审判：法庭对抗卡牌游戏（Web + Socket.IO，含本地桌面版）",
+  "author": "y22t19053",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node server.js",
+    "desktop": "electron .",
+    "build:win": "electron-builder --win portable --x64",
+    "build:dir": "electron-builder --dir",
     "test": "node --test _test_skill_combos.js && node --test _test_cross_exam.js && node --test _balance_test.js && node --test _smoke_game.js && node --test --test-force-exit _test_reconnect.js && node --test _test_snapshot.js && node --test _test_restart.js && node --test _test_rng_restore.js && node --test _test_uid_unique.js && node --test _test_strategy_diversity.js && node --test _render_test.js",
     "ci": "node _ci_test.js"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=20"
   },
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
     "playwright-core": "^1.62.1",
     "socket.io-client": "^4.8.3"
+  },
+  "build": {
+    "appId": "com.y22t19053.heli-suspect",
+    "productName": "合理怀疑世纪审判",
+    "copyright": "Copyright © 2026 y22t19053",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "server.js",
+      "shared/**/*",
+      "public/**/*",
+      "singleplayer.html",
+      "favicon.svg",
+      "manifest.json",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/icon.png",
+      "artifactName": "合理怀疑-世纪审判-${version}-win64.exe"
+    },
+    "portable": {
+      "artifactName": "合理怀疑-世纪审判-${version}-win64.exe",
+      "requestExecutionLevel": "user"
+    },
+    "electronDist": "node_modules/electron/dist"
   }
 }

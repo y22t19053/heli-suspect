@@ -190,6 +190,21 @@ sudo systemctl enable --now heli-suspect
 
 ## 七、APK / EXE 封包
 
+### 已完成：Windows 桌面版（EXE）
+
+已经用 **Electron + 内置 Node 服务器** 打包完成：
+
+```text
+dist/合理怀疑-世纪审判-1.2.0-win64.exe
+```
+
+- 双击自动启动本地服务器并打开游戏窗口；
+- 单机完全离线；
+- 联机时这台电脑就是主机，朋友在同一 Wi-Fi 打开 `http://你的IPv4:端口`；
+- 端口优先 3000，被占用自动换；
+- `npm run build:win` 可重新构建；
+- 未签名，Windows SmartScreen 可能提示“未知发布者”，选择“仍要运行”即可。
+
 ### 现状
 
 《合理怀疑》是：
@@ -203,41 +218,30 @@ sudo systemctl enable --now heli-suspect
 - **单机模式**（`singleplayer.html`）可以完全离线打包；
 - **联机模式**必须有服务端，APK/EXE 本身不能凭空联机。
 
-### 推荐顺序
+### 后续：PWA / APK
 
-1. **先做 PWA**（0 成本）
+1. **PWA**（0 成本）
    - 手机浏览器打开线上地址 → “添加到主屏幕”；
    - 单机可离线；联机照常连服务器；
    - 这是最快、最省事的“App 化”。
 
-2. **EXE（Windows，推荐先做这个）**
-   - 方案 A：Electron/Tauri 壳 + 内置 Node 服务器；
-     - 打开 exe 自动启动 `server.js`；
-     - 窗口加载 `http://127.0.0.1:3000`；
-     - 单机完全离线；联机时它自己就是主机，朋友连你的局域网 IP；
-     - 体积：Electron 约 80–120 MB；Tauri + Node sidecar 更小但配置多。
-   - 方案 B：Node SEA / pkg 把服务端打成单 exe，启动后自动打开默认浏览器；
-     - 体积最小、最接近“绿色版”；
-     - 没有原生窗口，体验差一点。
-   - 建议 A，和《勇闯四合》的“双击即玩”最接近。
-
-3. **APK（Android 客户端）**
+2. **APK（Android 客户端）**
    - 用 Capacitor 把 Web 客户端包成 WebView App；
    - 单机：把 `singleplayer.html`、`shared/`、字体等放进 assets，离线玩；
-   - 联机：App 里加“服务器地址”输入框，连 PC/云主机；
+   - 联机：App 里填“服务器地址”，连 PC/云主机；
    - **不要在 Android 里塞 Node 服务器**：Node 官方不支持 Android 直接跑；用 Termux 也只是折腾，不适合发给朋友。
    - 想让手机当主机，实际还是让 PC/云主机跑服务端，手机只是客户端。
 
-### 需要先改的一处
+### 服务器地址配置（已实现）
 
-当前客户端默认连“当前页面同源”的 Socket.IO。打包成 APK/EXE 后页面在 `file://` 或 `capacitor://` 下，必须支持配置服务器地址，例如：
+客户端设置里已经有“服务器地址”输入框：
 
 ```js
 const SERVER_URL = localStorage.getItem('heli_server_url') || location.origin;
 const socket = io(SERVER_URL, { ... });
 ```
 
-再在设置里加一个“服务器地址”输入框。这个改动做完，APK/EXE 才能同时支持单机和联机。
+桌面版默认连本地服务器，不用填；APK 或远程页面填 `http://192.168.x.x:3000` / `https://你的域名` 即可，保存后自动重载。
 
 ---
 

@@ -24,7 +24,28 @@ npm start          # 启动联机服务器，默认 http://localhost:3000
 - Render Free（`render.yaml`）
 - Oracle Cloud Always Free（2 OCPU / 12GB）
 - `Dockerfile` 可直接部署
-- APK/EXE/PWA 的封包取舍
+- Windows 桌面版已构建：`dist/合理怀疑-世纪审判-1.2.0-win64.exe`（双击即玩，内置本地服务器，可当局域网主机）
+- APK/PWA 的封包取舍
+
+## Windows 桌面版
+
+```bash
+npm install
+npm run build:win
+# 产物：dist/合理怀疑-世纪审判-1.2.0-win64.exe
+```
+
+双击后自动：
+
+1. 在本机 3000 端口（被占用则自动换）启动 Node 服务器；
+2. 用 Electron 打开游戏窗口；
+3. 单机离线可玩；朋友在同一 Wi-Fi 下打开 `http://你的IPv4:端口` 即可联机。
+
+也可开发模式运行：
+
+```bash
+npm run desktop
+```
 
 ## 测试
 

@@ -468,7 +468,23 @@ function lvMark(lv) { return lv === 1 ? '①' : (lv === 2 ? '②' : (lv === 3 ? 
  * 渲染层直接调用，不再维护本地薄封装。 */
 
 /* ---------------- 连接状态与全局 UI 状态 ---------------- */
-const socket = io();
+/* 打包版（EXE/APK）默认不是同源页面，需要允许指定服务器地址：
+ * - 桌面版/浏览器默认同源
+ * - APK 可在设置里填 https://your-server 或 http://192.168.x.x:3000
+ * - 也支持 ?server=https://... 临时覆盖 */
+const SERVER_URL_KEY = 'heli_server_url';
+function serverBaseUrl() {
+  try {
+    const q = new URLSearchParams(location.search).get('server');
+    if (q) return q.replace(/\/+$/, '');
+  } catch (e) { /* file:// 等环境忽略 */ }
+  try {
+    const saved = localStorage.getItem(SERVER_URL_KEY);
+    if (saved) return saved.replace(/\/+$/, '');
+  } catch (e) { /* 隐私模式忽略 */ }
+  return location.origin;
+}
+const socket = io(serverBaseUrl(), { transports: ['websocket', 'polling'] });
 let roomInfo = null;        // {code, mode, maxSeats, started, seats[]}
 let view = null;            // 服务端下发的我的视角
 let vm = null;              // P1-8：UIPresenter.project(view) 投影 ViewModel（renderPanels 等消费）
@@ -665,6 +681,19 @@ function initSettings() {
   $s('set-quality').onchange = e => { settings.quality = e.target.value; saveSettings(); };
   $s('set-quick').onclick = () => { settings.quick = !settings.quick; saveSettings(); toast(settings.quick ? '快速模式：开（1 轮试玩）' : '快速模式：关（完整 5 轮）'); };
   $s('set-fullscreen').onclick = () => { toggleFullscreen(); };
+  const srv = $s('set-server');
+  if (srv) {
+    try { srv.value = localStorage.getItem(SERVER_URL_KEY) || ''; } catch (e) { /* 忽略 */ }
+    const apply = $s('set-server-apply');
+    if (apply) apply.onclick = () => {
+      const v = (srv.value || '').trim().replace(/\/+$/, '');
+      try {
+        if (v) localStorage.setItem(SERVER_URL_KEY, v);
+        else localStorage.removeItem(SERVER_URL_KEY);
+      } catch (e) { /* 忽略 */ }
+      location.reload();
+    };
+  }
   saveSettings();
 }
 function toggleFullscreen() {
