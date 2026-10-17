@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+_shots
+docs
+tools
+*.md
+Dockerfile
+.dockerignore
+rooms-snapshot.json
+junit.xml
+*.log

@@ -14,6 +14,18 @@ npm start          # 启动联机服务器，默认 http://localhost:3000
 - 单人模式：无需服务器，直接打开 `singleplayer.html`（根目录）即可游玩（本文件为构建产物，源码见 `public/singleplayer.html` 对应的内联构建）。
 - 联机模式：`npm start` 后访问 `http://<主机>:3000`，创建房间并分享房间号，支持 AI 托管、断线重连、房主转移。
 
+## 免费服务器 / 内网联机 / 封包
+
+见 [`DEPLOY.md`](DEPLOY.md)：
+
+- 同 Wi-Fi 局域网（零成本）
+- Tailscale 异地组网（Personal 免费）
+- Cloudflare Quick Tunnel 临时公网链接
+- Render Free（`render.yaml`）
+- Oracle Cloud Always Free（2 OCPU / 12GB）
+- `Dockerfile` 可直接部署
+- APK/EXE/PWA 的封包取舍
+
 ## 测试
 
 ```bash
