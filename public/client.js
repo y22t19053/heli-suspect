@@ -501,8 +501,13 @@ function diagOut(reason) {
 }
 
 const $ = id => document.getElementById(id);
-function show(id) { $(id).classList.remove('hidden'); }
-function hide(id) { $(id).classList.add('hidden'); }
+function syncInGameGear() {
+  const b = document.getElementById('btn-ingame-settings');
+  const g = document.getElementById('game');
+  if (b && g) b.classList.toggle('hidden', g.classList.contains('hidden'));
+}
+function show(id) { $(id).classList.remove('hidden'); syncInGameGear(); }
+function hide(id) { $(id).classList.add('hidden'); syncInGameGear(); }
 function mySeatObj() { return view && mySeat != null ? view.seats[mySeat] : null; }
 
 /* ---------------- Socket 事件 ---------------- */
@@ -651,6 +656,8 @@ function initSettings() {
   const $s = id => document.getElementById(id);
   if (!$s('btn-settings')) return;
   $s('btn-settings').onclick = () => { saveSettings(); show('settings'); };
+  const ig = $s('btn-ingame-settings');
+  if (ig) ig.onclick = () => { saveSettings(); show('settings'); };
   $s('settings-close').onclick = () => { hide('settings'); };
   $s('set-music').oninput = e => { settings.music = +e.target.value; saveSettings(); };
   $s('set-sfx').oninput = e => { settings.sfx = +e.target.value; saveSettings(); };

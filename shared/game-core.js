@@ -78,7 +78,12 @@
     { id: 'organizer',  name: '首席助理',   camp: 'green', desc: '审议时本方 +1 票',   skill: { type: 'votePlus', v: 1 } },
     { id: 'pragmatist', name: '务实派律师', camp: 'blue',  desc: '可保留 2 份证词',    skill: { type: 'lockPlus', v: 1 } },
     { id: 'analyst',    name: '数据分析师', camp: 'green', desc: '每轮结束 +1⊙',      skill: { type: 'roundMoney', v: 1 } },
-    { id: 'counsel',    name: '首席顾问',   camp: 'gold',  desc: '事件牌效果 +1',      skill: { type: 'eventBuff', v: 1 } }
+    { id: 'counsel',    name: '首席顾问',   camp: 'gold',  desc: '事件牌效果 +1',      skill: { type: 'eventBuff', v: 1 } },
+    /* 2026 扩展：四位新律师（沿用已验证的被动类型） */
+    { id: 'publicdef',  name: '公益律师',   camp: 'red',   desc: '起始⊙ +1',          skill: { type: 'startMoney', v: 1 } },
+    { id: 'forensic',   name: '法证调查员', camp: 'green', desc: '证物架多抽 1 张',    skill: { type: 'drawPlus', v: 1 } },
+    { id: 'spin',       name: '舆情顾问',   camp: 'blue',  desc: '审议时本方 +1 票',   skill: { type: 'votePlus', v: 1 } },
+    { id: 'clerk',      name: '法庭书记官', camp: 'gold',  desc: '可保留 2 份证词',    skill: { type: 'lockPlus', v: 1 } }
   ];
 
   /* 证词技能词典（① ② ③ 分级；证据排除在亮出阶段发动）
@@ -283,7 +288,16 @@
     { id: 'v118', name: '绝境陈词',      cost: 4, votes: 1, skill: 'hailMary', desc: '本方落后 ≥2 票且已亮 ≥3 张时，本方 +3 票' },
     { id: 'v119', name: '链条卷宗',      cost: 4, votes: 1, skill: 'fullChain', desc: '本方已亮物证 ≥2 张时，本方所有已亮牌 +1 票' },
     { id: 'v120', name: '禁言动议',      cost: 4, votes: 1, skill: 'gagOrder', desc: '对方本轮打过 ≥3 张时，票数最高的对方 -2 票' },
-    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' }
+    { id: 'v121', name: '两派对峙',      cost: 3, votes: 1, skill: 'split', desc: '双方已亮牌数相等时，双方最高票玩家各 -1 票' },
+    /* 2026 扩展：庭外调查 / 新证据包（沿用已有技能） */
+    { id: 'v200', name: '实习记者',      cost: 1, votes: 1, skill: 'tagBoost', desc: '本方 +1 票' },
+    { id: 'v201', name: '法医报告',      cost: 2, votes: 1, skill: 'crossExam', desc: '相邻敌方 -1 票；带丑闻再 -1' },
+    { id: 'v202', name: '匿名举报信',    cost: 2, votes: 1, skill: 'troll', desc: '对方 -1 票' },
+    { id: 'v203', name: '专家证人',      cost: 3, votes: 1, skill: 'orator', desc: '本方 +1 票' },
+    { id: 'v204', name: '现场录像',      cost: 4, votes: 1, skill: 'wave', desc: '本方 +1，对方 -1' },
+    { id: 'v205', name: '陪审团笔记',    cost: 4, votes: 1, skill: 'idol', desc: '本方 +2 票' },
+    { id: 'v206', name: '弹道报告',      cost: 4, votes: 1, skill: 'megaScandal', desc: '对方 -2 票' },
+    { id: 'v207', name: '辩方总结',      cost: 4, votes: 1, skill: 'comeback', desc: '落后时 +1 票' }
   ];
   /* 卡池精简（评审 P0-5）：v121/v122 已并入 engine/01-data.js 的 VOTER_TEMPLATES */
 

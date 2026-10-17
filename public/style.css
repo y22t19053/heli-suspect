@@ -8,6 +8,33 @@
  *   · 动效：hover 上浮光晕 / active 按下回弹 / 流光按钮 / 敲锤开场
  * ============================================================ */
 * { box-sizing: border-box; }
+
+/* 局内设置：固定在右上安全区，触屏也有足够点击面积 */
+.ingame-gear {
+  position: fixed;
+  top: calc(10px + var(--sat));
+  right: calc(10px + var(--sar));
+  z-index: 6;
+  min-width: 84px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(233, 196, 106, 0.55);
+  background: rgba(12, 14, 24, 0.82);
+  color: var(--gold);
+  font: 700 14px/1 var(--sans);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  touch-action: manipulation;
+}
+.ingame-gear:hover { color: var(--gold-hi); border-color: var(--gold-hi); }
+.ingame-gear.hidden { display: none; }
+@media (max-width: 640px) {
+  .ingame-gear { min-width: 76px; min-height: 44px; font-size: 13px; }
+}
 :root {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
