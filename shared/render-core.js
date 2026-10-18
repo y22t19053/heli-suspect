@@ -635,11 +635,11 @@
       if (copy.lockShow ? copy.lockShow(s, isMe, g) : (show.locked && s.lockedCount)) flow.push({ icon: 'lock', txt: String(s.lockedCount), col: copy.lockCol || PAL.blue });
       if (env.compact) {
         /* 圆形头像 + 两行大字（行1 名字/阵营/徽章，行2 角色名/数值流/状态标签） */
-        const avSz = 20, avX0 = x + 6, avY = y + Math.max(3, (ph - 4) / 2 - avSz / 2);
+        const avSz = 24, avX0 = x + 6, avY = y + Math.max(2, (ph - 4) / 2 - avSz / 2);
         const pt = partyOf(i);
         RC._avatarOf(env, avX0 + avSz / 2, avY + avSz / 2, avSz / 2, pt.sym, campColor(i), isActing);
         // 行1：名字（大，fit 限宽）+ 阵营 + 右侧徽章（陪审/先例，右对齐）
-        let nx1 = x + 30;
+        let nx1 = x + 34;
         const nmT1 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(64, w * 0.34), Math.max(12, env.UI.fs.name - 0.5));
         const nmR1 = drawPixelText(nmT1.text, nx1, y + 15, nmT1.size, PAL.black, { shadow: false });
         nx1 += nmR1.w + 6;
@@ -654,7 +654,7 @@
         if (show.prev && g.precedentSeat === i) badges1.push({ icon: 'scale', txt: '先例' });
         RC._rightBadgesOf(env, x + w - 8, y + 15, 11, badges1, nx1);
         // 行2：角色名（红）→ 数值流（大）→ 状态标签（红底白字）
-        let nx2 = x + 30;
+        let nx2 = x + 34;
         if (s.char) {
           const fCh = fitText(copy.charBrief ? copy.charBrief(s) : s.char.name, Math.max(30, w * 0.2), copy.charSize || 11.5);
           drawPixelText(fCh.text, nx2, y + ph - 8, fCh.size, copy.charCol || PAL.red, { shadow: false });
@@ -665,11 +665,11 @@
         if (isActing) RC._statusTagOf(env, nxF + 4, y + ph - 8, isPlayAct ? '举证中' : '行动中', 11);
       } else {
         /* 圆形头像（更大）+ 两行大字（行1 名字/阵营/角色名/徽章，行2 数值流/状态标签/丑闻条） */
-        const avSz = 26, avX0 = x + 6, avY = y + Math.max(3, (ph - 4) / 2 - avSz / 2);
+        const avSz = 36, avX0 = x + 7, avY = y + Math.max(2, (ph - 4) / 2 - avSz / 2);
         const pt = partyOf(i);
         RC._avatarOf(env, avX0 + avSz / 2, avY + avSz / 2, avSz / 2, pt.short || pt.sym, campColor(i), isActing);
         // 行1：头像 + 名字（大粗，fit 限宽）+ 阵营 + 角色名（红，接在名字后不再盖字）
-        let nx1 = x + 36;
+        let nx1 = x + 47;
         const nmT2 = fitText(s.name + (isMe ? '（你）' : ''), Math.max(72, w * 0.28), Math.min(17, env.UI.fs.name + 2));
         const nmR2 = drawPixelText(nmT2.text, nx1, y + 18, nmT2.size, PAL.black, { shadow: false });
         nx1 += nmR2.w + 8;
@@ -692,7 +692,7 @@
         RC._rightBadgesOf(env, x + w - 10, y + 18, 13, badges2, nx1);
         // 行2：数值流（大粗）→ 状态标签（红底白字，醒目）
         //       丑闻条/结案陈词在右侧 → 数值流让位（maxX），不再撞到屏幕边/右侧信息
-        const nx2 = RC._panelFlowOf(env, x + 36, y + ph - 8, Math.max(12.5, env.UI.fs.num - 0.5), flow, x + w - (inPlay ? 132 : 78));
+        const nx2 = RC._panelFlowOf(env, x + 47, y + ph - 8, Math.max(12.5, env.UI.fs.num - 0.5), flow, x + w - (inPlay ? 132 : 78));
         if (isActing) RC._statusTagOf(env, nx2 + 6, y + ph - 8, isPlayAct ? '举证中' : '行动中', 12.5);
         // 行2 右侧：丑闻条（右对齐，不再压数值流）+ 结案陈词
         if (copy.scandalBar ? copy.scandalBar(s, sc) : show.scandalBar) {
@@ -707,7 +707,7 @@
         if (inPlay) drawPixelText('结案陈词', x + w - 14, y + ph - 8, 12.5, PAL.coin, { align: 'right', shadow: false });
       }
       // 事件目标选择 / 选择起始玩家（点击头像，命中区=圆+边距）
-      const avSz = env.compact ? 20 : 26;
+      const avSz = env.compact ? 24 : 36;
       const avX = 6, avY2 = y + Math.max(3, (ph - 4) / 2 - avSz / 2);
       if ((g.phase === 'preEvent' || g.phase === 'postEvent') && env.eventPick && env.eventPick.seat === env.mySeat && i !== env.mySeat) {
         pxBorder(x + 4, y + 2, avSz + 4, avSz + 4, copy.pickCol || PAL.red, 4);
@@ -779,12 +779,30 @@
       ctx.stroke();
       ctx.restore();
     }
-    // 圆内文字：裁切防越出圆形（双字用小号，单字用大号）
-    ctx.beginPath();
-    ctx.arc(cx, cy, rr, 0, Math.PI * 2);
-    ctx.clip();
-    const size = sym.length >= 2 ? Math.max(8.5, r * 0.85) : Math.max(9, r * 1.05);
-    drawPixelText(sym, cx, cy + 0.5, size, contrast(col), { align: 'center', shadow: false });
+    // 圆内：外部 CC0 头像优先，没有素材时退回阵营符号文字
+    const portraits = (typeof window !== 'undefined' && window.SeatPortraits) ? window.SeatPortraits : null;
+    const portrait = portraits ? portraits[sym] : null;
+    if (portrait && portrait.complete && portrait.naturalWidth) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(portrait, cx - rr, cy - rr, rr * 2, rr * 2);
+      // 底部暗角，压住头像过亮的背景，保证圆章边界清楚
+      const shade = ctx.createLinearGradient(0, cy + rr * 0.15, 0, cy + rr);
+      shade.addColorStop(0, 'rgba(0,0,0,0)');
+      shade.addColorStop(1, 'rgba(0,0,0,0.42)');
+      ctx.fillStyle = shade;
+      ctx.fillRect(cx - rr, cy - rr * 0.1, rr * 2, rr * 1.1);
+      ctx.restore();
+    } else {
+      // 圆内文字：裁切防越出圆形（双字用小号，单字用大号）
+      ctx.beginPath();
+      ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+      ctx.clip();
+      const size = sym.length >= 2 ? Math.max(8.5, r * 0.85) : Math.max(9, r * 1.05);
+      drawPixelText(sym, cx, cy + 0.5, size, contrast(col), { align: 'center', shadow: false });
+    }
     ctx.restore();
   };
 

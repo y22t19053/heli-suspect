@@ -24,3 +24,5 @@ junit.xml
 # 服务器房间快照（运行时产物）
 rooms-snapshot.json
 rooms-snapshot.json.tmp
+!public/assets/portraits/*.png
+!www/assets/portraits/*.png

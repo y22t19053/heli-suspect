@@ -194,6 +194,12 @@ let AC = null;
 let sfxWarned = false;
 function sfx(name) {
   try {
+    // 有外部 Kenney 音效的先用采样；没有/被浏览器拦截再退回 WebAudio 合成
+    const sampleName = ({
+      click: 'click', hover: 'hover', flip: 'card', swoosh: 'card', card: 'card',
+      reveal: 'reveal', gavel: 'gavel', win: 'win', lose: 'lose', shatter: 'card'
+    })[name];
+    if (sampleName && sampleSfx(sampleName)) return;
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
     if (AC.state === 'suspended') AC.resume();
     const t = AC.currentTime;
@@ -468,6 +474,47 @@ function lvMark(lv) { return lv === 1 ? '①' : (lv === 2 ? '②' : (lv === 3 ? 
  * 渲染层直接调用，不再维护本地薄封装。 */
 
 /* ---------------- 连接状态与全局 UI 状态 ---------------- */
+/* 外部美术/音效：OpenGameArt CC0 头像、Kenney CC0 界面音效。
+ * 角色头像按阵营映射到座位圆章；音效在用户第一次交互后播放。 */
+const SEAT_PORTRAITS = {};
+(function preloadPortraits() {
+  const map = {
+    '检': 'lawyer1.png', '公诉': 'lawyer1.png',
+    '辩': 'lawyer2.png', '被告': 'lawyer2.png',
+    '席': 'lawyer3.png', '第三': 'lawyer3.png',
+    '议': 'lawyer4.png', '第四': 'lawyer4.png'
+  };
+  Object.keys(map).forEach(k => {
+    const im = new Image();
+    im.src = 'assets/portraits/' + map[k];
+    SEAT_PORTRAITS[k] = im;
+  });
+  window.SeatPortraits = SEAT_PORTRAITS;
+})();
+const SAMPLE_SFX = {
+  click: 'assets/audio/click.ogg',
+  hover: 'assets/audio/hover.ogg',
+  card: 'assets/audio/card.ogg',
+  reveal: 'assets/audio/reveal.ogg',
+  gavel: 'assets/audio/gavel.ogg',
+  win: 'assets/audio/win.ogg',
+  lose: 'assets/audio/lose.ogg'
+};
+const _sampleCache = {};
+function sampleSfx(name) {
+  try {
+    const src = SAMPLE_SFX[name];
+    if (!src) return false;
+    let a = _sampleCache[name];
+    if (!a) { a = new Audio(src); _sampleCache[name] = a; }
+    a.volume = Math.max(0, Math.min(1, (typeof settings !== 'undefined' && settings.sfx != null ? settings.sfx : 80) / 100 * 0.55));
+    a.currentTime = 0;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+    return true;
+  } catch (e) { return false; }
+}
+
 /* 打包版（EXE/APK）默认不是同源页面，需要允许指定服务器地址：
  * - 桌面版/浏览器默认同源
  * - APK 可在设置里填 https://your-server 或 http://192.168.x.x:3000

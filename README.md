@@ -23,6 +23,12 @@ npm start          # http://localhost:3000
 - 5 轮后支持度最高者胜诉；先例胜利 / 陪审团否决是特殊胜出路径。
 - 联机 2–4 人；单人模式由 AI 补位。
 
+## 本轮 UI / 素材
+
+- 主菜单新增「四大律师团」头像横列，游戏内座位圆章改为外部 CC0 头像；保留 Slay 式手牌与 TFT 式头像 HUD 的阅读顺序。
+- 新增 Kenney Interface Sounds（CC0）采样：点击、抽/放牌、法槌、亮出、胜/负、悬停。
+- 素材清单与许可：[`ASSETS.md`](ASSETS.md)。
+
 ## 免费服务器 / 内网联机 / 封包
 
 见 [`DEPLOY.md`](DEPLOY.md)：

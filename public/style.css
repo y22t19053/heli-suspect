@@ -822,3 +822,34 @@ html, body {
   #menu .logo { font-size: 40px; }
   .file-left { display: contents; }
 }
+
+/* 外部 CC0 头像：主菜单“律师团”横列，贴合金铲铲式英雄选择感 */
+.champion-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 12px 0 2px;
+}
+.champ {
+  position: relative;
+  text-align: center;
+  padding: 5px 3px 4px;
+  border: 1px solid rgba(216,168,78,.24);
+  background: rgba(0,0,0,.2);
+}
+.champ img {
+  width: 54px; height: 54px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid rgba(216,168,78,.55);
+  filter: saturate(.8) contrast(1.05);
+  box-shadow: 0 0 0 3px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.35);
+}
+.champ span { display: block; margin-top: 4px; color: var(--gold-soft, #E8C888); font: 700 9px var(--sans); letter-spacing: .16em; }
+.champ:nth-child(1) img { border-color: #C94A3C; }
+.champ:nth-child(2) img { border-color: #2E5E8C; }
+.champ:nth-child(3) img { border-color: #3F7D66; }
+.champ:nth-child(4) img { border-color: #C79A4B; }
+@media (max-width: 640px) {
+  .champ img { width: 44px; height: 44px; }
+}
