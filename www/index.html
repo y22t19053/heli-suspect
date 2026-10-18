@@ -57,9 +57,8 @@
   <h1>合理怀疑</h1>
   <div class="sub">COURTROOM DRAMA · 世纪审判</div>
 
-  <button id="btn-tower" class="btn primary">审 判 之 塔 · 单人 Roguelike</button>
-  <button id="btn-offline" class="btn">经典单机模式（离线）</button>
-  <button id="btn-online" class="btn">联机模式</button>
+  <button id="btn-offline" class="btn primary">单 机 模 式（离线）</button>
+  <button id="btn-online" class="btn">联 机 模 式</button>
 
   <div class="field">
     <label>联机服务器地址</label>
@@ -95,10 +94,6 @@
     setStatus('已保存：' + v);
   });
 
-  document.getElementById('btn-tower').addEventListener('click', function () {
-    location.href = 'tower.html';
-  });
-
   document.getElementById('btn-offline').addEventListener('click', function () {
     location.href = 'singleplayer.html';
   });
@@ -107,7 +102,7 @@
     var url = currentServer().replace(/\/+$/, '');
     try { localStorage.setItem(KEY, url); } catch (e) { /* 忽略 */ }
     setStatus('正在连接 ' + url + ' …');
-    location.href = url + '/classic.html';
+    location.href = url;
   });
 })();
 </script>
