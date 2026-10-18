@@ -1050,6 +1050,11 @@ function renderGame() {
   // 渲染骨架收敛至 shared/render-core.js（renderScene）：清屏+背景+六段+尾部
   const env = renderEnv();
   env.drawBackdrop = () => {
+    // 新美术：Ink Court 插画背景（红幕/立柱/法官席/旁听席/地板/聚光）
+    if (window.RenderCore && RenderCore.drawCourtScene) {
+      RenderCore.drawCourtScene(ctx, 'game', W, H, LOW_Q);
+      return;
+    }
     // P0-4 法庭场景：深景渐变 + 木饰墙板 + 法官席轮廓 + 地板透视 + 聚光灯
     pxRect(0, 0, W, H, PAL.bg.a);
     if (LOW_Q) return;
@@ -1571,15 +1576,21 @@ function renderLogs() {
   const py0 = H - HAND_AREA_H - btnRowH - ph2 - 6;
   logRect = { x: px0, y: py0, w: panelW, h: ph2 };
   ctx.save();
-  ctx.globalAlpha = 0.92;
-  pxRect(px0, py0, panelW, ph2, 'rgba(16,20,28,0.92)');
-  pxBorder(px0, py0, panelW, ph2, PAL.border, 1.5);
+  ctx.globalAlpha = 0.95;
+  pxRect(px0 + 3, py0 + 4, panelW, ph2, 'rgba(0,0,0,0.45)');
+  pxRect(px0, py0, panelW, ph2, '#1E1710');
+  pxRect(px0 + 4, py0 + 4, panelW - 8, ph2 - 8, '#D8C39C');
+  ctx.fillStyle = 'rgba(78,54,30,0.10)';
+  for (let li = py0 + 8; li < py0 + ph2 - 6; li += 5) ctx.fillRect(px0 + 5, li, panelW - 10, 1);
+  pxBorder(px0, py0, panelW, ph2, '#1A110B', 2);
+  pxBorder(px0 + 2, py0 + 2, panelW - 4, ph2 - 4, 'rgba(216,168,78,0.55)', 1);
+  pxRect(px0, py0 + 2, 4, ph2 - 4, PAL.deepRed);
   ctx.globalAlpha = 1;
-  drawPixelText('庭审记录', px0 + 10, py0 + 10, 12, PAL.gold, { shadow: false });
+  drawPixelText('庭 审 记 录', px0 + 12, py0 + 10, 11, PAL.deepRed, { shadow: false });
   let yy = py0 + 24;
   show.forEach(ln => {
-    const f = fitText('· ' + ln, panelW - 20, 13);
-    drawPixelText(f.text, px0 + 10, yy, f.size, '#DCE6F5', { shadow: false });
+    const f = fitText('· ' + ln, panelW - 24, 12);
+    drawPixelText(f.text, px0 + 12, yy, f.size, '#3A2A1A', { shadow: false });
     yy += 15;
   });
   ctx.restore();

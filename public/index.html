@@ -78,79 +78,91 @@
     <div class="court-vignette"></div>
   </div>
 
-  <div class="panel glass">
-    <div class="logo-row">
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10v24"/><path d="M12 36h24"/><path d="M13 16h22"/><path d="M13 16l-7 8"/><path d="M35 16l7 8"/><path d="M4 28q6 8 12 0"/><path d="M32 28q6 8 12 0"/></g></svg></span>
-      <div class="logo">合理怀疑</div>
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span>
-    </div>
-    <div class="logo-sub">COURTROOM DRAMA · ONLINE · 世纪审判</div>
-    <div class="grass-divider"></div>
-
-    <!-- 律师档案卡（局外成长 P2）：等级/经验/称号/解锁进度 -->
-    <div id="profile-card" class="profile-card">
-      <div class="profile-top">
-        <span id="pf-avatar" class="pf-avatar">衡</span>
-        <div class="pf-info">
-          <div class="pf-name-row"><span id="pf-name" class="pf-name">初出茅庐</span><span id="pf-title" class="pf-title">实习律师</span></div>
-          <div class="pf-xp-bar"><div id="pf-xp-fill" class="pf-xp-fill" style="width:0%"></div></div>
-          <div class="pf-xp-text"><span id="pf-lv">Lv.1</span><span id="pf-xp">0 / 100</span></div>
-        </div>
-        <span id="pf-wins" class="pf-wins" title="胜场">胜场 0</span>
+  <div class="panel glass court-file">
+    <div class="file-header">
+      <div class="file-stamp">联邦巡回法庭<br><b>案卷</b></div>
+      <div class="logo-row">
+        <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10v24"/><path d="M12 36h24"/><path d="M13 16h22"/><path d="M13 16l-7 8"/><path d="M35 16l7 8"/><path d="M4 28q6 8 12 0"/><path d="M32 28q6 8 12 0"/></g></svg></span>
+        <div class="logo">合理怀疑</div>
+        <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span>
       </div>
+      <div class="logo-sub">THE INK COURT · 世纪审判 · 联机版</div>
+      <div class="grass-divider"></div>
     </div>
 
-    <div class="field">
-      <label>你的昵称</label>
-      <input id="inp-name" maxlength="12" placeholder="输入昵称">
+    <div class="file-body">
+      <section class="file-left">
+        <div class="file-label">律师档案 / COUNSEL</div>
+        <div id="profile-card" class="profile-card">
+          <div class="profile-top">
+            <span id="pf-avatar" class="pf-avatar">衡</span>
+            <div class="pf-info">
+              <div class="pf-name-row"><span id="pf-name" class="pf-name">初出茅庐</span><span id="pf-title" class="pf-title">实习律师</span></div>
+              <div class="pf-xp-bar"><div id="pf-xp-fill" class="pf-xp-fill" style="width:0%"></div></div>
+              <div class="pf-xp-text"><span id="pf-lv">Lv.1</span><span id="pf-xp">0 / 100</span></div>
+            </div>
+            <span id="pf-wins" class="pf-wins" title="胜场">胜场 0</span>
+          </div>
+        </div>
+
+        <button id="btn-solo" class="btn gold solo-btn">单 人 模 式 <small>AI 补位 · 直接开庭</small></button>
+
+        <div class="menu-extra">
+          <button id="btn-tutorial" class="btn half">新 手 教 程</button>
+          <button id="btn-glossary" class="btn half">术 语 百 科</button>
+          <button id="btn-about" class="btn half">关 于</button>
+          <button id="btn-settings" class="btn half">设 置</button>
+        </div>
+
+        <div class="file-empty">
+          <div class="file-empty-title">“宁可放过一个坏人，<br>不可冤枉一个好人。”</div>
+          <div class="file-empty-sub">—— 法庭速记 · 第 1 页</div>
+        </div>
+
+        <div class="hint">共 5 轮庭审。选律师 → 定次序 → 抽议题 → 抽证据 → 调查取证 → 暗置举证 → 亮出 → 审议 → 排名 → 结算。<br>快捷键：<b>空格</b>=确认 · <b>1-9</b>=选卡 · <b>F</b>=全屏 · <b>M</b>=静音</div>
+        <div class="version-tag">合理怀疑 · 世纪审判 v1.2.0 · THE INK COURT</div>
+      </section>
+
+      <section class="file-right">
+        <div class="file-label">开庭准备 / CASE SETUP</div>
+        <div class="field">
+          <label>你的昵称</label>
+          <input id="inp-name" maxlength="12" placeholder="输入昵称">
+        </div>
+        <div class="row">
+          <label>座位数</label>
+          <select id="sel-seats">
+            <option value="2">2 人</option>
+            <option value="3">3 人</option>
+            <option value="4">4 人</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>种子码（可选，留空随机）</label>
+          <input id="inp-seed" maxlength="20" placeholder="同一种子 = 同一对局">
+        </div>
+        <div class="field">
+          <label>房间密码（可选，留空公开）</label>
+          <input id="inp-pass" maxlength="12" placeholder="创建或加入时填写">
+        </div>
+        <button id="btn-create" class="btn primary">创 建 房 间 <small>→ 等待朋友入席</small></button>
+
+        <div class="divider">── 加入已有庭审 ──</div>
+
+        <div class="field">
+          <label>房间代码</label>
+          <input id="inp-code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase">
+        </div>
+        <button id="btn-join" class="btn">加 入 房 间</button>
+        <div class="join-row">
+          <button id="btn-quickjoin" class="btn half">快 速 加 入</button>
+          <button id="btn-spectate" class="btn half">旁 观 房 间</button>
+        </div>
+        <div id="menu-msg" class="msg"></div>
+      </section>
     </div>
-
-    <div class="row">
-      <label>座位数</label>
-      <select id="sel-seats">
-        <option value="2">2 人</option>
-        <option value="3">3 人</option>
-        <option value="4">4 人</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>种子码（可选，留空随机）</label>
-      <input id="inp-seed" maxlength="20" placeholder="同一种子 = 同一对局">
-    </div>
-
-    <div class="field">
-      <label>房间密码（可选，留空公开）</label>
-      <input id="inp-pass" maxlength="12" placeholder="创建或加入时填写">
-    </div>
-
-    <button id="btn-create" class="btn primary">创 建 房 间</button>
-    <button id="btn-solo" class="btn gold">单 人 模 式（AI 补位）</button>
-
-    <div class="menu-extra">
-      <button id="btn-tutorial" class="btn half">新 手 教 程</button>
-      <button id="btn-glossary" class="btn half">术 语 百 科</button>
-      <button id="btn-about" class="btn half">关 于</button>
-      <button id="btn-settings" class="btn half">设 置</button>
-    </div>
-
-    <div class="divider">─ 或 ─</div>
-
-    <div class="field">
-      <label>房间代码</label>
-      <input id="inp-code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase">
-    </div>
-    <button id="btn-join" class="btn">加 入 房 间</button>
-    <button id="btn-quickjoin" class="btn">快 速 加 入（公开房）</button>
-    <button id="btn-spectate" class="btn">旁 观 房 间（不占座）</button>
-
-    <div id="menu-msg" class="msg"></div>
-    <div class="version-tag">合理怀疑 · 世纪审判联机版 v1.2.0</div>
-    <div class="hint">规则：共 5 轮庭审，每轮 16 步——选律师→定次序→抽议题→抽证据→调查取证（传唤/留证/换证）→暗置举证→亮出（证据排除）→审议（①②③）→排名→结算倾向→整理→发放酬金。<br>
-    每轮按排名结算陪审团倾向（末位也有保底），5 轮后倾向最高者胜诉。<br>快捷键：<b>空格</b>=确认/下一步 · <b>1-9</b>=选卡 · <b>F</b>=全屏 · <b>M</b>=静音</div>
   </div>
 </div>
-
 <!-- ================= 设置弹窗（P1-5 音画设置） ================= -->
 <div id="settings" class="overlay hidden">
   <div class="panel glass narrow">

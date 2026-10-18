@@ -756,15 +756,15 @@
   function drawCardBackAt(ctx, x, y, w, h, col) {
     const shadow = E('comicShadow'), rect = E('pxRect'), border = E('pxBorder'), text = E('drawPixelText');
     const PAL = E('PAL') || {};
-    const bc = col || (PAL.ui && PAL.ui.b) || '#14213D';
+    const bc = col || (PAL.ui && PAL.ui.b) || '#D8A84E';
     shadow(x, y, w, h, 3, 3);
-    rect(x, y, w, h, '#1C2530');                       // 深蓝黑档案袋底
+    rect(x, y, w, h, '#17120E');                       // 深胡桃木档案封面
     border(x, y, w, h, bc, 2.5);
-    // 顶部机密条（红色封条）
+    // 顶部机密条（红蜡封条 + 金线）
     const barH = Math.max(11, h * 0.11);
-    rect(x + 3, y + 3, w - 6, barH, PAL.deepRed);
+    rect(x + 3, y + 3, w - 6, barH, PAL.deepRed || '#8F2420');
     border(x + 3, y + 3, w - 6, barH, PAL.black, 1);
-    text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), PAL.white, { align: 'center', shadow: false });
+    text('机密 CONFIDENTIAL', x + w / 2, y + 3 + barH / 2, Math.max(6.5, h * 0.05), '#F4D88E', { align: 'center', shadow: false });
 
     const mini = w < 70 || h < 62;                     // 迷你尺寸降级：只保留封条 + 问号
     if (mini) {
@@ -879,6 +879,51 @@
     ctx.fillStyle = '#000000';
     ctx.fillRect(Math.round(x + 2), Math.round(y + h - 3), Math.round(w - 4), 2.4);
     ctx.restore();
+
+    /* Ink Court 实体感：纸纹 + 黄铜角花 + 左上装订孔 + 右上红蜡印 */
+    if (w > 58 && h > 52) {
+      ctx.save();
+      // 纸纹（确定性短横线，不抢字）
+      ctx.strokeStyle = 'rgba(70,48,28,0.075)';
+      ctx.lineWidth = 1;
+      const seed = (card.uid || 1) * 13 + (card.name ? card.name.length : 3);
+      for (let gi = 0; gi < 5; gi++) {
+        const gy = y + 6 + ((seed * (gi + 3)) % Math.max(8, h - 12));
+        const gx = x + 4 + ((seed * (gi + 7)) % Math.max(4, w * 0.25));
+        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx + Math.min(18, w * 0.18), gy); ctx.stroke();
+      }
+      // 黄铜角花（四角 L 形）
+      const cl = Math.max(5, Math.min(9, w * 0.055));
+      ctx.strokeStyle = 'rgba(168,118,52,0.55)';
+      ctx.lineWidth = 1.4;
+      [[x + 3, y + 3, 1, 1], [x + w - 3, y + 3, -1, 1], [x + 3, y + h - 3, 1, -1], [x + w - 3, y + h - 3, -1, -1]].forEach(c => {
+        ctx.beginPath();
+        ctx.moveTo(c[0] + c[2] * cl, c[1]);
+        ctx.lineTo(c[0], c[1]);
+        ctx.lineTo(c[0], c[1] + c[3] * cl);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(c[0] + c[2] * 1.5, c[1] + c[3] * 1.5, 1.3, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(168,118,52,0.55)'; ctx.fill();
+      });
+      // 左侧装订孔
+      ctx.fillStyle = 'rgba(50,32,18,0.22)';
+      for (let bi = 1; bi <= 3; bi++) {
+        ctx.beginPath(); ctx.arc(x + 4.5, y + h * (bi / 4), 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+      // 右上红蜡印（只在大卡上）
+      if (w > 96 && h > 80) {
+        const sr = Math.max(7, Math.min(11, w * 0.065));
+        const sx = x + w - sr - 3, sy = y + sr + 4;
+        ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(143,36,32,0.88)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(224,176,90,0.65)'; ctx.lineWidth = 1.2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(sx, sy, sr * 0.66, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,224,160,0.35)'; ctx.lineWidth = 0.8; ctx.stroke();
+        text('证', sx, sy, Math.max(6, sr * 0.92), '#F4D88E', { align: 'center', shadow: false });
+      }
+      ctx.restore();
+    }
 
     // 阵营色带（o.seat 提供时）
     if (o.seat !== undefined && o.seat >= 0) {

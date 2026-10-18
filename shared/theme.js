@@ -16,46 +16,41 @@
   'use strict';
   /* 四方法律团队：公诉方红 / 被告方蓝 / 第三方绿 / 第四方金 */
   const PARTY_META = {
-    red:   { name: '公诉方律师团', short: '公诉', sym: '检', col: '#FF3B30', soft: '#FFD9D2' },
-    blue:  { name: '被告方律师团', short: '被告', sym: '辩', col: '#0A84FF', soft: '#CFE3FF' },
-    green: { name: '第三方律师团', short: '第三', sym: '席', col: '#2FBF5F', soft: '#D0F5DD' },
-    gold:  { name: '第四方律师团', short: '第四', sym: '议', col: '#FFC61A', soft: '#FFEEC9' }
+    red:   { name: '公诉方律师团', short: '公诉', sym: '检', col: '#C94A3C', soft: '#E8C6B8' },
+    blue:  { name: '被告方律师团', short: '被告', sym: '辩', col: '#2E5E8C', soft: '#C8D6E2' },
+    green: { name: '第三方律师团', short: '第三', sym: '席', col: '#3F7D66', soft: '#C6DCCF' },
+    gold:  { name: '第四方律师团', short: '第四', sym: '议', col: '#C79A4B', soft: '#E8D6B0' }
   };
-  /* #5 十组配色三维分层（键名：bg/ui/accent/paper 保留原键名兼容旧渲染，
-   * 新增 court/neutral/fx；paper 由字符串升级为对象——旧代码若直接当字符串
-   * 用会被 render-core 收口，见 ui-kit drawCard 的 PAPER 兜底） */
+  /* Ink Court：19 世纪法庭木刻 / 红丝绒 / 黄铜 / 羊皮纸 */
   const PAL = {
-    bg:     { a: '#1A1A1D', b: '#222222', light: '#FF3B30' },  // 包豪斯炭黑 + 红光晕（背景聚光灯）
-    court:  { a: '#012696', b: '#66D4C8' },                    // 克莱因蓝辩论台 + 薄荷青高光
-    ui:     { a: '#FFFFF0', b: '#C01E25', gold: '#FFED00' },   // 象牙白纸 + 正红 + 柠檬黄
-    accent: { a: '#F7EEAD', b: '#8A2BE2', danger: '#D24735' }, // 淡黄 + 紫罗兰 + 危险红
-    paper:  { a: '#01847F', b: '#1A6840', c: '#F9D2E4', d: '#FFB7C5' }, // 卡纸四档（物证绿/程序绿/封神技粉/攻击粉）
-    neutral:{ a: '#7B2CBF', b: '#80ED99' },                    // 中性紫 + 荧光绿
-    fx:     { a: '#D3FFAF', b: '#05A5FA' },                    // 特效荧光绿 + 亮蓝
-    /* —— 兼容旧键（历史渲染仍引用，值映射到新配色）—— */
-    events: { a: '#012696', b: '#66D4C8' },    // 事件牌克莱因蓝 + 薄荷青
-    reward: { a: '#FFED00', b: '#1A1A1D' },    // 奖励柠檬黄
-    draft:  { a: '#1A1A1D', b: '#FFED00' },    // 选角炭黑 + 柠檬黄
-    ink:    '#F7EEAD',
-    grave:  '#5A5A5A',
-    /* —— P0.5 语义色键（颜色纪律：渲染层高频最终色收口到此，键名即用途）—— */
-    gold:      '#FFD60A',   // 主题金（悬浮标题/脉冲边框/金条）
-    goldSoft:  '#E9C46A',   // 柔金（副标题/次要金）
-    red:       '#FF3B30',   // 公诉方红（统一鲜红）
-    blue:      '#0A84FF',   // 被告方蓝
-    green:     '#2FBF5F',   // 第三方绿
-    partyGold: '#FFC61A',   // 第四方金（阵营金）
-    darkBg:    '#0F1B2D',   // 演播室深蓝底
-    panel:     '#F2E9D2',   // 浅面板底
-    textSoft:  '#C9D6EA',   // 柔和正文（深底）
-    border:    '#3A4258',   // 深底边框
+    bg:     { a: '#0B0D10', b: '#14120F', light: '#C94A3C' },
+    court:  { a: '#1B1410', b: '#D8A84E' },
+    ui:     { a: '#F0E2C6', b: '#A82E2A', gold: '#D8A84E' },
+    accent: { a: '#E8D2A6', b: '#3F7D66', danger: '#B2352C' },
+    paper:  { a: '#D8C39C', b: '#8FA88C', c: '#D8B0AA', d: '#B97868' },
+    neutral:{ a: '#6F5A78', b: '#8FA88C' },
+    fx:     { a: '#D8C39C', b: '#3F7D66' },
+    events: { a: '#2E5E8C', b: '#D8A84E' },
+    reward: { a: '#D8A84E', b: '#1B1410' },
+    draft:  { a: '#0B0D10', b: '#D8A84E' },
+    ink:    '#F0E2C6',
+    grave:  '#6B6254',
+    gold:      '#D8A84E',
+    goldSoft:  '#E8C888',
+    red:       '#C94A3C',
+    blue:      '#2E5E8C',
+    green:     '#3F7D66',
+    partyGold: '#C79A4B',
+    darkBg:    '#0B0D10',
+    panel:     '#E8D8B4',
+    textSoft:  '#D8CBB2',
+    border:    '#6B5A3E',
     white:     '#FFFFFF',
-    black:     '#111111',
-    /* —— 高频语义色收口（渲染层高频复用色，颜色纪律最终收口）—— */
-    coin:      '#FFB020',   // 金币/奖励金（⊙ 数字/皇冠/技能标签金）
-    deepRed:   '#A31B1B',   // 档案深红（恐怖分子条/事件牌/负效果）
-    linkBlue:  '#5AC8FA',   // 信息亮蓝（旁观/已使用标记）
-    brownInk:  '#4A3100'    // 浅底深棕墨（卡片浅底正文）
+    black:     '#17120C',
+    coin:      '#D8A84E',
+    deepRed:   '#8F2420',
+    linkBlue:  '#7FB6C9',
+    brownInk:  '#2B2015'
   };
   /* 卡纸底色兜底（旧代码把 PAL.paper 当字符串用：升级后由这里补默认档） */
   const PAPER_FALLBACK = PAL.paper.a;

@@ -128,28 +128,134 @@
       return;
     }
     if (env.drawRowBackdrop) env.drawRowBackdrop(cy, rh);
-    /* ③ 辩论台 2.5D 立体感（双端统一）：克莱因蓝台面 + 炭黑底部阴影带 + 薄荷青高光 + 柠檬黄细边
-     * 台面从行区顶之上 2px 起、下沿多出 8px，两端微暗做出圆柱纵深；行卡浮在台面上 */
+    /* ③ 证据台：深色胡桃木台面 + 黄铜包边 + 红毯压边（Ink Court 新美术）
+     * 不再是整块克莱因蓝；台面有木纹、切角、投影，卡片像真的放在法庭桌上。 */
     ctx.save();
     const tbTop = cy - 2, tbH = rh + 10;
-    // 台面下方炭黑阴影带（立体投落影）
-    pxRect(0, tbTop + tbH, W, 9, 'rgba(0,0,0,0.5)');
-    pxRect(0, tbTop + tbH + 9, W, 4, 'rgba(0,0,0,0.28)');
-    // 克莱因蓝台面
-    pxRect(0, tbTop, W, tbH, PAL.court.a);
-    // 台面顶部高光：薄荷青 1.8px + 柠檬黄 1.2px 细边（2.5D 高光线）
-    pxRect(0, tbTop, W, 1.8, PAL.court.b);
-    pxRect(0, tbTop + 1.6, W, 1.1, PAL.ui.gold);
-    // 台面两端侧影（圆柱纵深）
-    ctx.fillStyle = 'rgba(0,0,0,0.16)';
-    ctx.fillRect(0, tbTop, 28, tbH);
-    ctx.fillRect(W - 28, tbTop, 28, tbH);
-    // 台面内细纹理：极淡的横向分隔线（法庭木纹/砖缝，低对比不抢行卡）
-    ctx.fillStyle = 'rgba(255,255,255,0.045)';
-    ctx.fillRect(0, tbTop + tbH * 0.5, W, 1);
+    // 台下投影
+    pxRect(0, tbTop + tbH, W, 11, 'rgba(0,0,0,0.58)');
+    pxRect(0, tbTop + tbH + 11, W, 5, 'rgba(0,0,0,0.32)');
+    // 胡桃木台面（中间略亮，两端压暗）
+    const wood = ctx.createLinearGradient(0, tbTop, 0, tbTop + tbH);
+    wood.addColorStop(0, '#3B2A1E');
+    wood.addColorStop(0.10, '#2A1D15');
+    wood.addColorStop(0.55, '#1B1310');
+    wood.addColorStop(1, '#0D0908');
+    ctx.fillStyle = wood;
+    ctx.fillRect(0, tbTop, W, tbH);
+    // 木纹：细长横纹 + 两端切角
+    ctx.strokeStyle = 'rgba(214,178,112,0.075)';
+    ctx.lineWidth = 1;
+    for (let wi = 1; wi <= 7; wi++) {
+      const wy = tbTop + (tbH * wi / 8) + Math.sin(wi * 2.1) * 2;
+      ctx.beginPath(); ctx.moveTo(0, wy); ctx.lineTo(W, wy); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,0.30)';
+    for (let wx = 0; wx < W; wx += Math.max(90, W * 0.085)) {
+      ctx.beginPath(); ctx.moveTo(wx, tbTop + 4); ctx.lineTo(wx + 18, tbTop + tbH - 4); ctx.stroke();
+    }
+    // 顶部黄铜高光 + 底部红毯压边
+    pxRect(0, tbTop, W, 2, 'rgba(216,168,78,0.58)');
+    pxRect(0, tbTop + 2, W, 1, 'rgba(255,238,190,0.22)');
+    pxRect(0, tbTop + tbH - 5, W, 5, 'rgba(92,18,22,0.55)');
+    pxRect(0, tbTop + tbH - 5, W, 1.2, 'rgba(216,168,78,0.30)');
+    // 两端深色立柱压边
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(0, tbTop, 25, tbH);
+    ctx.fillRect(W - 25, tbTop, 25, tbH);
+    // 黄铜铆钉
+    ctx.fillStyle = 'rgba(216,168,78,0.42)';
+    for (let rx = 34; rx < W - 20; rx += Math.max(120, W * 0.12)) {
+      ctx.beginPath(); ctx.arc(rx, tbTop + 7, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rx, tbTop + tbH - 10, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
-    const lb = copy.rowLabel || { x: 20, dy: -4, col: '#9FB3CE' };
-    drawPixelText('证据 · 已亮出', lb.x, cy + lb.dy, lb.size || 13, lb.col, { shadow: false });
+    /* 桌面道具：红毯压边 / 法槌 / 法典 / 中央法徽，让空证据台不再是一块空木板 */
+    ctx.save();
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = 'rgba(92,18,22,0.55)';
+    ctx.fillRect(0, cy + rh * 0.48, W, Math.max(4, rh * 0.05));
+    ctx.fillStyle = 'rgba(216,168,78,0.22)';
+    ctx.fillRect(0, cy + rh * 0.48, W, 1);
+    // 左：法槌
+    ctx.save();
+    ctx.translate(W * 0.065, cy + rh * 0.62);
+    ctx.rotate(-0.42);
+    ctx.fillStyle = '#3A2416';
+    ctx.fillRect(-4, -3, 64, 7);
+    ctx.fillStyle = '#6B4525';
+    ctx.fillRect(56, -12, 22, 24);
+    ctx.strokeStyle = 'rgba(216,168,78,0.45)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(56, -12, 22, 24);
+    ctx.restore();
+    // 右：法典堆
+    ctx.save();
+    ctx.translate(W * 0.87, cy + rh * 0.58);
+    for (let bi = 0; bi < 3; bi++) {
+      ctx.fillStyle = bi === 0 ? '#4A2A1A' : (bi === 1 ? '#2F3A2A' : '#3A2020');
+      ctx.fillRect(-44 + bi * 3, 8 - bi * 10, 88 - bi * 6, 9);
+      ctx.strokeStyle = 'rgba(216,168,78,0.35)'; ctx.lineWidth = 1;
+      ctx.strokeRect(-44 + bi * 3, 8 - bi * 10, 88 - bi * 6, 9);
+    }
+    ctx.restore();
+    // 中：法徽水印
+    if (typeof drawSkillIcon === 'function') {
+      ctx.globalAlpha = 0.30;
+      drawSkillIcon(ctx, 'scale', W / 2, cy + rh * 0.50, Math.min(84, rh * 0.52), 'rgba(216,168,78,0.9)');
+    }
+    // 两侧黄铜烛台 + 暖光（法庭夜审氛围）
+    [W * 0.12, W * 0.88].forEach(function (cxx) {
+      ctx.globalAlpha = 0.72;
+      ctx.fillStyle = '#3A2416';
+      ctx.fillRect(cxx - 3, cy + rh * 0.52, 6, rh * 0.30);
+      ctx.fillStyle = '#6B4525';
+      ctx.fillRect(cxx - 11, cy + rh * 0.80, 22, 5);
+      ctx.fillStyle = '#D8A84E';
+      ctx.fillRect(cxx - 8, cy + rh * 0.50, 16, 3);
+      // 火焰
+      ctx.globalAlpha = 0.55;
+      var flame = ctx.createRadialGradient(cxx, cy + rh * 0.44, 1, cxx, cy + rh * 0.44, 26);
+      flame.addColorStop(0, 'rgba(255,232,170,0.55)');
+      flame.addColorStop(0.4, 'rgba(255,170,70,0.20)');
+      flame.addColorStop(1, 'rgba(255,110,30,0)');
+      ctx.fillStyle = flame;
+      ctx.beginPath(); ctx.arc(cxx, cy + rh * 0.44, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#FFE9B0';
+      ctx.beginPath();
+      ctx.moveTo(cxx, cy + rh * 0.42);
+      ctx.quadraticCurveTo(cxx + 4, cy + rh * 0.46, cxx, cy + rh * 0.49);
+      ctx.quadraticCurveTo(cxx - 4, cy + rh * 0.46, cxx, cy + rh * 0.42);
+      ctx.fill();
+    });
+    // 中央摊开的卷宗 + 散落证据，填满空证据台（有牌时被牌压住，不抢信息）
+    ctx.save();
+    ctx.globalAlpha = 0.56;
+    const fw = Math.min(W * 0.30, 300), fh = Math.min(rh * 0.52, 92);
+    const fx0 = W / 2 - fw / 2, fy0 = cy + rh * 0.18;
+    ctx.translate(W / 2, fy0 + fh / 2);
+    ctx.rotate(-0.025);
+    ctx.fillStyle = '#C9B48E';
+    ctx.fillRect(-fw / 2, -fh / 2, fw / 2 - 2, fh);
+    ctx.fillStyle = '#D8C39C';
+    ctx.fillRect(0, -fh / 2 + 2, fw / 2 - 2, fh - 2);
+    ctx.strokeStyle = 'rgba(42,28,16,0.55)'; ctx.lineWidth = 1.4;
+    ctx.strokeRect(-fw / 2, -fh / 2, fw, fh);
+    ctx.beginPath(); ctx.moveTo(0, -fh / 2); ctx.lineTo(0, fh / 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(42,28,16,0.18)'; ctx.lineWidth = 1;
+    for (let li = 1; li <= 5; li++) {
+      const ly = -fh / 2 + fh * (li / 6);
+      ctx.beginPath(); ctx.moveTo(8, ly); ctx.lineTo(fw / 2 - 14, ly); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fw / 2 + 10, ly); ctx.lineTo(fw - 12, ly); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(143,36,32,0.72)';
+    ctx.beginPath(); ctx.arc(fw / 2 - 24, fh / 2 - 16, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(216,168,78,0.6)'; ctx.stroke();
+    drawPixelText('卷宗', fw / 2 - 24, fh / 2 - 16, 8, '#F4D88E', { align: 'center', shadow: false });
+    drawPixelText('CASE FILE', -fw / 2 + 12, -fh / 2 + 14, 7, 'rgba(42,28,16,0.55)', { shadow: false });
+    ctx.restore();
+    ctx.restore();
+    const lb = copy.rowLabel || { x: 20, dy: -4, col: '#C9A96A' };
+    drawPixelText('证 据 · 已 亮 出', lb.x, cy + lb.dy, lb.size || 12, lb.col, { shadow: false });
     // 审议阶段：行左/右半区分隔线 + 行首/行尾标记（位置博弈技能可读性）
     if (g.phase === 'count') {
       const act = lay.items.filter(it => it.revealed === true && it.removed !== true);
@@ -492,9 +598,30 @@
       const focusPhase = g.phase === 'buy' || g.phase === 'play' || g.phase === 'discard' || g.phase === 'preEvent' || g.phase === 'postEvent';
       const focusDim = (copy.screenGuard === false || env.screen === 'game') && focusPhase && !RC.myTurnOf(env) && !isMe && act !== i;
       if (focusDim) { ctx.save(); ctx.globalAlpha = 0.4; }
-      pxRect(x, y, w, ph - 4, isMe ? campSoft(i) : (copy.panelBg || PAL.panel));
-      const brd = copy.panelBorder ? copy.panelBorder(act === i) : { col: PAL.black, w: 2 };
-      pxBorder(x, y, w, ph - 4, brd.col, brd.w);
+      // Ink Court 席位牌：深色木框 + 内嵌羊皮纸记录条 + 黄铜铆钉 + 阵营蜡条
+      pxRect(x + 2, y + 3, w, ph - 4, 'rgba(0,0,0,0.42)');
+      pxRect(x, y, w, ph - 4, '#241A12');
+      ctx.fillStyle = 'rgba(216,168,78,0.10)';
+      ctx.fillRect(x + 1, y + 1, w - 2, 1);
+      pxRect(x + 30, y + 2, Math.max(20, w - 36), ph - 8, isMe ? campSoft(i) : (copy.panelBg || PAL.panel));
+      ctx.fillStyle = 'rgba(255,250,230,0.38)';
+      ctx.fillRect(x + 31, y + 3, Math.max(10, w - 38), 1);
+      ctx.fillStyle = 'rgba(78,54,30,0.10)';
+      for (let gi = 5; gi < ph - 7; gi += 4) {
+        ctx.fillRect(x + 32, y + gi, Math.max(8, w - 40), 1);
+      }
+      pxBorder(x, y, w, ph - 4, '#1A110B', 2);
+      pxBorder(x + 1, y + 1, w - 2, ph - 6, 'rgba(216,168,78,0.55)', 1);
+      pxBorder(x + 30, y + 2, Math.max(20, w - 36), ph - 8, 'rgba(42,28,16,0.55)', 1);
+      pxRect(x, y + 2, 4, ph - 8, campColor(i));
+      pxBorder(x, y + 2, 4, ph - 8, 'rgba(42,28,16,0.8)', 1);
+      // 黄铜铆钉
+      ctx.fillStyle = 'rgba(216,168,78,0.55)';
+      [[x + 10, y + 7], [x + 10, y + ph - 11], [x + w - 8, y + 7], [x + w - 8, y + ph - 11]].forEach(function (pt) {
+        ctx.beginPath(); ctx.arc(pt[0], pt[1], 1.4, 0, Math.PI * 2); ctx.fill();
+      });
+      const brd = copy.panelBorder ? copy.panelBorder(act === i) : { col: '#1A110B', w: 2 };
+      if (brd && brd.w) pxBorder(x - 1, y - 1, w + 2, ph - 2, brd.col, brd.w);
       const sc = s.scandal || 0;
       const isActing = act === i;
       const isPlayAct = isActing && g.phase === 'play';
@@ -598,6 +725,21 @@
         env.hoverCards.push({ x: x + avX, y: avY2, w: avSz, h: avSz, kind: 'crossView', data: { targetSeat: i } });
         if (copy.pickBtn) copy.pickBtn(x + avX, avY2, avSz, avSz, 'crossView', i);
       }
+      // 席位牌实体感：底部折角 + 右侧红蜡印
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.moveTo(x + w - 12, y + ph - 4);
+      ctx.lineTo(x + w - 4, y + ph - 4);
+      ctx.lineTo(x + w - 4, y + ph - 12);
+      ctx.closePath(); ctx.fill();
+      const sealR = Math.max(6, Math.min(8, (ph - 4) * 0.17));
+      const sealX = x + w - sealR - 5, sealY = y + ph - sealR - 5;
+      ctx.beginPath(); ctx.arc(sealX, sealY, sealR, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(143,36,32,0.78)'; ctx.fill();
+      ctx.strokeStyle = 'rgba(216,168,78,0.50)'; ctx.lineWidth = 1; ctx.stroke();
+      drawPixelText(partyOf(i).sym || '卷', sealX, sealY, Math.max(6, sealR * 0.9), '#F4D88E', { align: 'center', shadow: false });
+      ctx.restore();
       if (focusDim) ctx.restore();
     }
   };
@@ -1075,6 +1217,294 @@
     };
   };
 
+  /* ---------------- Ink Court：共享法庭场景画（双端背景唯一源） ----------------
+   * 目标：不是“深蓝渐变 + 几条线”，而是一张有层次的插画：
+   *   红丝绒幕布 / 黄铜立柱 / 法官席剪影 / 旁听席 / 透视木地板 / 聚光灯 / 网点 / 尘埃。
+   * 所有元素都画在信息层后面，alpha 压得很低，保证卡牌和文字可读。
+   * kind: menu | draft | game | over. LOW_Q 只画底色 + 暗角。 */
+  RC.drawCourtScene = function (ctx, kind, W, H, lowQ) {
+    var P = (typeof PAL !== 'undefined' ? PAL : {}) || {};
+    var menu = kind === 'menu';
+    var over = kind === 'over';
+    var draft = kind === 'draft';
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() / 1000 : 0;
+
+    /* 底色：深墨绿/炭黑，比纯蓝更有“老法庭”的木头与铜锈感 */
+    var base = ctx.createLinearGradient(0, 0, 0, H);
+    base.addColorStop(0, '#0B1012');
+    base.addColorStop(0.45, '#11181A');
+    base.addColorStop(0.78, '#0D1214');
+    base.addColorStop(1, '#07090B');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, W, H);
+
+    /* 低配：只留底色和暗角 */
+    if (lowQ) {
+      var vg0 = ctx.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.20, W / 2, H * 0.42, Math.max(W, H) * 0.78);
+      vg0.addColorStop(0, 'rgba(0,0,0,0)');
+      vg0.addColorStop(1, 'rgba(0,0,0,0.58)');
+      ctx.fillStyle = vg0;
+      ctx.fillRect(0, 0, W, H);
+      return;
+    }
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+
+    /* ① 墙面：木饰板 + 细木纹 */
+    var plankW = Math.max(38, W * 0.052);
+    for (var px = plankW / 2; px < W; px += plankW) {
+      ctx.strokeStyle = 'rgba(214,178,112,0.055)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H * 0.84); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.16)';
+      ctx.beginPath(); ctx.moveTo(px + 2, 0); ctx.lineTo(px + 2, H * 0.84); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(214,178,112,0.045)';
+    ctx.fillRect(0, H * 0.26, W, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(0, H * 0.26 + 2, W, 7);
+
+    /* ② 大拱门 + 两侧黄铜立柱 */
+    var archCx = W / 2;
+    var archR = Math.min(W * 0.27, H * 0.33);
+    var archY = H * 0.10 + archR * 0.52;
+    ctx.strokeStyle = 'rgba(214,178,112,0.16)';
+    ctx.lineWidth = Math.max(2, W * 0.0022);
+    ctx.beginPath(); ctx.arc(archCx, archY, archR, Math.PI, 0); ctx.stroke();
+    ctx.strokeStyle = 'rgba(214,178,112,0.075)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(archCx, archY, archR * 0.86, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(archCx, archY, archR * 0.72, Math.PI, 0); ctx.stroke();
+
+    var colW = Math.max(12, W * 0.018);
+    var colTop = H * 0.16;
+    var colH = H * 0.66;
+    [W * 0.16, W * 0.84].forEach(function (cx0) {
+      var cg = ctx.createLinearGradient(cx0 - colW / 2, 0, cx0 + colW / 2, 0);
+      cg.addColorStop(0, 'rgba(20,26,24,0.55)');
+      cg.addColorStop(0.35, 'rgba(98,78,44,0.30)');
+      cg.addColorStop(0.55, 'rgba(214,178,112,0.20)');
+      cg.addColorStop(1, 'rgba(8,10,10,0.55)');
+      ctx.fillStyle = cg;
+      ctx.fillRect(cx0 - colW / 2, colTop, colW, colH);
+      // 柱头/柱础
+      ctx.fillStyle = 'rgba(214,178,112,0.22)';
+      ctx.fillRect(cx0 - colW * 1.15, colTop - 7, colW * 2.3, 7);
+      ctx.fillRect(cx0 - colW * 1.15, colTop + colH, colW * 2.3, 8);
+      // 凹槽
+      ctx.strokeStyle = 'rgba(0,0,0,0.24)';
+      ctx.lineWidth = 1;
+      for (var fi = -2; fi <= 2; fi++) {
+        var fx = cx0 + fi * colW * 0.17;
+        ctx.beginPath(); ctx.moveTo(fx, colTop + 10); ctx.lineTo(fx, colTop + colH - 6); ctx.stroke();
+      }
+    });
+
+    /* ③ 红丝绒幕布：顶部帷幔 + 两侧褶皱（菜单最明显，游戏里压低） */
+    var curtainA = menu ? 0.72 : 0.42;
+    var valH = menu ? H * 0.16 : H * 0.12;
+    var vg = ctx.createLinearGradient(0, 0, 0, valH);
+    vg.addColorStop(0, 'rgba(92,20,24,' + curtainA + ')');
+    vg.addColorStop(0.55, 'rgba(126,28,32,' + (curtainA * 0.92) + ')');
+    vg.addColorStop(1, 'rgba(52,12,15,' + (curtainA * 0.8) + ')');
+    ctx.fillStyle = vg;
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(W, 0); ctx.lineTo(W, valH * 0.72);
+    ctx.quadraticCurveTo(W * 0.72, valH * 1.10, W * 0.50, valH * 0.82);
+    ctx.quadraticCurveTo(W * 0.28, valH * 1.10, 0, valH * 0.72);
+    ctx.closePath(); ctx.fill();
+    // 帷幔金边 + 流苏
+    ctx.strokeStyle = 'rgba(214,178,112,' + (menu ? 0.55 : 0.30) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, valH * 0.72);
+    ctx.quadraticCurveTo(W * 0.28, valH * 1.10, W * 0.50, valH * 0.82);
+    ctx.quadraticCurveTo(W * 0.72, valH * 1.10, W, valH * 0.72);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(214,178,112,' + (menu ? 0.22 : 0.10) + ')';
+    for (var tx0 = W * 0.04; tx0 < W; tx0 += Math.max(28, W * 0.035)) {
+      ctx.fillRect(tx0, valH * 0.72 + Math.sin(tx0 * 0.05) * 4, 2, 10);
+    }
+
+    // 左右幕布
+    function drawCurtain(side) {
+      var cw = W * (menu ? 0.13 : 0.085);
+      var x0 = side < 0 ? 0 : W - cw;
+      var cg2 = ctx.createLinearGradient(x0, 0, x0 + cw, 0);
+      cg2.addColorStop(0, 'rgba(58,12,16,' + (menu ? 0.78 : 0.55) + ')');
+      cg2.addColorStop(0.45, 'rgba(130,30,34,' + (menu ? 0.62 : 0.38) + ')');
+      cg2.addColorStop(0.72, 'rgba(86,18,22,' + (menu ? 0.52 : 0.30) + ')');
+      cg2.addColorStop(1, 'rgba(30,6,9,' + (menu ? 0.72 : 0.40) + ')');
+      ctx.fillStyle = cg2;
+      ctx.beginPath();
+      ctx.moveTo(x0, 0);
+      ctx.lineTo(x0 + cw, 0);
+      // 内缘波浪
+      for (var yy = 0; yy <= H; yy += H / 9) {
+        var wob = Math.sin(yy * 0.013 + (side < 0 ? 0 : 1.4)) * cw * 0.10;
+        ctx.lineTo(x0 + cw + wob, yy);
+      }
+      ctx.lineTo(x0, H);
+      ctx.closePath(); ctx.fill();
+      // 褶皱高光
+      ctx.strokeStyle = 'rgba(255,190,140,' + (menu ? 0.10 : 0.055) + ')';
+      ctx.lineWidth = 1;
+      for (var k = 1; k <= 4; k++) {
+        ctx.beginPath();
+        for (var yy2 = 0; yy2 <= H; yy2 += 18) {
+          var xx2 = x0 + cw * (k / 4.6) + Math.sin(yy2 * 0.012 + k) * cw * 0.05;
+          if (yy2 === 0) ctx.moveTo(xx2, yy2); else ctx.lineTo(xx2, yy2);
+        }
+        ctx.stroke();
+      }
+      // 内缘金边
+      ctx.strokeStyle = 'rgba(214,178,112,' + (menu ? 0.32 : 0.16) + ')';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (var yy3 = 0; yy3 <= H; yy3 += 12) {
+        var wob3 = Math.sin(yy3 * 0.013 + (side < 0 ? 0 : 1.4)) * cw * 0.10;
+        if (yy3 === 0) ctx.moveTo(x0 + cw + wob3, yy3); else ctx.lineTo(x0 + cw + wob3, yy3);
+      }
+      ctx.stroke();
+    }
+    drawCurtain(-1); drawCurtain(1);
+
+    /* ④ 法官席剪影 + 法徽（在幕布/立柱之后，HUD 之前） */
+    var benchY = menu ? H * 0.18 : H * 0.10;
+    var benchW2 = Math.min(W * 0.38, 520);
+    var benchH2 = menu ? H * 0.13 : H * 0.12;
+    var bg2 = ctx.createLinearGradient(0, benchY, 0, benchY + benchH2);
+    bg2.addColorStop(0, 'rgba(34,22,16,0.86)');
+    bg2.addColorStop(1, 'rgba(10,8,7,0.92)');
+    ctx.fillStyle = bg2;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - benchW2 * 0.5, benchY + benchH2);
+    ctx.lineTo(W / 2 - benchW2 * 0.5, benchY + benchH2 * 0.28);
+    ctx.quadraticCurveTo(W / 2, benchY - benchH2 * 0.14, W / 2 + benchW2 * 0.5, benchY + benchH2 * 0.28);
+    ctx.lineTo(W / 2 + benchW2 * 0.5, benchY + benchH2);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(214,178,112,0.28)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - benchW2 * 0.5, benchY + benchH2 * 0.30);
+    ctx.quadraticCurveTo(W / 2, benchY - benchH2 * 0.10, W / 2 + benchW2 * 0.5, benchY + benchH2 * 0.30);
+    ctx.stroke();
+    // 高背椅
+    ctx.fillStyle = 'rgba(12,9,7,0.90)';
+    ctx.fillRect(W / 2 - 34, benchY + benchH2 * 0.05, 68, benchH2 * 0.72);
+    ctx.strokeStyle = 'rgba(214,178,112,0.18)';
+    ctx.strokeRect(W / 2 - 34, benchY + benchH2 * 0.05, 68, benchH2 * 0.72);
+
+    /* ⑤ 旁听席剪影：左右两排人头肩线 */
+    var galY = H * 0.56;
+    ctx.fillStyle = 'rgba(4,6,7,0.72)';
+    for (var row = 0; row < 2; row++) {
+      var gy = galY + row * H * 0.075;
+      for (var side = -1; side <= 1; side += 2) {
+        for (var j = 0; j < 7; j++) {
+          var gx = W / 2 + side * (W * 0.22 + j * W * 0.038);
+          var gh = H * 0.038 + (j % 3) * 2;
+          ctx.beginPath();
+          ctx.arc(gx, gy, gh * 0.44, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(gx - gh * 0.72, gy + gh * 1.6);
+          ctx.quadraticCurveTo(gx, gy + gh * 0.45, gx + gh * 0.72, gy + gh * 1.6);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+
+    /* ⑥ 透视木地板 + 红毯 */
+    var floorY = H * 0.79;
+    var fg2 = ctx.createLinearGradient(0, floorY, 0, H);
+    fg2.addColorStop(0, 'rgba(32,22,14,0.50)');
+    fg2.addColorStop(1, 'rgba(6,5,4,0.82)');
+    ctx.fillStyle = fg2;
+    ctx.fillRect(0, floorY, W, H - floorY);
+    // 地板透视线
+    ctx.strokeStyle = 'rgba(214,178,112,0.07)';
+    ctx.lineWidth = 1;
+    for (var fi2 = 1; fi2 <= 4; fi2++) {
+      var fy = floorY + (H - floorY) * (fi2 / 4);
+      ctx.beginPath(); ctx.moveTo(0, fy); ctx.lineTo(W, fy); ctx.stroke();
+    }
+    var vpx = W / 2, vpy = floorY - H * 0.10;
+    for (var vi = -7; vi <= 7; vi++) {
+      ctx.beginPath(); ctx.moveTo(vpx + vi * W * 0.09, floorY); ctx.lineTo(vpx + vi * W * 0.22, H); ctx.stroke();
+    }
+    // 红毯
+    var runner = ctx.createLinearGradient(W * 0.40, 0, W * 0.60, 0);
+    runner.addColorStop(0, 'rgba(92,20,24,0.05)');
+    runner.addColorStop(0.5, 'rgba(150,34,36,0.22)');
+    runner.addColorStop(1, 'rgba(92,20,24,0.05)');
+    ctx.fillStyle = runner;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.44, floorY); ctx.lineTo(W * 0.56, floorY);
+    ctx.lineTo(W * 0.68, H); ctx.lineTo(W * 0.32, H);
+    ctx.closePath(); ctx.fill();
+
+    /* ⑦ 聚光灯 + 光柱 */
+    var spot = ctx.createRadialGradient(W / 2, -H * 0.08, 10, W / 2, H * 0.48, Math.max(W, H) * 0.74);
+    spot.addColorStop(0, 'rgba(255,232,176,0.18)');
+    spot.addColorStop(0.28, 'rgba(255,220,150,0.075)');
+    spot.addColorStop(0.65, 'rgba(255,220,150,0.018)');
+    spot.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = spot;
+    ctx.fillRect(0, 0, W, H);
+    // 两束侧光
+    ctx.fillStyle = 'rgba(255,226,166,0.035)';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.10, 0); ctx.lineTo(W * 0.22, 0); ctx.lineTo(W * 0.38, H); ctx.lineTo(W * 0.02, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(W * 0.90, 0); ctx.lineTo(W * 0.78, 0); ctx.lineTo(W * 0.62, H); ctx.lineTo(W * 0.98, H); ctx.closePath(); ctx.fill();
+
+    /* ⑧ 尘埃/网点：让画面有“印刷插画”的颗粒 */
+    ctx.fillStyle = 'rgba(255,244,206,0.050)';
+    for (var di = 0; di < 34; di++) {
+      var dx = (di * 137.3 + Math.sin(di) * 20) % W;
+      var dy = (di * 83.7 + Math.cos(di * 1.7) * 24) % (H * 0.82);
+      ctx.beginPath(); ctx.arc(dx, dy, 0.7 + (di % 3) * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    var step = 14;
+    for (var hy = 0; hy < H; hy += step) {
+      for (var hx = (hy / step % 2) * step; hx < W; hx += step * 2) {
+        ctx.fillRect(hx, hy, 1.1, 1.1);
+      }
+    }
+
+    /* ⑨ 菜单专属：中央天平法徽 + 顶部金线 */
+    if (menu && typeof drawSkillIcon === 'function') {
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      drawSkillIcon(ctx, 'scale', W / 2, H * 0.27, Math.min(W * 0.17, H * 0.20), 'rgba(214,178,112,0.92)');
+      ctx.restore();
+    }
+    if (over) {
+      var glow2 = ctx.createRadialGradient(W / 2, H * 0.28, 4, W / 2, H * 0.28, Math.max(W, H) * 0.55);
+      glow2.addColorStop(0, 'rgba(255,214,10,0.20)');
+      glow2.addColorStop(0.5, 'rgba(255,214,10,0.06)');
+      glow2.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow2; ctx.fillRect(0, 0, W, H);
+    }
+    if (draft) {
+      ctx.fillStyle = 'rgba(10,8,5,0.30)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    /* ⑩ 暗角 */
+    var vg2 = ctx.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.18, W / 2, H * 0.42, Math.max(W, H) * 0.78);
+    vg2.addColorStop(0, 'rgba(0,0,0,0)');
+    vg2.addColorStop(0.72, 'rgba(0,0,0,0.18)');
+    vg2.addColorStop(1, 'rgba(0,0,0,0.62)');
+    ctx.fillStyle = vg2;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.restore();
+  };
+
   /* ---------------- P0-3 场景化：三套独立背景构图 ---------------- 
    * menu / draft / over 三屏背景收口为独立构图语言（game 屏保留法庭场景 drawBackdrop）：
    *   menu  —— 正门大堂：大拱门 + 双立柱 + 顶部暖聚光（庄严入口感）
@@ -1082,6 +1512,8 @@
    *   over  —— 胜利荣光：中央金辉 + 两侧暖光束 + 法院剪影地坪（落幕感）
    * 每套独立成画，互不复用；LOW_Q 时只画底色（低端机降级）。 */
   RC.sceneBg = function (ctx, kind, W, H, lowQ) {
+    /* 新美术：统一走 Ink Court 插画背景；旧构图保留在下方作为极端回退。 */
+    if (RC.drawCourtScene) { RC.drawCourtScene(ctx, kind, W, H, lowQ); return; }
     var PALo = (typeof PAL !== 'undefined' ? PAL : {}) || {};
     pxRect(0, 0, W, H, (PALo.draft && PALo.draft.a) || '#1A1A1D');
     if (lowQ) return;
