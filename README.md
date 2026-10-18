@@ -25,7 +25,24 @@ npm start          # 启动联机服务器，默认 http://localhost:3000
 - Oracle Cloud Always Free（2 OCPU / 12GB）
 - `Dockerfile` 可直接部署
 - Windows 桌面版已构建：`dist/合理怀疑-世纪审判-1.2.0-win64.exe`（双击即玩，内置本地服务器，可当局域网主机）
+- Android APK 已构建：`dist/合理怀疑-1.2.0.apk`（离线单机 + 联机连服务器）
+- GitHub：<https://github.com/y22t19053/heli-suspect>
 - APK/PWA 的封包取舍
+
+## Android APK
+
+```text
+dist/合理怀疑-1.2.0.apk
+```
+
+- 包名：`com.y22t19053.heliuspect`
+- 版本：1.2.0（versionCode 2）
+- debug 签名，侧载安装；不需要上架
+- 打开后：
+  - **单机模式（离线）**：直接玩 `singleplayer.html`
+  - **联机模式**：默认连 Render；首次使用可在首页改服务器地址
+- 默认服务器地址：`https://heli-suspect.onrender.com`
+- Render 免费服务冷启动时，第一次进入可能要等 30–60 秒
 
 ## Windows 桌面版
 

@@ -218,19 +218,38 @@ dist/合理怀疑-世纪审判-1.2.0-win64.exe
 - **单机模式**（`singleplayer.html`）可以完全离线打包；
 - **联机模式**必须有服务端，APK/EXE 本身不能凭空联机。
 
-### 后续：PWA / APK
+### 已完成：Android APK
 
-1. **PWA**（0 成本）
-   - 手机浏览器打开线上地址 → “添加到主屏幕”；
-   - 单机可离线；联机照常连服务器；
-   - 这是最快、最省事的“App 化”。
+已经用 **Capacitor 8 + 内置 Web 资源** 打包完成：
 
-2. **APK（Android 客户端）**
-   - 用 Capacitor 把 Web 客户端包成 WebView App；
-   - 单机：把 `singleplayer.html`、`shared/`、字体等放进 assets，离线玩；
-   - 联机：App 里填“服务器地址”，连 PC/云主机；
-   - **不要在 Android 里塞 Node 服务器**：Node 官方不支持 Android 直接跑；用 Termux 也只是折腾，不适合发给朋友。
-   - 想让手机当主机，实际还是让 PC/云主机跑服务端，手机只是客户端。
+```text
+dist/合理怀疑-1.2.0.apk
+```
+
+- 包名 `com.y22t19053.heliuspect`，版本 1.2.0（versionCode 2）；
+- 首页提供 **单机（离线）** / **联机** / 服务器地址；
+- 单机加载打包进去的 `singleplayer.html` + `shared/`，断网可玩；
+- 联机默认打开 Render 地址，可在首页改成自己的服务器；
+- debug 签名，Android 侧载安装，不上架；
+- 构建：`cd android && gradlew.bat assembleDebug`（需要 JDK 21 + Android SDK 36）。
+
+### 公网部署（Render）
+
+仓库已推送：<https://github.com/y22t19053/heli-suspect>
+
+1. 用 GitHub 登录 <https://dashboard.render.com/register>；
+2. 新建 **Blueprint**，连接 `y22t19053/heli-suspect`；
+3. Render 读取 `render.yaml`：免费 Web Service、`node server.js`、`/health`；
+4. 部署完成后拿到 `https://heli-suspect.onrender.com`（如果服务名被占用，URL 会不同，APK 首页可改）；
+5. 先访问 `/health` 确认 200，再让朋友建房/进房测试。
+
+> Render 免费服务空闲会休眠，第一次访问 30–60 秒冷启动；这是免费方案的限制。
+
+### 后续：PWA
+
+- 手机浏览器打开线上地址 → “添加到主屏幕”；
+- 单机可离线；联机照常连服务器；
+- Android 已有 APK，PWA 主要作为电脑/其他设备的轻量入口。
 
 ### 服务器地址配置（已实现）
 
