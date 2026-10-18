@@ -255,7 +255,8 @@
     ctx.restore();
     ctx.restore();
     const lb = copy.rowLabel || { x: 20, dy: -4, col: '#C9A96A' };
-    drawPixelText('证 据 · 已 亮 出', lb.x, cy + lb.dy, lb.size || 12, lb.col, { shadow: false });
+    const rowLabelText = (row.length && row.some(it => it.revealed === true)) ? '证 据 · 已 亮 出' : '证 据 · 暗 置 中';
+    drawPixelText(rowLabelText, lb.x, cy + lb.dy, lb.size || 12, lb.col, { shadow: false });
     // 审议阶段：行左/右半区分隔线 + 行首/行尾标记（位置博弈技能可读性）
     if (g.phase === 'count') {
       const act = lay.items.filter(it => it.revealed === true && it.removed !== true);
@@ -282,8 +283,33 @@
       else RC.drawRowCardOf(env, it);
     });
     if (!row.length) {
+      /* 空桌不再是一块空木板：画出 2–4 个暗置槽位，明确「暗置 → 亮出 → 从左到右结算」。
+       * 纯装饰，不改变任何行数据/结算顺序。 */
+      const seatsN = Math.max(2, (g.seats ? g.seats.length : 2));
+      const slotW = Math.min(118, W * 0.095);
+      const slotH = Math.min(Math.max(54, rh * 0.52), 82);
+      const gap = Math.max(18, slotW * 0.34);
+      const totalW = seatsN * slotW + (seatsN - 1) * gap;
+      const startX = W / 2 - totalW / 2;
+      const slotY = cy + rh * 0.22;
+      drawPixelText('暗 置 区 · 左 → 右 依 次 结 算', W / 2, cy - 16, 12, 'rgba(216,168,78,0.72)', { align: 'center', shadow: false });
+      for (let si = 0; si < seatsN; si++) {
+        const sx = startX + si * (slotW + gap);
+        ctx.save();
+        ctx.globalAlpha = 0.58;
+        ctx.fillStyle = 'rgba(12,9,7,0.55)';
+        ctx.fillRect(sx, slotY, slotW, slotH);
+        ctx.strokeStyle = 'rgba(216,168,78,0.34)';
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(sx + 0.5, slotY + 0.5, slotW - 1, slotH - 1);
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.75;
+        drawPixelText(String(si + 1), sx + 11, slotY + 13, 10, 'rgba(216,168,78,0.9)', { shadow: false });
+        drawPixelText('暗置', sx + slotW / 2, slotY + slotH / 2 + 1, 11, 'rgba(231,214,180,0.52)', { align: 'center', shadow: false });
+        ctx.restore();
+      }
       const em = copy.rowEmpty || { text: '（等待暗置举证…）', size: 15, col: '#7E93B0' };
-      drawPixelText(em.text, W / 2, cy + rh / 2, em.size, em.col, { align: 'center', shadow: false });
+      drawPixelText(em.text, W / 2, slotY + slotH + 17, em.size, em.col, { align: 'center', shadow: false });
     }
     /* Task 6：竖屏展开态下，行区右上提供「▲ 收起」小按钮（仿 toggleLog 折叠模式；
      * 放 W-100 处避开联机日志按钮 x=W-42 位） */
