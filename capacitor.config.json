@@ -1,0 +1,11 @@
+{
+  "appId": "com.y22t19053.heliuspect",
+  "appName": "合理怀疑",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
