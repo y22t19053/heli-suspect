@@ -193,7 +193,7 @@ test('单机：进入对局自动推进 + 渲染截屏', async (t) => {
 test('联机：大厅 + 单人房 + 开局自动推进 + 渲染截屏', async (t) => {
   if (!browser) return t.skip('前置资源缺失（playwright-core / 浏览器 / 服务器）');
   const { page, errors } = await newPage();
-  await page.goto(BASE + '/');
+  await page.goto(BASE + '/classic.html');
   await page.waitForTimeout(1200);
   await page.screenshot({ path: shot('mp_lobby.png') });
   // 创建单人房（AI 补位）
@@ -529,7 +529,7 @@ test('评审9.3：同种子同操作序列 → 双端 buy 阶段像素级一致'
     // 跳过联机新手教程横幅（renderTutorialBanner 只联机端有、覆盖顶部中央，单机无 → 排除此设计差异）
     try { localStorage.setItem('elec_tut_done', '1'); } catch (e) { /* 忽略 */ }
   });
-  await mp.page.goto(BASE + '/');
+  await mp.page.goto(BASE + '/classic.html');
   await mp.page.waitForTimeout(1200);
   const mpState = await driveMpToBuy(mp.page);
   await mp.page.waitForTimeout(3200);

@@ -5,6 +5,8 @@
 > 2. **不常开电脑**：Oracle Cloud **Always Free** ARM 机器，长期在线、WebSocket 稳定、0 元。
 > 3. **最省事**：Render Free，连上后 WebSocket 会保持活跃；没人玩时会休眠，第一次连要等冷启动。
 > 4. **APK/EXE**：这个项目是 Node + Socket.IO + Canvas 的 Web 游戏，不能像 Godot 那样直接导出。EXE 可以内置本地服务器；APK 是客户端，联机仍需一台 PC/云主机当服务端。
+>
+> **路由**：`/` = 审判之塔（单人 Roguelike，默认首页）；`/classic.html` = 联机经典版；`/singleplayer.html` = 旧版单机。
 
 ---
 

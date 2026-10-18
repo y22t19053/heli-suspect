@@ -3,264 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>合理怀疑 · 世纪审判联机版</title>
-<meta name="description" content="虚构「米合众国」联邦巡回法庭卡牌对抗——举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
-<meta name="theme-color" content="#0E0F1A">
-<meta property="og:title" content="合理怀疑 · 世纪审判联机版">
-<meta property="og:description" content="法庭卡牌对抗：举证、审议、排名、先例，5 轮庭审决出世纪审判的胜诉方。">
-<meta property="og:type" content="website">
-<meta property="og:image" content="/favicon.svg">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg">
-<link rel="manifest" href="/manifest.json">
-<!-- 字体：书法标题体 + 思源宋体副标 + 思源黑体正文（评审 P2：非阻塞加载，离线/墙外静默回退系统字体） -->
+<title>合理怀疑：审判之塔</title>
+<meta name="theme-color" content="#08090B">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@700;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@700;900&family=Noto+Sans+SC:wght@400;500;700;900&display=swap"></noscript>
-<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@600;700;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="tower.css">
 </head>
 <body>
-
-<!-- 局内设置入口：不打断联机对局，只覆盖设置面板 -->
-<button id="btn-ingame-settings" class="ingame-gear hidden" title="设置" aria-label="打开设置">⚙ 设置</button>
-
-<!-- ================= 主菜单（HTML 层） ================= -->
-<div id="menu" class="overlay">
-  <!-- 法庭舞台背景：穹顶剪影 + 立柱 + 聚光灯 + 敲锤开场 -->
-  <div class="court-stage" aria-hidden="true">
-    <svg class="court-svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
-      <defs>
-        <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#10131f"/>
-          <stop offset="1" stop-color="#05060c"/>
-        </linearGradient>
-        <radialGradient id="lampGrad" cx="0.5" cy="0" r="0.9">
-          <stop offset="0" stop-color="rgba(233,196,106,0.28)"/>
-          <stop offset="0.6" stop-color="rgba(233,196,106,0.06)"/>
-          <stop offset="1" stop-color="rgba(0,0,0,0)"/>
-        </radialGradient>
-      </defs>
-      <!-- 背景墙 -->
-      <rect width="1440" height="900" fill="url(#wallGrad)"/>
-      <!-- 穹顶拱门 -->
-      <path d="M0 900 L0 470 Q720 40 1440 470 L1440 900 Z" fill="rgba(6,8,16,0.9)"/>
-      <path d="M60 900 L60 470 Q720 70 1380 470 L1380 900 Z" fill="none" stroke="rgba(233,196,106,0.25)" stroke-width="3"/>
-      <!-- 中央法官席剪影 -->
-      <rect x="620" y="430" width="200" height="110" rx="6" fill="#0b0d18"/>
-      <rect x="640" y="300" width="160" height="140" rx="4" fill="#0d0f1c"/>
-      <circle cx="720" cy="260" r="46" fill="#0f1220"/>
-      <!-- 四根立柱 -->
-      <g fill="#0c0e1a" stroke="rgba(233,196,106,0.18)" stroke-width="2">
-        <rect x="170" y="150" width="46" height="750"/>
-        <rect x="1224" y="150" width="46" height="750"/>
-        <rect x="330" y="260" width="34" height="640"/>
-        <rect x="1076" y="260" width="34" height="640"/>
-      </g>
-      <!-- 柱头装饰 -->
-      <g fill="#131628">
-        <rect x="152" y="128" width="82" height="26" rx="4"/>
-        <rect x="1206" y="128" width="82" height="26" rx="4"/>
-        <rect x="318" y="238" width="58" height="26" rx="4"/>
-        <rect x="1064" y="238" width="58" height="26" rx="4"/>
-      </g>
-      <!-- 旁听席剪影（左右两排） -->
-      <g fill="rgba(14,17,30,0.95)">
-        <rect x="90" y="620" width="200" height="120" rx="4"/>
-        <rect x="1150" y="620" width="200" height="120" rx="4"/>
-      </g>
-      <!-- 顶部聚光灯锥 -->
-      <path d="M470 0 L700 470 L760 470 L970 0 Z" fill="url(#lampGrad)"/>
-    </svg>
-    <div class="court-gavel"><span><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span></div>
-    <div class="court-gavel-line"></div>
-    <div class="court-vignette"></div>
-  </div>
-
-  <div class="panel glass court-file">
-    <div class="file-header">
-      <div class="file-stamp">联邦巡回法庭<br><b>案卷</b></div>
-      <div class="logo-row">
-        <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10v24"/><path d="M12 36h24"/><path d="M13 16h22"/><path d="M13 16l-7 8"/><path d="M35 16l7 8"/><path d="M4 28q6 8 12 0"/><path d="M32 28q6 8 12 0"/></g></svg></span>
-        <div class="logo">合理怀疑</div>
-        <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span>
-      </div>
-      <div class="logo-sub">THE INK COURT · 世纪审判 · 联机版</div>
-      <div class="grass-divider"></div>
-    </div>
-
-    <div class="file-body">
-      <section class="file-left">
-        <div class="file-label">律师档案 / COUNSEL</div>
-        <div id="profile-card" class="profile-card">
-          <div class="profile-top">
-            <span id="pf-avatar" class="pf-avatar">衡</span>
-            <div class="pf-info">
-              <div class="pf-name-row"><span id="pf-name" class="pf-name">初出茅庐</span><span id="pf-title" class="pf-title">实习律师</span></div>
-              <div class="pf-xp-bar"><div id="pf-xp-fill" class="pf-xp-fill" style="width:0%"></div></div>
-              <div class="pf-xp-text"><span id="pf-lv">Lv.1</span><span id="pf-xp">0 / 100</span></div>
-            </div>
-            <span id="pf-wins" class="pf-wins" title="胜场">胜场 0</span>
-          </div>
-        </div>
-
-        <button id="btn-solo" class="btn gold solo-btn">单 人 模 式 <small>AI 补位 · 直接开庭</small></button>
-
-        <div class="menu-extra">
-          <button id="btn-tutorial" class="btn half">新 手 教 程</button>
-          <button id="btn-glossary" class="btn half">术 语 百 科</button>
-          <button id="btn-about" class="btn half">关 于</button>
-          <button id="btn-settings" class="btn half">设 置</button>
-        </div>
-
-        <div class="file-empty">
-          <div class="file-empty-title">“宁可放过一个坏人，<br>不可冤枉一个好人。”</div>
-          <div class="file-empty-sub">—— 法庭速记 · 第 1 页</div>
-        </div>
-
-        <div class="hint">共 5 轮庭审。选律师 → 定次序 → 抽议题 → 抽证据 → 调查取证 → 暗置举证 → 亮出 → 审议 → 排名 → 结算。<br>快捷键：<b>空格</b>=确认 · <b>1-9</b>=选卡 · <b>F</b>=全屏 · <b>M</b>=静音</div>
-        <div class="version-tag">合理怀疑 · 世纪审判 v1.2.0 · THE INK COURT</div>
-      </section>
-
-      <section class="file-right">
-        <div class="file-label">开庭准备 / CASE SETUP</div>
-        <div class="field">
-          <label>你的昵称</label>
-          <input id="inp-name" maxlength="12" placeholder="输入昵称">
-        </div>
-        <div class="row">
-          <label>座位数</label>
-          <select id="sel-seats">
-            <option value="2">2 人</option>
-            <option value="3">3 人</option>
-            <option value="4">4 人</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>种子码（可选，留空随机）</label>
-          <input id="inp-seed" maxlength="20" placeholder="同一种子 = 同一对局">
-        </div>
-        <div class="field">
-          <label>房间密码（可选，留空公开）</label>
-          <input id="inp-pass" maxlength="12" placeholder="创建或加入时填写">
-        </div>
-        <button id="btn-create" class="btn primary">创 建 房 间 <small>→ 等待朋友入席</small></button>
-
-        <div class="divider">── 加入已有庭审 ──</div>
-
-        <div class="field">
-          <label>房间代码</label>
-          <input id="inp-code" maxlength="4" placeholder="ABCD" style="text-transform:uppercase">
-        </div>
-        <button id="btn-join" class="btn">加 入 房 间</button>
-        <div class="join-row">
-          <button id="btn-quickjoin" class="btn half">快 速 加 入</button>
-          <button id="btn-spectate" class="btn half">旁 观 房 间</button>
-        </div>
-        <div id="menu-msg" class="msg"></div>
-      </section>
-    </div>
-  </div>
-</div>
-<!-- ================= 设置弹窗（P1-5 音画设置） ================= -->
-<div id="settings" class="overlay hidden">
-  <div class="panel glass narrow">
-    <div class="logo-row"><span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="24" cy="24" r="7"/><path d="M24 6v6M24 36v6M6 24h6M36 24h6M12 12l4 4M32 32l4 4M36 12l-4 4M16 32l-4 4"/></g></svg></span><div class="logo small">设 置</div><span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span></div>
-    <div class="grass-divider"></div>
-    <div class="set-group">
-      <div class="set-row">
-        <label>音乐音量</label>
-        <input id="set-music" type="range" min="0" max="100" value="50">
-      </div>
-      <div class="set-row">
-        <label>音效音量</label>
-        <input id="set-sfx" type="range" min="0" max="100" value="80">
-      </div>
-      <div class="set-row">
-        <label>敲锤开场演出</label>
-        <button id="set-gavel" class="btn half">开</button>
-      </div>
-      <div class="set-row">
-        <label>画质（粒子密度）</label>
-        <select id="set-quality">
-          <option value="high">高（满特效）</option>
-          <option value="low">低（省电）</option>
-        </select>
-      </div>
-      <div class="set-row">
-        <label>快速模式（1 轮试玩）</label>
-        <button id="set-quick" class="btn half">开</button>
-      </div>
-      <div class="set-row">
-        <label>全屏模式</label>
-        <button id="set-fullscreen" class="btn half">进入全屏</button>
-      </div>
-      <div class="set-row set-row-server">
-        <label>服务器地址</label>
-        <input id="set-server" class="set-server" type="url" placeholder="留空 = 当前服务器">
-        <button id="set-server-apply" class="btn half">应用</button>
-      </div>
-      <div class="set-hint">局域网：http://192.168.x.x:3000 · 云端：https://你的域名。改完会重载页面。</div>
-    </div>
-    <div id="settings-msg" class="msg"></div>
-    <button id="settings-close" class="btn primary">保 存</button>
-  </div>
+<div id="bg" aria-hidden="true">
+  <div class="bg-curtain left"></div>
+  <div class="bg-curtain right"></div>
+  <div class="bg-arch"></div>
+  <div class="bg-bench"></div>
+  <div class="bg-gallery"></div>
+  <div class="bg-floor"></div>
+  <div class="bg-vignette"></div>
 </div>
 
-<!-- ================= 关于弹窗 ================= -->
-<div id="about" class="overlay hidden">
-  <div class="panel about-panel">
-    <div class="logo-row">
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10v24"/><path d="M12 36h24"/><path d="M13 16h22"/><path d="M13 16l-7 8"/><path d="M35 16l7 8"/><path d="M4 28q6 8 12 0"/><path d="M32 28q6 8 12 0"/></g></svg></span>
-      <div class="logo small">关 于</div>
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg></span>
+<div id="app">
+  <header id="topbar" class="topbar hidden">
+    <div class="brand">
+      <span class="brand-mark">⚖</span>
+      <div><b>合理怀疑</b><small>审判之塔</small></div>
     </div>
-    <div class="logo-sub">ABOUT · 版本信息</div>
-    <div class="grass-divider"></div>
-    <div class="about-body">
-      <div class="about-title">合理怀疑 · 世纪审判联机版</div>
-      <div class="about-ver">版本 v1.1.0</div>
-      <p>虚构「米合众国」联邦巡回法庭体系，四方法律团队对抗。
-      每轮 16 步：选律师→定次序→抽议题→抽证据→调查取证（传唤/留证/换证）→暗置举证→亮出（证据排除）→审议（①②③ 技能）→排名→结算陪审团倾向→整理→发放酬金。</p>
-      <p>5 轮庭审后陪审团倾向最高者胜诉；先例确立或陪审团集满 3 人可提前胜诉。</p>
-      <p class="about-note">本游戏为虚构作品，与任何现实人物、组织、事件无关。</p>
+    <div class="run-stats">
+      <span class="stat hp"><i>❤</i><b id="stat-hp">--</b></span>
+      <span class="stat gold"><i>◈</i><b id="stat-gold">--</b></span>
+      <span class="stat floor"><i>⌂</i><b id="stat-floor">--</b></span>
     </div>
-    <button id="about-close" class="btn primary">关 闭</button>
-  </div>
+    <div class="top-actions">
+      <button class="icon-btn" data-act="deck" title="牌组">牌组</button>
+      <button class="icon-btn" data-act="menu" title="菜单">菜单</button>
+    </div>
+  </header>
+
+  <main id="screen" aria-live="polite"></main>
+  <div id="toast" class="toast"></div>
 </div>
 
-<!-- ================= 大厅（HTML 层） ================= -->
-<div id="lobby" class="overlay hidden">
-  <div class="panel">
-    <div class="logo-row">
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6h14l8 8v26H14z"/><path d="M28 6v8h8"/><path d="M19 24h12"/><path d="M19 31h12"/></g></svg></span>
-      <div class="logo small">联 机 大 厅</div>
-      <span class="logo-ico"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="12" width="30" height="9"/><path d="M11 21v17h26V21"/><path d="M20 27l4 4 6-8"/></g></svg></span>
-    </div>
-    <div class="logo-sub">WAITING ROOM</div>
-    <div class="grass-divider"></div>
-    <div class="room-code"><span class="rc-label"><svg viewBox="0 0 48 48" width="1em" height="1em" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="4" width="28" height="14" rx="4"/><path d="M24 20v14"/><path d="M14 36h20"/></g></svg> 房间代码</span> <span id="room-code">----</span></div>
-    <div id="seat-list" class="seat-list"></div>
-    <div class="msg" id="lobby-msg"></div>
-    <button id="btn-start" class="btn primary hidden">开 始 对 局</button>
-    <button id="btn-leave" class="btn">离 开 房 间</button>
-  </div>
-</div>
-
-<!-- ================= 游戏画布 ================= -->
-<canvas id="game" class="hidden"></canvas>
-
-<div id="toast-wrap"></div>
-
-<script src="/socket.io/socket.io.js"></script>
-<script src="/shared/game-core.js"></script>
-<script src="/shared/flavor.js"></script>
-<script src="/shared/theme.js"></script>
-<script src="/shared/draw-primitives.js"></script>
-<script src="/shared/ui-kit.js"></script>
-<script src="/shared/render-core.js"></script>
-<script src="UIPresenter.js"></script>
-<script src="client.js"></script>
+<script src="tower.js"></script>
 </body>
 </html>

@@ -1,18 +1,34 @@
-# 合理怀疑 · 世纪审判
+# 合理怀疑 · 世纪审判 / 审判之塔
 
-法庭对抗卡牌游戏。检察官与辩护律师围绕一桩世纪大案对簿公堂，用证词牌、事件牌与角色技能左右陪审团的支持度。
+法庭对抗卡牌游戏。现在有两个入口：
+
+- **审判之塔（默认 `/`）**：单人 Roguelike 牌组构筑。8 层庭审、3 位律师、20 张证词、地图/商店/休整/精英/Boss。
+- **联机经典版（`/classic.html`）**：原来的 2–4 人联机法庭对战。
 
 ## 快速开始
 
 ```bash
-npm install        # 安装依赖（socket.io）
-npm start          # 启动联机服务器，默认 http://localhost:3000
+npm install
+npm start          # http://localhost:3000
 ```
 
-浏览器打开后：
+浏览器打开：
 
-- 单人模式：无需服务器，直接打开 `singleplayer.html`（根目录）即可游玩（本文件为构建产物，源码见 `public/singleplayer.html` 对应的内联构建）。
-- 联机模式：`npm start` 后访问 `http://<主机>:3000`，创建房间并分享房间号，支持 AI 托管、断线重连、房主转移。
+- `/`：审判之塔（新 UI，单人，无需服务器也能玩）。
+- `/classic.html`：联机经典版，创建房间并分享房间号。
+- `/singleplayer.html`：旧版单机庭审。
+
+## 审判之塔
+
+- **地图**：8 层，战斗 / 精英 / 休整 / 商店 / 事件 / Boss。
+- **战斗**：能量、抽牌/弃牌、手牌、敌人意图、格挡、破绽/弱点、力量、陪审团。
+- **构筑**：每场战斗后三选一证词；商店买牌；休整回血或加最大生命。
+- **三位律师**：公诉人（进攻/法槌）、辩护人（防御/案卷）、公益律师（陪审/笔记）。
+- **素材**：Kenney Fantasy UI Borders（CC0）框体；其余插画为程序化 CSS/SVG，不使用《杀戮尖塔》《金铲铲之战》的版权素材。
+
+## 联机经典版
+
+`npm start` 后访问 `/classic.html`，其余规则不变。
 
 ## 免费服务器 / 内网联机 / 封包
 
@@ -24,10 +40,10 @@ npm start          # 启动联机服务器，默认 http://localhost:3000
 - Render Free（`render.yaml`）
 - Oracle Cloud Always Free（2 OCPU / 12GB）
 - `Dockerfile` 可直接部署
-- Windows 桌面版已构建：`dist/合理怀疑-世纪审判-1.2.0-win64.exe`（双击即玩，内置本地服务器，可当局域网主机）
-- Android APK 已构建：`dist/合理怀疑-1.2.0.apk`（离线单机 + 联机连服务器）
+- Windows 桌面版已构建：`dist/合理怀疑-世纪审判-1.2.0-win64.exe`（双击即玩，默认进入审判之塔；也内置本地服务器）
+- Android APK 已构建：`dist/合理怀疑-1.2.0.apk`（审判之塔离线 + 联机连服务器）
 - GitHub：<https://github.com/y22t19053/heli-suspect>
-- APK/PWA 的封包取舍
+- 素材：Kenney Fantasy UI Borders（CC0），见 [`ASSETS.md`](ASSETS.md)
 
 ## Android APK
 
@@ -39,8 +55,9 @@ dist/合理怀疑-1.2.0.apk
 - 版本：1.2.0（versionCode 2）
 - debug 签名，侧载安装；不需要上架
 - 打开后：
-  - **单机模式（离线）**：直接玩 `singleplayer.html`
-  - **联机模式**：默认连 Render；首次使用可在首页改服务器地址
+  - **审判之塔（新）**：本地离线单人 Roguelike
+  - **经典单机模式**：旧版单机庭审
+  - **联机模式**：默认连 Render 的 `/classic.html` 联机大厅
 - 默认服务器地址：`https://heli-suspect.onrender.com`
 - Render 免费服务冷启动时，第一次进入可能要等 30–60 秒
 

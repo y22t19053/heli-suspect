@@ -5,6 +5,8 @@ node_modules/
 _shots/
 *.png
 !electron/icon.png
+!public/assets/ui/*.png
+!www/assets/ui/*.png
 
 # 桌面版构建产物
 dist/
